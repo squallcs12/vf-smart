@@ -267,11 +267,223 @@ void setupWebServer() {
     request->send(200, "application/json", getCarStatusJSON());
   });
 
+  // POST /car/lock - Lock the car
+  server.on("/car/lock", HTTP_POST, [](AsyncWebServerRequest *request){
+    vf3_car_lock = HIGH;
+    vf3_car_unlock = LOW;
+    digitalWrite(VF3_CAR_LOCK, HIGH);
+    digitalWrite(VF3_CAR_UNLOCK, LOW);
+
+    JsonDocument doc;
+    doc["success"] = true;
+    doc["message"] = "Car locked";
+    doc["car_lock"] = vf3_car_lock;
+    doc["car_unlock"] = vf3_car_unlock;
+
+    String output;
+    serializeJson(doc, output);
+    request->send(200, "application/json", output);
+  });
+
+  // POST /car/unlock - Unlock the car
+  server.on("/car/unlock", HTTP_POST, [](AsyncWebServerRequest *request){
+    vf3_car_lock = LOW;
+    vf3_car_unlock = HIGH;
+    digitalWrite(VF3_CAR_LOCK, LOW);
+    digitalWrite(VF3_CAR_UNLOCK, HIGH);
+
+    JsonDocument doc;
+    doc["success"] = true;
+    doc["message"] = "Car unlocked";
+    doc["car_lock"] = vf3_car_lock;
+    doc["car_unlock"] = vf3_car_unlock;
+
+    String output;
+    serializeJson(doc, output);
+    request->send(200, "application/json", output);
+  });
+
+  // POST /car/accessory-power - Toggle accessory power
+  server.on("/car/accessory-power", HTTP_POST, [](AsyncWebServerRequest *request){
+    String state = "";
+    if (request->hasParam("state", true)) {
+      state = request->getParam("state", true)->value();
+    }
+
+    if (state == "on") {
+      vf3_accessory_power = HIGH;
+      digitalWrite(VF3_ACCESSORY_POWER, HIGH);
+    } else if (state == "off") {
+      vf3_accessory_power = LOW;
+      digitalWrite(VF3_ACCESSORY_POWER, LOW);
+    } else if (state == "toggle") {
+      vf3_accessory_power = !vf3_accessory_power;
+      digitalWrite(VF3_ACCESSORY_POWER, vf3_accessory_power);
+    } else {
+      JsonDocument doc;
+      doc["success"] = false;
+      doc["message"] = "Invalid state. Use 'on', 'off', or 'toggle'";
+
+      String output;
+      serializeJson(doc, output);
+      request->send(400, "application/json", output);
+      return;
+    }
+
+    JsonDocument doc;
+    doc["success"] = true;
+    doc["message"] = "Accessory power updated";
+    doc["accessory_power"] = vf3_accessory_power;
+
+    String output;
+    serializeJson(doc, output);
+    request->send(200, "application/json", output);
+  });
+
+  // POST /car/windows/close - Close windows (30 second timer)
+  server.on("/car/windows/close", HTTP_POST, [](AsyncWebServerRequest *request){
+    window_close_timer = millis();
+    digitalWrite(VF3_WINDOW_LEFT, HIGH);
+    digitalWrite(VF3_WINDOW_RIGHT, HIGH);
+
+    JsonDocument doc;
+    doc["success"] = true;
+    doc["message"] = "Windows closing for 30 seconds";
+    doc["window_close_active"] = true;
+    doc["duration_ms"] = WINDOW_CLOSE_DURATION;
+
+    String output;
+    serializeJson(doc, output);
+    request->send(200, "application/json", output);
+  });
+
+  // POST /car/windows/stop - Stop window operation
+  server.on("/car/windows/stop", HTTP_POST, [](AsyncWebServerRequest *request){
+    window_close_timer = 0;
+    digitalWrite(VF3_WINDOW_LEFT, LOW);
+    digitalWrite(VF3_WINDOW_RIGHT, LOW);
+
+    JsonDocument doc;
+    doc["success"] = true;
+    doc["message"] = "Window operation stopped";
+    doc["window_close_active"] = false;
+
+    String output;
+    serializeJson(doc, output);
+    request->send(200, "application/json", output);
+  });
+
+  // POST /car/buzzer - Control buzzer
+  server.on("/car/buzzer", HTTP_POST, [](AsyncWebServerRequest *request){
+    String state = "";
+    int duration = 0;
+
+    if (request->hasParam("state", true)) {
+      state = request->getParam("state", true)->value();
+    }
+    if (request->hasParam("duration", true)) {
+      duration = request->getParam("duration", true)->value().toInt();
+    }
+
+    if (state == "on") {
+      digitalWrite(VF3_BUZZER, HIGH);
+    } else if (state == "off") {
+      digitalWrite(VF3_BUZZER, LOW);
+    } else if (state == "beep" && duration > 0) {
+      digitalWrite(VF3_BUZZER, HIGH);
+      delay(duration);
+      digitalWrite(VF3_BUZZER, LOW);
+    } else {
+      JsonDocument doc;
+      doc["success"] = false;
+      doc["message"] = "Invalid parameters. Use state='on'/'off' or state='beep' with duration";
+
+      String output;
+      serializeJson(doc, output);
+      request->send(400, "application/json", output);
+      return;
+    }
+
+    JsonDocument doc;
+    doc["success"] = true;
+    doc["message"] = "Buzzer control executed";
+
+    String output;
+    serializeJson(doc, output);
+    request->send(200, "application/json", output);
+  });
+
+  // POST /car/turn-signal - Control turn signals
+  server.on("/car/turn-signal", HTTP_POST, [](AsyncWebServerRequest *request){
+    String side = "";
+    String state = "";
+
+    if (request->hasParam("side", true)) {
+      side = request->getParam("side", true)->value();
+    }
+    if (request->hasParam("state", true)) {
+      state = request->getParam("state", true)->value();
+    }
+
+    bool validRequest = false;
+
+    if (side == "left" && state == "on") {
+      digitalWrite(VF3_TURN_SIGNAL_L, HIGH);
+      validRequest = true;
+    } else if (side == "left" && state == "off") {
+      digitalWrite(VF3_TURN_SIGNAL_L, LOW);
+      validRequest = true;
+    } else if (side == "right" && state == "on") {
+      digitalWrite(VF3_TURN_SIGNAL_R, HIGH);
+      validRequest = true;
+    } else if (side == "right" && state == "off") {
+      digitalWrite(VF3_TURN_SIGNAL_R, LOW);
+      validRequest = true;
+    } else if (side == "both" && state == "off") {
+      digitalWrite(VF3_TURN_SIGNAL_L, LOW);
+      digitalWrite(VF3_TURN_SIGNAL_R, LOW);
+      validRequest = true;
+    }
+
+    if (!validRequest) {
+      JsonDocument doc;
+      doc["success"] = false;
+      doc["message"] = "Invalid parameters. Use side='left'/'right'/'both' and state='on'/'off'";
+
+      String output;
+      serializeJson(doc, output);
+      request->send(400, "application/json", output);
+      return;
+    }
+
+    JsonDocument doc;
+    doc["success"] = true;
+    doc["message"] = "Turn signal updated";
+    doc["side"] = side;
+    doc["state"] = state;
+
+    String output;
+    serializeJson(doc, output);
+    request->send(200, "application/json", output);
+  });
+
   // Root endpoint - Simple info page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     String html = "<!DOCTYPE html><html><head><title>VF3 Smart</title></head><body>";
     html += "<h1>VinFast VF3 Smart Control System</h1>";
-    html += "<p>Access car status at: <a href='/car/status'>/car/status</a></p>";
+    html += "<h2>API Endpoints</h2>";
+    html += "<h3>Status</h3>";
+    html += "<ul><li>GET <a href='/car/status'>/car/status</a> - Get car status</li></ul>";
+    html += "<h3>Control</h3>";
+    html += "<ul>";
+    html += "<li>POST /car/lock - Lock the car</li>";
+    html += "<li>POST /car/unlock - Unlock the car</li>";
+    html += "<li>POST /car/accessory-power - Control accessory power (state=on/off/toggle)</li>";
+    html += "<li>POST /car/windows/close - Close windows</li>";
+    html += "<li>POST /car/windows/stop - Stop windows</li>";
+    html += "<li>POST /car/buzzer - Control buzzer (state=on/off/beep, duration=ms)</li>";
+    html += "<li>POST /car/turn-signal - Control turn signals (side=left/right/both, state=on/off)</li>";
+    html += "</ul>";
     html += "</body></html>";
     request->send(200, "text/html", html);
   });

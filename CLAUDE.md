@@ -111,7 +111,9 @@ The system includes an async web server that exposes car status via HTTP endpoin
 
 ### API Endpoints
 
-#### GET /car/status
+#### Status Endpoints
+
+##### GET /car/status
 Returns complete car status as JSON.
 
 **Response Structure:**
@@ -155,19 +157,166 @@ Returns complete car status as JSON.
 }
 ```
 
-#### GET /
-Returns a simple HTML info page with link to `/car/status`.
+##### GET /
+Returns a simple HTML info page with links to all API endpoints.
+
+#### Control Endpoints
+
+##### POST /car/lock
+Lock the car.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Car locked",
+  "car_lock": 1,
+  "car_unlock": 0
+}
+```
+
+##### POST /car/unlock
+Unlock the car.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Car unlocked",
+  "car_lock": 0,
+  "car_unlock": 1
+}
+```
+
+##### POST /car/accessory-power
+Control accessory power. Requires `state` parameter.
+
+**Parameters:**
+- `state` (required): `on`, `off`, or `toggle`
+
+**Example Request:**
+```bash
+curl -X POST http://192.168.4.1/car/accessory-power -d "state=on"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Accessory power updated",
+  "accessory_power": 1
+}
+```
+
+##### POST /car/windows/close
+Start closing windows (30-second timer).
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Windows closing for 30 seconds",
+  "window_close_active": true,
+  "duration_ms": 30000
+}
+```
+
+##### POST /car/windows/stop
+Stop window operation immediately.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Window operation stopped",
+  "window_close_active": false
+}
+```
+
+##### POST /car/buzzer
+Control the buzzer/alarm.
+
+**Parameters:**
+- `state` (required): `on`, `off`, or `beep`
+- `duration` (optional): Duration in milliseconds for `beep` mode
+
+**Example Requests:**
+```bash
+# Turn on buzzer
+curl -X POST http://192.168.4.1/car/buzzer -d "state=on"
+
+# Beep for 500ms
+curl -X POST http://192.168.4.1/car/buzzer -d "state=beep&duration=500"
+
+# Turn off buzzer
+curl -X POST http://192.168.4.1/car/buzzer -d "state=off"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Buzzer control executed"
+}
+```
+
+##### POST /car/turn-signal
+Control turn signals.
+
+**Parameters:**
+- `side` (required): `left`, `right`, or `both`
+- `state` (required): `on` or `off`
+
+**Example Requests:**
+```bash
+# Turn on left turn signal
+curl -X POST http://192.168.4.1/car/turn-signal -d "side=left&state=on"
+
+# Turn off both turn signals
+curl -X POST http://192.168.4.1/car/turn-signal -d "side=both&state=off"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Turn signal updated",
+  "side": "left",
+  "state": "on"
+}
+```
 
 ### Testing the API
 
 ```bash
-# Connect to VF3_SMART WiFi network
-# Then access the API:
+# Connect to VF3_SMART WiFi network (password: vf3smart123)
+# Then test the APIs:
 
 # Get car status
 curl http://192.168.4.1/car/status
 
-# View in browser
+# Lock the car
+curl -X POST http://192.168.4.1/car/lock
+
+# Unlock the car
+curl -X POST http://192.168.4.1/car/unlock
+
+# Toggle accessory power
+curl -X POST http://192.168.4.1/car/accessory-power -d "state=toggle"
+
+# Close windows
+curl -X POST http://192.168.4.1/car/windows/close
+
+# Stop windows
+curl -X POST http://192.168.4.1/car/windows/stop
+
+# Beep buzzer for 1 second
+curl -X POST http://192.168.4.1/car/buzzer -d "state=beep&duration=1000"
+
+# Turn on left turn signal
+curl -X POST http://192.168.4.1/car/turn-signal -d "side=left&state=on"
+
+# View API documentation in browser
 open http://192.168.4.1
 ```
 
