@@ -652,17 +652,17 @@ void setupWebServer() {
     html += "input { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; border: 1px solid #ddd; border-radius: 5px; }";
     html += "</style>";
     html += "</head><body>";
-    html += "<h1>VF3 Smart Control</h1>";
+    html += "<h1>\xF0\x9F\x9A\x97 VF3 Smart Control</h1>";
 
     html += "<div class='section'>";
-    html += "<h2>Lock / Unlock</h2>";
+    html += "<h2>\xF0\x9F\x94\x90 Lock / Unlock</h2>";
     html += "<div class='button-group'>";
-    html += "<button class='btn-primary' onclick='sendCommand(\"/car/lock\", \"POST\")'>Lock Car</button>";
-    html += "<button class='btn-secondary' onclick='sendCommand(\"/car/unlock\", \"POST\")'>Unlock Car</button>";
+    html += "<button class='btn-primary' onclick='sendCommand(\"/car/lock\", \"POST\")'>\xF0\x9F\x94\x92 Lock Car</button>";
+    html += "<button class='btn-secondary' onclick='sendCommand(\"/car/unlock\", \"POST\")'>\xF0\x9F\x94\x93 Unlock Car</button>";
     html += "</div></div>";
 
     html += "<div class='section'>";
-    html += "<h2>Accessory Power</h2>";
+    html += "<h2>\xE2\x9A\xA1 Accessory Power</h2>";
     html += "<div class='button-group'>";
     html += "<button class='btn-secondary' onclick='sendCommand(\"/car/accessory-power\", \"POST\", \"state=on\")'>Power ON</button>";
     html += "<button class='btn-danger' onclick='sendCommand(\"/car/accessory-power\", \"POST\", \"state=off\")'>Power OFF</button>";
@@ -670,30 +670,30 @@ void setupWebServer() {
     html += "</div></div>";
 
     html += "<div class='section'>";
-    html += "<h2>Windows</h2>";
+    html += "<h2>\xF0\x9F\xAA\x9F Windows</h2>";
     html += "<div class='button-group'>";
     html += "<button class='btn-primary' onclick='sendCommand(\"/car/windows/close\", \"POST\")'>Close Windows (30s)</button>";
-    html += "<button class='btn-danger' onclick='sendCommand(\"/car/windows/stop\", \"POST\")'>Stop</button>";
+    html += "<button class='btn-danger' onclick='sendCommand(\"/car/windows/stop\", \"POST\")'>\xE2\x8F\xB9 Stop</button>";
     html += "</div></div>";
 
     html += "<div class='section'>";
-    html += "<h2>Buzzer</h2>";
+    html += "<h2>\xF0\x9F\x94\x94 Buzzer</h2>";
     html += "<div class='button-group'>";
     html += "<button class='btn-warning' onclick='sendCommand(\"/car/buzzer\", \"POST\", \"state=beep&duration=500\")'>Beep (0.5s)</button>";
     html += "<button class='btn-warning' onclick='sendCommand(\"/car/buzzer\", \"POST\", \"state=beep&duration=1000\")'>Beep (1s)</button>";
     html += "</div></div>";
 
     html += "<div class='section'>";
-    html += "<h2>Turn Signals</h2>";
+    html += "<h2>\xF0\x9F\x9A\xA6 Turn Signals</h2>";
     html += "<div class='button-group'>";
-    html += "<button class='btn-warning' onclick='sendCommand(\"/car/turn-signal\", \"POST\", \"side=left&state=on\")'>Left ON</button>";
-    html += "<button class='btn-warning' onclick='sendCommand(\"/car/turn-signal\", \"POST\", \"side=right&state=on\")'>Right ON</button>";
+    html += "<button class='btn-warning' onclick='sendCommand(\"/car/turn-signal\", \"POST\", \"side=left&state=on\")'>\xE2\xAC\x85 Left ON</button>";
+    html += "<button class='btn-warning' onclick='sendCommand(\"/car/turn-signal\", \"POST\", \"side=right&state=on\")'>Right ON \xE2\x9E\xA1</button>";
     html += "<button class='btn-danger' onclick='sendCommand(\"/car/turn-signal\", \"POST\", \"side=both&state=off\")'>All OFF</button>";
     html += "</div></div>";
 
     html += "<div class='section'>";
-    html += "<h2>Car Status</h2>";
-    html += "<button class='btn-primary' onclick='getStatus()' style='width: 100%;'>Refresh Status</button>";
+    html += "<h2>\xF0\x9F\x93\x8A Car Status</h2>";
+    html += "<button class='btn-primary' onclick='getStatus()' style='width: 100%;'>\xF0\x9F\x94\x84 Refresh Status</button>";
     html += "<div class='status' id='status'>Click 'Refresh Status' to load car data...</div>";
     html += "</div>";
 
@@ -726,17 +726,17 @@ void setupWebServer() {
     html += "    .then(r => r.json())";
     html += "    .then(data => {";
     html += "      let html = '';";
-    html += "      html += '<div class=\"status-item\"><strong>Locks:</strong> ' + (data.controls.car_lock ? 'LOCKED' : 'UNLOCKED') + '</div>';";
-    html += "      html += '<div class=\"status-item\"><strong>Accessory Power:</strong> ' + (data.controls.accessory_power ? 'ON' : 'OFF') + '</div>';";
-    html += "      html += '<div class=\"status-item\"><strong>Windows:</strong> ' + (data.window_close_active ? 'Closing (' + Math.round(data.window_close_remaining_ms/1000) + 's)' : 'Idle') + '</div>';";
-    html += "      html += '<div class=\"status-item\"><strong>Doors:</strong> FL:' + (data.doors.front_left ? 'OPEN' : 'CLOSED') + ' FR:' + (data.doors.front_right ? 'OPEN' : 'CLOSED') + ' Trunk:' + (data.doors.trunk ? 'OPEN' : 'CLOSED') + '</div>';";
-    html += "      html += '<div class=\"status-item\"><strong>Lights:</strong> Demi:' + (data.lights.demi_light ? 'ON' : 'OFF') + ' Normal:' + (data.lights.normal_light ? 'ON' : 'OFF') + '</div>';";
-    html += "      html += '<div class=\"status-item\"><strong>Seats:</strong> FL:' + (data.seats.front_left_occupied ? 'OCCUPIED' : 'EMPTY') + ' FR:' + (data.seats.front_right_occupied ? 'OCCUPIED' : 'EMPTY') + '</div>';";
-    html += "      html += '<div class=\"status-item\"><strong>Seatbelts:</strong> FL:' + (data.seats.front_left_seatbelt ? 'FASTENED' : 'UNFASTENED') + ' FR:' + (data.seats.front_right_seatbelt ? 'FASTENED' : 'UNFASTENED') + '</div>';";
-    html += "      html += '<div class=\"status-item\"><strong>Proximity:</strong> L:' + (data.proximity.rear_left ? 'DETECTED' : 'CLEAR') + ' R:' + (data.proximity.rear_right ? 'DETECTED' : 'CLEAR') + '</div>';";
-    html += "      html += '<div class=\"status-item\"><strong>Speed:</strong> ' + data.sensors.vehicle_speed + '</div>';";
-    html += "      html += '<div class=\"status-item\"><strong>Pedals:</strong> Accel:' + data.sensors.accelerator + ' Brake:' + data.sensors.brake + '</div>';";
-    html += "      html += '<div class=\"status-item\"><strong>Steering:</strong> ' + data.sensors.steering_angle + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>\xF0\x9F\x94\x90 Locks:</strong> ' + (data.controls.car_lock ? '\xF0\x9F\x94\x92 Locked' : '\xF0\x9F\x94\x93 Unlocked') + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>\xE2\x9A\xA1 Accessory Power:</strong> ' + (data.controls.accessory_power ? '\xE2\x9C\x85 ON' : '\xE2\x9D\x8C OFF') + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>\xF0\x9F\xAA\x9F Windows:</strong> ' + (data.window_close_active ? '\xE2\x8F\xB3 Closing (' + Math.round(data.window_close_remaining_ms/1000) + 's)' : '\xE2\x9C\x85 Idle') + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>\xF0\x9F\x9A\xAA Doors:</strong> FL:' + (data.doors.front_left ? '\xF0\x9F\x94\xB4' : '\xF0\x9F\x9F\xA2') + ' FR:' + (data.doors.front_right ? '\xF0\x9F\x94\xB4' : '\xF0\x9F\x9F\xA2') + ' Trunk:' + (data.doors.trunk ? '\xF0\x9F\x94\xB4' : '\xF0\x9F\x9F\xA2') + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>\xF0\x9F\x92\xA1 Lights:</strong> Demi:' + (data.lights.demi_light ? '\xF0\x9F\x92\xA1' : '\xE2\x9A\xAB') + ' Normal:' + (data.lights.normal_light ? '\xF0\x9F\x92\xA1' : '\xE2\x9A\xAB') + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>\xF0\x9F\xAA\x91 Seats:</strong> FL:' + (data.seats.front_left_occupied ? '\xF0\x9F\x91\xA4' : '\xE2\x9A\xAB') + ' FR:' + (data.seats.front_right_occupied ? '\xF0\x9F\x91\xA4' : '\xE2\x9A\xAB') + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>\xF0\x9F\x94\x97 Seatbelts:</strong> FL:' + (data.seats.front_left_seatbelt ? '\xE2\x9C\x85' : '\xE2\x9A\xA0\xEF\xB8\x8F') + ' FR:' + (data.seats.front_right_seatbelt ? '\xE2\x9C\x85' : '\xE2\x9A\xA0\xEF\xB8\x8F') + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>\xF0\x9F\x93\xA1 Proximity:</strong> L:' + (data.proximity.rear_left ? '\xF0\x9F\x9A\xA8' : '\xE2\x9C\x85') + ' R:' + (data.proximity.rear_right ? '\xF0\x9F\x9A\xA8' : '\xE2\x9C\x85') + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>\xF0\x9F\x9A\x97 Speed:</strong> ' + data.sensors.vehicle_speed + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>\xF0\x9F\x8E\xAE Pedals:</strong> Accel:' + data.sensors.accelerator + ' Brake:' + data.sensors.brake + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>\xF0\x9F\x8E\x9B Steering:</strong> ' + data.sensors.steering_angle + '</div>';";
     html += "      document.getElementById('status').innerHTML = html;";
     html += "    })";
     html += "    .catch(e => showMessage('Error loading status: ' + e.message, true));";
@@ -777,7 +777,7 @@ void setupOnboardingServer() {
 
     // Show different message based on whether reconfiguring or initial setup
     if (is_configured) {
-      html += "<div class='warning'>WARNING: Reconfiguration Mode - Previous WiFi connection failed or you requested to reconfigure.</div>";
+      html += "<div class='warning'>\xE2\x9A\xA0\xEF\xB8\x8F Reconfiguration Mode - Previous WiFi connection failed or you requested to reconfigure.</div>";
     } else {
       html += "<div class='info'>Welcome! Configure your VF3 Smart device with WiFi credentials and security settings.</div>";
     }
