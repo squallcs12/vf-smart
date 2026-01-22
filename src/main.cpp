@@ -223,8 +223,8 @@ void setup() {
 
 void loop() {
   // ===== MQTT CONNECTION HANDLING =====
-  // Only attempt MQTT if device is configured (has API key for topics)
-  if (is_configured && configured_api_key.length() >= 8) {
+  // Only attempt MQTT if device is configured and WiFi is connected
+  if (is_configured && configured_api_key.length() >= 8 && WiFi.status() == WL_CONNECTED) {
     if (!mqttClient.connected()) {
       unsigned long now = millis();
       if (now - lastMqttReconnectAttempt > MQTT_RECONNECT_INTERVAL) {
