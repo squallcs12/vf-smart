@@ -1,7 +1,17 @@
 #include <Arduino.h>
+#include <WiFi.h>
+#include <ESPAsyncWebServer.h>
+#include <ArduinoJson.h>
 
 // VinFast VF3 Electric Car - Input and Output Definitions
 // =========================================================
+
+// ===== WIFI CONFIGURATION =====
+const char* ssid = "VF3_SMART";           // WiFi SSID
+const char* password = "vf3smart123";     // WiFi Password
+
+// ===== WEB SERVER =====
+AsyncWebServer server(80);
 
 // ===== ANALOG INPUTS (Sensors) - ADC1 pins =====
 #define VF3_MOTOR_TEMP 35              // GPIO 35 - Motor temperature sensor
@@ -69,6 +79,8 @@ int vf3_door_locked = LOW;            // 0=unlocked, 1=locked
 // ===== FUNCTION DECLARATIONS =====
 void handleAccessoryPower();
 void handleWindowControl();
+void setupWebServer();
+String getCarStatusJSON();
 
 void setup() {
   // Initialize Serial Communication
@@ -104,7 +116,17 @@ void setup() {
   
   // Turn on accessory power on startup
   digitalWrite(VF3_ACCESSORY_POWER, HIGH);
-  
+
+  // Initialize WiFi
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(ssid, password);
+  Serial.println("WiFi AP Started");
+  Serial.print("AP IP address: ");
+  Serial.println(WiFi.softAPIP());
+
+  // Setup web server
+  setupWebServer();
+
   Serial.println("VinFast VF3 MCU System Ready!");
 }
 
@@ -182,4 +204,83 @@ void handleAccessoryPower() {
     digitalWrite(VF3_ACCESSORY_POWER, HIGH);
     vf3_accessory_power = HIGH;
   }
+}
+
+String getCarStatusJSON() {
+  JsonDocument doc;
+
+  // Analog sensor values
+  JsonObject sensors = doc["sensors"].to<JsonObject>();
+  sensors["motor_temp"] = vf3_motor_temp;
+  sensors["accelerator"] = vf3_accelerator;
+  sensors["brake"] = vf3_brake;
+  sensors["steering_angle"] = vf3_steering_angle;
+  sensors["vehicle_speed"] = vf3_vehicle_speed;
+
+  // Door status
+  JsonObject doors = doc["doors"].to<JsonObject>();
+  doors["front_left"] = vf3_door_fl;
+  doors["front_right"] = vf3_door_fr;
+  doors["trunk"] = vf3_door_trunk;
+  doors["locked"] = vf3_door_locked;
+
+  // Seat and seatbelt status
+  JsonObject seats = doc["seats"].to<JsonObject>();
+  seats["front_left_occupied"] = vf3_seat_fl;
+  seats["front_right_occupied"] = vf3_seat_fr;
+  seats["front_left_seatbelt"] = vf3_seatbelt_fl;
+  seats["front_right_seatbelt"] = vf3_seatbelt_fr;
+
+  // Lights status
+  JsonObject lights = doc["lights"].to<JsonObject>();
+  lights["demi_light"] = vf3_demi_light;
+  lights["normal_light"] = vf3_normal_light;
+
+  // Proximity sensors
+  JsonObject proximity = doc["proximity"].to<JsonObject>();
+  proximity["rear_left"] = vf3_proximity_rear_l;
+  proximity["rear_right"] = vf3_proximity_rear_r;
+
+  // Controls status
+  JsonObject controls = doc["controls"].to<JsonObject>();
+  controls["brake_pressed"] = vf3_brake_pressed;
+  controls["accessory_power"] = vf3_accessory_power;
+  controls["car_lock"] = vf3_car_lock;
+  controls["car_unlock"] = vf3_car_unlock;
+
+  // Window timer status
+  doc["window_close_active"] = (window_close_timer != 0);
+  if (window_close_timer != 0) {
+    doc["window_close_remaining_ms"] = WINDOW_CLOSE_DURATION - (millis() - window_close_timer);
+  } else {
+    doc["window_close_remaining_ms"] = 0;
+  }
+
+  String output;
+  serializeJson(doc, output);
+  return output;
+}
+
+void setupWebServer() {
+  // GET /car/status - Return all car status as JSON
+  server.on("/car/status", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(200, "application/json", getCarStatusJSON());
+  });
+
+  // Root endpoint - Simple info page
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    String html = "<!DOCTYPE html><html><head><title>VF3 Smart</title></head><body>";
+    html += "<h1>VinFast VF3 Smart Control System</h1>";
+    html += "<p>Access car status at: <a href='/car/status'>/car/status</a></p>";
+    html += "</body></html>";
+    request->send(200, "text/html", html);
+  });
+
+  // Handle 404
+  server.onNotFound([](AsyncWebServerRequest *request){
+    request->send(404, "text/plain", "Not found");
+  });
+
+  server.begin();
+  Serial.println("Web server started on port 80");
 }

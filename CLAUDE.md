@@ -32,6 +32,8 @@ pio run --target upload && pio device monitor
 - **Framework**: Arduino (via espressif32 platform)
 - **Serial Communication**: 9600 baud
 - **Control Loop**: 50ms cycle time (20Hz)
+- **WiFi**: Access Point mode (SSID: VF3_SMART)
+- **Web Server**: AsyncWebServer on port 80
 
 ### Pin Assignment Architecture
 
@@ -96,3 +98,79 @@ State is managed through global variables that mirror physical sensor/actuator s
 - Input sensors: `vf3_<sensor_name>` (e.g., `vf3_door_fl`)
 - Output controls: `vf3_<control_name>` (e.g., `vf3_car_lock`)
 - Timer variables: `<feature>_timer` (e.g., `window_close_timer`)
+
+## Web Server API
+
+The system includes an async web server that exposes car status via HTTP endpoints.
+
+### WiFi Configuration
+- **Mode**: Access Point (AP)
+- **SSID**: `VF3_SMART`
+- **Password**: `vf3smart123`
+- **Default IP**: 192.168.4.1 (ESP32 AP default)
+
+### API Endpoints
+
+#### GET /car/status
+Returns complete car status as JSON.
+
+**Response Structure:**
+```json
+{
+  "sensors": {
+    "motor_temp": 0,
+    "accelerator": 0,
+    "brake": 0,
+    "steering_angle": 0,
+    "vehicle_speed": 0
+  },
+  "doors": {
+    "front_left": 0,
+    "front_right": 0,
+    "trunk": 0,
+    "locked": 0
+  },
+  "seats": {
+    "front_left_occupied": 0,
+    "front_right_occupied": 0,
+    "front_left_seatbelt": 0,
+    "front_right_seatbelt": 0
+  },
+  "lights": {
+    "demi_light": 0,
+    "normal_light": 0
+  },
+  "proximity": {
+    "rear_left": 0,
+    "rear_right": 0
+  },
+  "controls": {
+    "brake_pressed": 0,
+    "accessory_power": 1,
+    "car_lock": 0,
+    "car_unlock": 0
+  },
+  "window_close_active": false,
+  "window_close_remaining_ms": 0
+}
+```
+
+#### GET /
+Returns a simple HTML info page with link to `/car/status`.
+
+### Testing the API
+
+```bash
+# Connect to VF3_SMART WiFi network
+# Then access the API:
+
+# Get car status
+curl http://192.168.4.1/car/status
+
+# View in browser
+open http://192.168.4.1
+```
+
+### Dependencies
+- **ESPAsyncWebServer-esphome**: Async web server for ESP32
+- **ArduinoJson**: JSON serialization/deserialization
