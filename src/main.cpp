@@ -19,18 +19,14 @@
 #define VF3_SEAT_FR 28                 // GPIO 28 - Front right seat occupancy sensor
 #define VF3_SEATBELT_FL 30             // GPIO 30 - Front left seatbelt sensor
 #define VF3_SEATBELT_FR 31             // GPIO 31 - Front right seatbelt sensor
-#define VF3_GEAR_SELECTOR 17           // GPIO 17 - Gear position (P/R/N/D)
 #define VF3_DEMI_LIGHT 18              // GPIO 18 - Demi/low beam light (0=off, 1=on)
 #define VF3_NORMAL_LIGHT 19            // GPIO 19 - Normal/high beam light (0=off, 1=on)
-#define VF3_WIPER_CONTROL 9            // GPIO 9 - Wiper switch state (0-3) - 4 modes
 #define VF3_PROXIMITY_REAR_L 20        // GPIO 20 - Rear left proximity/parking detection
 #define VF3_PROXIMITY_REAR_R 21        // GPIO 21 - Rear right proximity/parking detection
 
 // ===== DIGITAL OUTPUTS (Controls & Indicators) =====
-#define VF3_BRAKE_CONTROL 22           // GPIO 22 - Brake system control
-#define VF3_DOOR_LOCK 13               // GPIO 13 - Door lock/unlock relay
-#define VF3_HEADLIGHTS 12              // GPIO 12 - Headlight control
-#define VF3_BRAKE_LIGHTS 15            // GPIO 15 - Brake light LED
+#define VF3_CAR_LOCK 5                 // GPIO 5 - Car lock control
+#define VF3_CAR_UNLOCK 6               // GPIO 6 - Car unlock control
 #define VF3_TURN_SIGNAL_L 2            // GPIO 2 - Left turn signal
 #define VF3_TURN_SIGNAL_R 0            // GPIO 0 - Right turn signal
 #define VF3_BUZZER 8                   // GPIO 8 - Warning buzzer/alarm
@@ -53,19 +49,16 @@ int vf3_seatbelt_fr = LOW;            // Front right seatbelt (0=unbuckled, 1=bu
 int vf3_brake_pressed = LOW;          // 0=not pressed, 1=pressed
 int vf3_proximity_rear_l = LOW;       // Rear left proximity sensor (0=clear, 1=detected)
 int vf3_proximity_rear_r = LOW;       // Rear right proximity sensor (0=clear, 1=detected)
-int vf3_wiper_speed = 0;              // Wiper switch state (0-3): 0=off, 1=low, 2=medium, 3=high
-int vf3_gear = 0;                     // 0=P, 1=R, 2=N, 3=D
 int vf3_demi_light = LOW;             // Demi/low beam light (0=off, 1=on)
 int vf3_normal_light = LOW;           // Normal/high beam light (0=off, 1=on)
 
 // ===== OUTPUT VARIABLES =====
-int vf3_brake_force = 0;              // Brake force (0-255)
+int vf3_car_lock = LOW;               // Car lock control
+int vf3_car_unlock = LOW;             // Car unlock control
+unsigned long window_close_timer = 0; // Timer for auto-close windows feature
+#define WINDOW_CLOSE_DURATION 30000    // Window close duration in milliseconds (30 seconds)
+#define VF3_DOOR_LOCK 13               // GPIO 13 - Door lock/unlock relay
 int vf3_door_locked = LOW;            // 0=unlocked, 1=locked
-int vf3_headlights_on = LOW;          // Headlight state
-int vf3_brake_lights_on = LOW;        // Brake light state
-
-// put function declarations here:
-int myFunction(int, int);
 
 void setup() {
   // Initialize Serial Communication
@@ -82,18 +75,15 @@ void setup() {
   pinMode(VF3_SEAT_FR, INPUT);
   pinMode(VF3_SEATBELT_FL, INPUT);
   pinMode(VF3_SEATBELT_FR, INPUT);
-  pinMode(VF3_GEAR_SELECTOR, INPUT);
   pinMode(VF3_DEMI_LIGHT, INPUT);
   pinMode(VF3_NORMAL_LIGHT, INPUT);
-  pinMode(VF3_WIPER_CONTROL, INPUT);
   pinMode(VF3_PROXIMITY_REAR_L, INPUT);
   pinMode(VF3_PROXIMITY_REAR_R, INPUT);
   
   // Initialize Digital Output Pins (Control Systems)
-  pinMode(VF3_BRAKE_CONTROL, OUTPUT);
+  pinMode(VF3_CAR_LOCK, OUTPUT);
+  pinMode(VF3_CAR_UNLOCK, OUTPUT);
   pinMode(VF3_DOOR_LOCK, OUTPUT);
-  pinMode(VF3_HEADLIGHTS, OUTPUT);
-  pinMode(VF3_BRAKE_LIGHTS, OUTPUT);
   pinMode(VF3_TURN_SIGNAL_L, OUTPUT);
   pinMode(VF3_TURN_SIGNAL_R, OUTPUT);
   pinMode(VF3_BUZZER, OUTPUT);
@@ -120,47 +110,29 @@ void loop() {
   vf3_seatbelt_fl = digitalRead(VF3_SEATBELT_FL);
   vf3_seatbelt_fr = digitalRead(VF3_SEATBELT_FR);
   vf3_brake_pressed = digitalRead(VF3_BRAKE_SWITCH);
-  vf3_gear = digitalRead(VF3_GEAR_SELECTOR);
   vf3_demi_light = digitalRead(VF3_DEMI_LIGHT);
   vf3_normal_light = digitalRead(VF3_NORMAL_LIGHT);
-  vf3_wiper_speed = digitalRead(VF3_WIPER_CONTROL);
   vf3_proximity_rear_l = digitalRead(VF3_PROXIMITY_REAR_L);
   vf3_proximity_rear_r = digitalRead(VF3_PROXIMITY_REAR_R);
   
-  // ===== SAFETY CHECKS & CONTROL LOGIC =====
+  // ===== CONTROL LOGIC =====
   
-  // Brake Light Control
-  if (vf3_brake_pressed == HIGH || vf3_brake > 100) {
-    digitalWrite(VF3_BRAKE_LIGHTS, HIGH);
+  // Auto close windows when car is locked (on for 30s, then off)
+  if (vf3_car_lock == HIGH) {
+    // Lock signal detected, start/reset timer
+    window_close_timer = millis();
+    digitalWrite(VF3_WINDOW_LEFT, HIGH);
+    digitalWrite(VF3_WINDOW_RIGHT, HIGH);
+  } else if (window_close_timer != 0 && millis() - window_close_timer < WINDOW_CLOSE_DURATION) {
+    // Keep windows closing for 30 seconds
+    digitalWrite(VF3_WINDOW_LEFT, HIGH);
+    digitalWrite(VF3_WINDOW_RIGHT, HIGH);
   } else {
-    digitalWrite(VF3_BRAKE_LIGHTS, LOW);
-  }
-  
-  // Headlight Control (based on light sensors)
-  if (vf3_demi_light == HIGH || vf3_normal_light == HIGH) {
-    digitalWrite(VF3_HEADLIGHTS, HIGH);
-  } else {
-    digitalWrite(VF3_HEADLIGHTS, LOW);
-  }
-  
-  // Safety Warning - Occupied seat without seatbelt
-  if ((vf3_seat_fl == HIGH && vf3_seatbelt_fl == LOW) || (vf3_seat_fr == HIGH && vf3_seatbelt_fr == LOW)) {
-    digitalWrite(VF3_BUZZER, HIGH);
-    delay(100);
-    digitalWrite(VF3_BUZZER, LOW);
-  }
-  
-  // Door lock engagement when driving
-  if (vf3_vehicle_speed > 0) {
-    digitalWrite(VF3_DOOR_LOCK, HIGH);
-  } else {
-    digitalWrite(VF3_DOOR_LOCK, LOW);
+    // Timer expired or lock not active
+    digitalWrite(VF3_WINDOW_LEFT, LOW);
+    digitalWrite(VF3_WINDOW_RIGHT, LOW);
+    window_close_timer = 0;  // Reset timer after windows finish closing
   }
   
   delay(50);  // 50ms control loop cycle
-}
-
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
 }
