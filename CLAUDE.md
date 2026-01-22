@@ -109,6 +109,33 @@ The system includes an async web server that exposes car status via HTTP endpoin
 - **Password**: `vf3smart123`
 - **Default IP**: 192.168.4.1 (ESP32 AP default)
 
+### API Authentication
+All control endpoints (POST requests) require API key authentication for security.
+
+**API Key**: `VF3-SMART-2024-SECRET-KEY-9876`
+
+**Authentication Methods:**
+1. **HTTP Header** (Recommended):
+   ```bash
+   curl -X POST http://192.168.4.1/car/lock \
+     -H "X-API-Key: VF3-SMART-2024-SECRET-KEY-9876"
+   ```
+
+2. **Query Parameter**:
+   ```bash
+   curl -X POST "http://192.168.4.1/car/lock?api_key=VF3-SMART-2024-SECRET-KEY-9876"
+   ```
+
+**Unauthorized Response** (401):
+```json
+{
+  "success": false,
+  "message": "Unauthorized - Invalid or missing API key"
+}
+```
+
+**Note**: Status endpoints (GET /car/status) do not require authentication.
+
 ### API Endpoints
 
 #### Status Endpoints
@@ -196,7 +223,9 @@ Control accessory power. Requires `state` parameter.
 
 **Example Request:**
 ```bash
-curl -X POST http://192.168.4.1/car/accessory-power -d "state=on"
+curl -X POST http://192.168.4.1/car/accessory-power \
+  -H "X-API-Key: VF3-SMART-2024-SECRET-KEY-9876" \
+  -d "state=on"
 ```
 
 **Response:**
@@ -243,13 +272,19 @@ Control the buzzer/alarm.
 **Example Requests:**
 ```bash
 # Turn on buzzer
-curl -X POST http://192.168.4.1/car/buzzer -d "state=on"
+curl -X POST http://192.168.4.1/car/buzzer \
+  -H "X-API-Key: VF3-SMART-2024-SECRET-KEY-9876" \
+  -d "state=on"
 
 # Beep for 500ms
-curl -X POST http://192.168.4.1/car/buzzer -d "state=beep&duration=500"
+curl -X POST http://192.168.4.1/car/buzzer \
+  -H "X-API-Key: VF3-SMART-2024-SECRET-KEY-9876" \
+  -d "state=beep&duration=500"
 
 # Turn off buzzer
-curl -X POST http://192.168.4.1/car/buzzer -d "state=off"
+curl -X POST http://192.168.4.1/car/buzzer \
+  -H "X-API-Key: VF3-SMART-2024-SECRET-KEY-9876" \
+  -d "state=off"
 ```
 
 **Response:**
@@ -270,10 +305,14 @@ Control turn signals.
 **Example Requests:**
 ```bash
 # Turn on left turn signal
-curl -X POST http://192.168.4.1/car/turn-signal -d "side=left&state=on"
+curl -X POST http://192.168.4.1/car/turn-signal \
+  -H "X-API-Key: VF3-SMART-2024-SECRET-KEY-9876" \
+  -d "side=left&state=on"
 
 # Turn off both turn signals
-curl -X POST http://192.168.4.1/car/turn-signal -d "side=both&state=off"
+curl -X POST http://192.168.4.1/car/turn-signal \
+  -H "X-API-Key: VF3-SMART-2024-SECRET-KEY-9876" \
+  -d "side=both&state=off"
 ```
 
 **Response:**
@@ -290,31 +329,45 @@ curl -X POST http://192.168.4.1/car/turn-signal -d "side=both&state=off"
 
 ```bash
 # Connect to VF3_SMART WiFi network (password: vf3smart123)
-# Then test the APIs:
+# Set API key for convenience
+API_KEY="VF3-SMART-2024-SECRET-KEY-9876"
 
-# Get car status
+# Get car status (no auth required)
 curl http://192.168.4.1/car/status
 
 # Lock the car
-curl -X POST http://192.168.4.1/car/lock
+curl -X POST http://192.168.4.1/car/lock \
+  -H "X-API-Key: $API_KEY"
 
 # Unlock the car
-curl -X POST http://192.168.4.1/car/unlock
+curl -X POST http://192.168.4.1/car/unlock \
+  -H "X-API-Key: $API_KEY"
 
 # Toggle accessory power
-curl -X POST http://192.168.4.1/car/accessory-power -d "state=toggle"
+curl -X POST http://192.168.4.1/car/accessory-power \
+  -H "X-API-Key: $API_KEY" \
+  -d "state=toggle"
 
 # Close windows
-curl -X POST http://192.168.4.1/car/windows/close
+curl -X POST http://192.168.4.1/car/windows/close \
+  -H "X-API-Key: $API_KEY"
 
 # Stop windows
-curl -X POST http://192.168.4.1/car/windows/stop
+curl -X POST http://192.168.4.1/car/windows/stop \
+  -H "X-API-Key: $API_KEY"
 
 # Beep buzzer for 1 second
-curl -X POST http://192.168.4.1/car/buzzer -d "state=beep&duration=1000"
+curl -X POST http://192.168.4.1/car/buzzer \
+  -H "X-API-Key: $API_KEY" \
+  -d "state=beep&duration=1000"
 
 # Turn on left turn signal
-curl -X POST http://192.168.4.1/car/turn-signal -d "side=left&state=on"
+curl -X POST http://192.168.4.1/car/turn-signal \
+  -H "X-API-Key: $API_KEY" \
+  -d "side=left&state=on"
+
+# Alternative: Using query parameter for authentication
+curl -X POST "http://192.168.4.1/car/lock?api_key=$API_KEY"
 
 # View API documentation in browser
 open http://192.168.4.1

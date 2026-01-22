@@ -10,6 +10,9 @@
 const char* ssid = "VF3_SMART";           // WiFi SSID
 const char* password = "vf3smart123";     // WiFi Password
 
+// ===== API AUTHENTICATION =====
+const char* api_key = "VF3-SMART-2024-SECRET-KEY-9876";  // Fixed API key for authentication
+
 // ===== WEB SERVER =====
 AsyncWebServer server(80);
 
@@ -81,6 +84,7 @@ void handleAccessoryPower();
 void handleWindowControl();
 void setupWebServer();
 String getCarStatusJSON();
+bool authenticateRequest(AsyncWebServerRequest *request);
 
 void setup() {
   // Initialize Serial Communication
@@ -206,6 +210,35 @@ void handleAccessoryPower() {
   }
 }
 
+bool authenticateRequest(AsyncWebServerRequest *request) {
+  // Check for API key in X-API-Key header
+  if (request->hasHeader("X-API-Key")) {
+    String headerKey = request->header("X-API-Key");
+    if (headerKey == api_key) {
+      return true;
+    }
+  }
+
+  // Check for API key in query parameter
+  if (request->hasParam("api_key")) {
+    String paramKey = request->getParam("api_key")->value();
+    if (paramKey == api_key) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void sendUnauthorized(AsyncWebServerRequest *request) {
+  JsonDocument doc;
+  doc["success"] = false;
+  doc["message"] = "Unauthorized - Invalid or missing API key";
+  String output;
+  serializeJson(doc, output);
+  request->send(401, "application/json", output);
+}
+
 String getCarStatusJSON() {
   JsonDocument doc;
 
@@ -269,6 +302,11 @@ void setupWebServer() {
 
   // POST /car/lock - Lock the car
   server.on("/car/lock", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (!authenticateRequest(request)) {
+      sendUnauthorized(request);
+      return;
+    }
+
     vf3_car_lock = HIGH;
     vf3_car_unlock = LOW;
     digitalWrite(VF3_CAR_LOCK, HIGH);
@@ -287,6 +325,11 @@ void setupWebServer() {
 
   // POST /car/unlock - Unlock the car
   server.on("/car/unlock", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (!authenticateRequest(request)) {
+      sendUnauthorized(request);
+      return;
+    }
+
     vf3_car_lock = LOW;
     vf3_car_unlock = HIGH;
     digitalWrite(VF3_CAR_LOCK, LOW);
@@ -305,6 +348,11 @@ void setupWebServer() {
 
   // POST /car/accessory-power - Toggle accessory power
   server.on("/car/accessory-power", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (!authenticateRequest(request)) {
+      sendUnauthorized(request);
+      return;
+    }
+
     String state = "";
     if (request->hasParam("state", true)) {
       state = request->getParam("state", true)->value();
@@ -342,6 +390,11 @@ void setupWebServer() {
 
   // POST /car/windows/close - Close windows (30 second timer)
   server.on("/car/windows/close", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (!authenticateRequest(request)) {
+      sendUnauthorized(request);
+      return;
+    }
+
     window_close_timer = millis();
     digitalWrite(VF3_WINDOW_LEFT, HIGH);
     digitalWrite(VF3_WINDOW_RIGHT, HIGH);
@@ -359,6 +412,11 @@ void setupWebServer() {
 
   // POST /car/windows/stop - Stop window operation
   server.on("/car/windows/stop", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (!authenticateRequest(request)) {
+      sendUnauthorized(request);
+      return;
+    }
+
     window_close_timer = 0;
     digitalWrite(VF3_WINDOW_LEFT, LOW);
     digitalWrite(VF3_WINDOW_RIGHT, LOW);
@@ -375,6 +433,11 @@ void setupWebServer() {
 
   // POST /car/buzzer - Control buzzer
   server.on("/car/buzzer", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (!authenticateRequest(request)) {
+      sendUnauthorized(request);
+      return;
+    }
+
     String state = "";
     int duration = 0;
 
@@ -415,6 +478,11 @@ void setupWebServer() {
 
   // POST /car/turn-signal - Control turn signals
   server.on("/car/turn-signal", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (!authenticateRequest(request)) {
+      sendUnauthorized(request);
+      return;
+    }
+
     String side = "";
     String state = "";
 
