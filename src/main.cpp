@@ -32,6 +32,7 @@
 #define VF3_BUZZER 8                   // GPIO 8 - Warning buzzer/alarm
 #define VF3_WINDOW_LEFT 10             // GPIO 10 - Front left window control
 #define VF3_WINDOW_RIGHT 11            // GPIO 11 - Front right window control
+#define VF3_ACCESSORY_POWER 7          // GPIO 7 - Accessory power control
 
 // ===== INPUT VARIABLES =====
 int vf3_motor_temp = 0;               // Motor temperature (°C)
@@ -55,10 +56,15 @@ int vf3_normal_light = LOW;           // Normal/high beam light (0=off, 1=on)
 // ===== OUTPUT VARIABLES =====
 int vf3_car_lock = LOW;               // Car lock control
 int vf3_car_unlock = LOW;             // Car unlock control
+int vf3_accessory_power = HIGH;       // Accessory power control (default ON)
 unsigned long window_close_timer = 0; // Timer for auto-close windows feature
 #define WINDOW_CLOSE_DURATION 30000    // Window close duration in milliseconds (30 seconds)
 #define VF3_DOOR_LOCK 13               // GPIO 13 - Door lock/unlock relay
 int vf3_door_locked = LOW;            // 0=unlocked, 1=locked
+
+// ===== FUNCTION DECLARATIONS =====
+void handleAccessoryPower();
+void handleWindowControl();
 
 void setup() {
   // Initialize Serial Communication
@@ -89,6 +95,10 @@ void setup() {
   pinMode(VF3_BUZZER, OUTPUT);
   pinMode(VF3_WINDOW_LEFT, OUTPUT);
   pinMode(VF3_WINDOW_RIGHT, OUTPUT);
+  pinMode(VF3_ACCESSORY_POWER, OUTPUT);
+  
+  // Turn on accessory power on startup
+  digitalWrite(VF3_ACCESSORY_POWER, HIGH);
   
   Serial.println("VinFast VF3 MCU System Ready!");
 }
@@ -117,6 +127,17 @@ void loop() {
   
   // ===== CONTROL LOGIC =====
   
+  // Handle window control
+  handleWindowControl();
+  
+  // Handle accessory power
+  handleAccessoryPower();
+  
+  delay(50);  // 50ms control loop cycle
+}
+
+// ===== FUNCTION DEFINITIONS =====
+void handleWindowControl() {
   // Auto close windows when car is locked (on for 30s, then off)
   if (vf3_car_lock == HIGH) {
     // Lock signal detected, start/reset timer
@@ -133,6 +154,17 @@ void loop() {
     digitalWrite(VF3_WINDOW_RIGHT, LOW);
     window_close_timer = 0;  // Reset timer after windows finish closing
   }
-  
-  delay(50);  // 50ms control loop cycle
 }
+
+void handleAccessoryPower() {
+  // Turn off accessory power when car is locked
+  if (vf3_car_lock == HIGH) {
+    digitalWrite(VF3_ACCESSORY_POWER, LOW);
+    vf3_accessory_power = LOW;
+  }
+  
+  // Turn on accessory power when car is unlocked
+  if (vf3_car_unlock == HIGH) {
+    digitalWrite(VF3_ACCESSORY_POWER, HIGH);
+    vf3_accessory_power = HIGH;
+  }
