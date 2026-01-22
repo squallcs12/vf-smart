@@ -21,41 +21,39 @@ const char* onboarding_password = "setup123";
 // ===== WEB SERVER =====
 AsyncWebServer server(80);
 
-// ===== ANALOG INPUTS (Sensors) - ADC1 pins =====
-#define VF3_MOTOR_TEMP 35              // GPIO 35 - Motor temperature sensor
-#define VF3_ACCELERATOR_PEDAL 33       // GPIO 33 - Accelerator pedal position
-#define VF3_BRAKE_PEDAL 25             // GPIO 25 - Brake pedal sensor
-#define VF3_STEERING_ANGLE 26          // GPIO 26 - Steering angle sensor
+// ===== ANALOG INPUTS (Sensors) - Use input-only pins =====
+#define VF3_ACCELERATOR_PEDAL 34       // GPIO 34 - Accelerator pedal position (input only)
+#define VF3_BRAKE_PEDAL 39             // GPIO 39 - Brake pedal sensor (input only)
+#define VF3_STEERING_ANGLE 36          // GPIO 36 - Steering angle sensor (input only)
 
 // ===== DIGITAL INPUTS (Sensors & Switches) =====
-#define VF3_SPEED_SENSOR 4             // GPIO 4 - Vehicle speed sensor
-#define VF3_DOOR_FL 14                 // GPIO 14 - Front left door open/close sensor
-#define VF3_DOOR_FR 15                 // GPIO 15 - Front right door open/close sensor
-#define VF3_DOOR_TRUNK 24              // GPIO 24 - Trunk/tailgate open/close sensor
-#define VF3_BRAKE_SWITCH 16            // GPIO 16 - Brake pressed switch
-#define VF3_SEAT_FL 27                 // GPIO 27 - Front left seat occupancy sensor
-#define VF3_SEAT_FR 28                 // GPIO 28 - Front right seat occupancy sensor
-#define VF3_SEATBELT_FL 30             // GPIO 30 - Front left seatbelt sensor
-#define VF3_SEATBELT_FR 31             // GPIO 31 - Front right seatbelt sensor
-#define VF3_DEMI_LIGHT 18              // GPIO 18 - Demi/low beam light (0=off, 1=on)
-#define VF3_NORMAL_LIGHT 19            // GPIO 19 - Normal/high beam light (0=off, 1=on)
-#define VF3_PROXIMITY_REAR_L 20        // GPIO 20 - Rear left proximity/parking detection
-#define VF3_PROXIMITY_REAR_R 21        // GPIO 21 - Rear right proximity/parking detection
-#define VF3_ACCESSORY_POWER_BUTTON 22  // GPIO 22 - Accessory power button (manual toggle)
+#define VF3_SPEED_SENSOR 35            // GPIO 35 - Vehicle speed sensor (input only)
+#define VF3_DOOR_FL 4                  // GPIO 4 - Front left door open/close sensor
+#define VF3_DOOR_FR 16                 // GPIO 16 - Front right door open/close sensor
+#define VF3_DOOR_TRUNK 17              // GPIO 17 - Trunk/tailgate open/close sensor
+#define VF3_BRAKE_SWITCH 2             // GPIO 2 - Brake pressed switch
+#define VF3_SEAT_FL 15                 // GPIO 15 - Front left seat occupancy sensor
+#define VF3_SEAT_FR 12                 // GPIO 12 - Front right seat occupancy sensor
+#define VF3_SEATBELT_FL 14             // GPIO 14 - Front left seatbelt sensor
+#define VF3_SEATBELT_FR 27             // GPIO 27 - Front right seatbelt sensor
+#define VF3_DEMI_LIGHT 26              // GPIO 26 - Demi/low beam light (0=off, 1=on)
+#define VF3_NORMAL_LIGHT 25            // GPIO 25 - Normal/high beam light (0=off, 1=on)
+#define VF3_PROXIMITY_REAR_L 33        // GPIO 33 - Rear left proximity/parking detection
+#define VF3_PROXIMITY_REAR_R 32        // GPIO 32 - Rear right proximity/parking detection
 
 // ===== DIGITAL OUTPUTS (Controls & Indicators) =====
+// AVOID: GPIO 0 (boot), 1 (TX), 3 (RX), 6-11 (flash)
 #define VF3_CAR_LOCK 5                 // GPIO 5 - Car lock control
-#define VF3_CAR_UNLOCK 6               // GPIO 6 - Car unlock control
-#define VF3_TURN_SIGNAL_L 2            // GPIO 2 - Left turn signal
-#define VF3_TURN_SIGNAL_R 0            // GPIO 0 - Right turn signal
-#define VF3_BUZZER 8                   // GPIO 8 - Warning buzzer/alarm
-#define VF3_WINDOW_LEFT 10             // GPIO 10 - Front left window control
-#define VF3_WINDOW_RIGHT 11            // GPIO 11 - Front right window control
-#define VF3_ACCESSORY_POWER 7          // GPIO 7 - Accessory power control
-#define VF3_BRAKE_SIGNAL 12            // GPIO 12 - Brake signal/brake light
+#define VF3_CAR_UNLOCK 18              // GPIO 18 - Car unlock control
+#define VF3_TURN_SIGNAL_L 19           // GPIO 19 - Left turn signal
+#define VF3_TURN_SIGNAL_R 21           // GPIO 21 - Right turn signal
+#define VF3_BUZZER 22                  // GPIO 22 - Warning buzzer/alarm
+#define VF3_WINDOW_LEFT 23             // GPIO 23 - Front left window control
+#define VF3_WINDOW_RIGHT 13            // GPIO 13 - Front right window control
+#define VF3_ACCESSORY_POWER 0          // GPIO 0 - Accessory power control (boot pin - ensure LOW at boot)
+#define VF3_BRAKE_SIGNAL 1             // GPIO 1 - Brake signal/brake light (TX pin - use carefully)
 
 // ===== INPUT VARIABLES =====
-int vf3_motor_temp = 0;               // Motor temperature (°C)
 int vf3_accelerator = 0;              // Accelerator pedal (0-100%)
 int vf3_brake = 0;                    // Brake pedal (0-100%)
 int vf3_steering_angle = 0;           // Steering angle (-180 to +180°)
@@ -72,8 +70,6 @@ int vf3_proximity_rear_l = LOW;       // Rear left proximity sensor (0=clear, 1=
 int vf3_proximity_rear_r = LOW;       // Rear right proximity sensor (0=clear, 1=detected)
 int vf3_demi_light = LOW;             // Demi/low beam light (0=off, 1=on)
 int vf3_normal_light = LOW;           // Normal/high beam light (0=off, 1=on)
-int vf3_accessory_power_button = LOW; // Accessory power button state (0=not pressed, 1=pressed)
-int vf3_accessory_power_button_last = LOW; // Last button state for edge detection
 
 // ===== OUTPUT VARIABLES =====
 int vf3_car_lock = LOW;               // Car lock control
@@ -116,7 +112,6 @@ void setup() {
   pinMode(VF3_NORMAL_LIGHT, INPUT);
   pinMode(VF3_PROXIMITY_REAR_L, INPUT);
   pinMode(VF3_PROXIMITY_REAR_R, INPUT);
-  pinMode(VF3_ACCESSORY_POWER_BUTTON, INPUT);
   
   // Initialize Digital Output Pins (Control Systems)
   pinMode(VF3_CAR_LOCK, OUTPUT);
@@ -133,23 +128,61 @@ void setup() {
   digitalWrite(VF3_ACCESSORY_POWER, HIGH);
 
   // Initialize WiFi based on configuration status
-  WiFi.mode(WIFI_AP);
-
   if (is_configured) {
-    // Use configured credentials
-    WiFi.softAP(configured_ssid.c_str(), configured_password.c_str());
-    Serial.println("WiFi AP Started with configured credentials");
+    // Try to connect to configured WiFi as Station
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(configured_ssid.c_str(), configured_password.c_str());
+
+    Serial.println("Connecting to WiFi...");
     Serial.print("SSID: ");
     Serial.println(configured_ssid);
-    Serial.print("AP IP address: ");
-    Serial.println(WiFi.softAPIP());
 
-    // Setup normal web server
-    setupWebServer();
-    Serial.println("VinFast VF3 MCU System Ready!");
+    // Wait up to 3 minutes (180 seconds) for connection
+    unsigned long start_time = millis();
+    unsigned long timeout = 180000; // 3 minutes
+
+    while (WiFi.status() != WL_CONNECTED && (millis() - start_time) < timeout) {
+      delay(500);
+      Serial.print(".");
+    }
+    Serial.println();
+
+    if (WiFi.status() == WL_CONNECTED) {
+      // Successfully connected to WiFi
+      Serial.println("WiFi Connected!");
+      Serial.print("IP Address: ");
+      Serial.println(WiFi.localIP());
+
+      // Setup normal web server
+      setupWebServer();
+      Serial.println("VinFast VF3 MCU System Ready!");
+    } else {
+      // Connection failed - start AP mode for reconfiguration
+      Serial.println("WiFi Connection Failed!");
+      Serial.println("Starting AP mode for reconfiguration...");
+
+      WiFi.mode(WIFI_AP);
+      WiFi.softAP(onboarding_ssid, onboarding_password);
+
+      Serial.println("===========================================");
+      Serial.println("RECONFIGURATION MODE - WiFi connection failed");
+      Serial.println("===========================================");
+      Serial.print("Connect to WiFi: ");
+      Serial.println(onboarding_ssid);
+      Serial.print("Password: ");
+      Serial.println(onboarding_password);
+      Serial.print("Then visit: http://");
+      Serial.println(WiFi.softAPIP());
+      Serial.println("===========================================");
+
+      // Setup onboarding web server
+      setupOnboardingServer();
+    }
   } else {
-    // Use onboarding AP
+    // Not configured - start AP mode for initial onboarding
+    WiFi.mode(WIFI_AP);
     WiFi.softAP(onboarding_ssid, onboarding_password);
+
     Serial.println("===========================================");
     Serial.println("ONBOARDING MODE - Device not configured");
     Serial.println("===========================================");
@@ -168,7 +201,6 @@ void setup() {
 
 void loop() {
   // ===== READ ANALOG SENSORS =====
-  vf3_motor_temp = analogRead(VF3_MOTOR_TEMP);
   vf3_accelerator = analogRead(VF3_ACCELERATOR_PEDAL);
   vf3_brake = analogRead(VF3_BRAKE_PEDAL);
   vf3_steering_angle = analogRead(VF3_STEERING_ANGLE);
@@ -187,13 +219,12 @@ void loop() {
   vf3_normal_light = digitalRead(VF3_NORMAL_LIGHT);
   vf3_proximity_rear_l = digitalRead(VF3_PROXIMITY_REAR_L);
   vf3_proximity_rear_r = digitalRead(VF3_PROXIMITY_REAR_R);
-  vf3_accessory_power_button = digitalRead(VF3_ACCESSORY_POWER_BUTTON);
-  
+
   // ===== CONTROL LOGIC =====
-  
+
   // Handle window control
   handleWindowControl();
-  
+
   // Handle accessory power
   handleAccessoryPower();
   
@@ -221,14 +252,6 @@ void handleWindowControl() {
 }
 
 void handleAccessoryPower() {
-  // Manual button toggle (on button press - rising edge detection)
-  if (vf3_accessory_power_button == HIGH && vf3_accessory_power_button_last == LOW) {
-    // Toggle accessory power
-    vf3_accessory_power = !vf3_accessory_power;
-    digitalWrite(VF3_ACCESSORY_POWER, vf3_accessory_power);
-  }
-  vf3_accessory_power_button_last = vf3_accessory_power_button;
-
   // Turn off accessory power when car is locked
   if (vf3_car_lock == HIGH) {
     digitalWrite(VF3_ACCESSORY_POWER, LOW);
@@ -309,7 +332,6 @@ String getCarStatusJSON() {
 
   // Analog sensor values
   JsonObject sensors = doc["sensors"].to<JsonObject>();
-  sensors["motor_temp"] = vf3_motor_temp;
   sensors["accelerator"] = vf3_accelerator;
   sensors["brake"] = vf3_brake;
   sensors["steering_angle"] = vf3_steering_angle;
@@ -600,23 +622,127 @@ void setupWebServer() {
     request->send(200, "application/json", output);
   });
 
-  // Root endpoint - Simple info page
+  // Root endpoint - Control dashboard
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    String html = "<!DOCTYPE html><html><head><title>VF3 Smart</title></head><body>";
-    html += "<h1>VinFast VF3 Smart Control System</h1>";
-    html += "<h2>API Endpoints</h2>";
-    html += "<h3>Status</h3>";
-    html += "<ul><li>GET <a href='/car/status'>/car/status</a> - Get car status</li></ul>";
-    html += "<h3>Control</h3>";
-    html += "<ul>";
-    html += "<li>POST /car/lock - Lock the car</li>";
-    html += "<li>POST /car/unlock - Unlock the car</li>";
-    html += "<li>POST /car/accessory-power - Control accessory power (state=on/off/toggle)</li>";
-    html += "<li>POST /car/windows/close - Close windows</li>";
-    html += "<li>POST /car/windows/stop - Stop windows</li>";
-    html += "<li>POST /car/buzzer - Control buzzer (state=on/off/beep, duration=ms)</li>";
-    html += "<li>POST /car/turn-signal - Control turn signals (side=left/right/both, state=on/off)</li>";
-    html += "</ul>";
+    String html = "<!DOCTYPE html><html><head>";
+    html += "<meta charset='UTF-8'>";
+    html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+    html += "<title>VF3 Smart Control</title>";
+    html += "<style>";
+    html += "body { font-family: Arial; max-width: 600px; margin: 20px auto; padding: 20px; background: #f5f5f5; }";
+    html += "h1 { color: #e71e2c; text-align: center; }";
+    html += ".section { background: white; padding: 20px; margin: 15px 0; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }";
+    html += ".section h2 { margin-top: 0; color: #333; font-size: 18px; border-bottom: 2px solid #e71e2c; padding-bottom: 10px; }";
+    html += ".button-group { display: flex; gap: 10px; margin: 10px 0; flex-wrap: wrap; }";
+    html += "button { flex: 1; min-width: 120px; padding: 15px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; transition: all 0.3s; }";
+    html += "button:active { transform: scale(0.95); }";
+    html += ".btn-primary { background: #e71e2c; color: white; }";
+    html += ".btn-primary:hover { background: #c51a26; }";
+    html += ".btn-secondary { background: #4CAF50; color: white; }";
+    html += ".btn-secondary:hover { background: #45a049; }";
+    html += ".btn-warning { background: #ff9800; color: white; }";
+    html += ".btn-warning:hover { background: #e68900; }";
+    html += ".btn-danger { background: #f44336; color: white; }";
+    html += ".btn-danger:hover { background: #da190b; }";
+    html += ".status { padding: 10px; background: #f0f0f0; border-radius: 5px; margin: 10px 0; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; }";
+    html += ".status-item { margin: 5px 0; }";
+    html += ".message { padding: 10px; margin: 10px 0; border-radius: 5px; text-align: center; display: none; }";
+    html += ".message.success { background: #d4edda; color: #155724; display: block; }";
+    html += ".message.error { background: #f8d7da; color: #721c24; display: block; }";
+    html += "input { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; border: 1px solid #ddd; border-radius: 5px; }";
+    html += "</style>";
+    html += "</head><body>";
+    html += "<h1>VF3 Smart Control</h1>";
+
+    html += "<div class='section'>";
+    html += "<h2>Lock / Unlock</h2>";
+    html += "<div class='button-group'>";
+    html += "<button class='btn-primary' onclick='sendCommand(\"/car/lock\", \"POST\")'>Lock Car</button>";
+    html += "<button class='btn-secondary' onclick='sendCommand(\"/car/unlock\", \"POST\")'>Unlock Car</button>";
+    html += "</div></div>";
+
+    html += "<div class='section'>";
+    html += "<h2>Accessory Power</h2>";
+    html += "<div class='button-group'>";
+    html += "<button class='btn-secondary' onclick='sendCommand(\"/car/accessory-power\", \"POST\", \"state=on\")'>Power ON</button>";
+    html += "<button class='btn-danger' onclick='sendCommand(\"/car/accessory-power\", \"POST\", \"state=off\")'>Power OFF</button>";
+    html += "<button class='btn-warning' onclick='sendCommand(\"/car/accessory-power\", \"POST\", \"state=toggle\")'>Toggle</button>";
+    html += "</div></div>";
+
+    html += "<div class='section'>";
+    html += "<h2>Windows</h2>";
+    html += "<div class='button-group'>";
+    html += "<button class='btn-primary' onclick='sendCommand(\"/car/windows/close\", \"POST\")'>Close Windows (30s)</button>";
+    html += "<button class='btn-danger' onclick='sendCommand(\"/car/windows/stop\", \"POST\")'>Stop</button>";
+    html += "</div></div>";
+
+    html += "<div class='section'>";
+    html += "<h2>Buzzer</h2>";
+    html += "<div class='button-group'>";
+    html += "<button class='btn-warning' onclick='sendCommand(\"/car/buzzer\", \"POST\", \"state=beep&duration=500\")'>Beep (0.5s)</button>";
+    html += "<button class='btn-warning' onclick='sendCommand(\"/car/buzzer\", \"POST\", \"state=beep&duration=1000\")'>Beep (1s)</button>";
+    html += "</div></div>";
+
+    html += "<div class='section'>";
+    html += "<h2>Turn Signals</h2>";
+    html += "<div class='button-group'>";
+    html += "<button class='btn-warning' onclick='sendCommand(\"/car/turn-signal\", \"POST\", \"side=left&state=on\")'>Left ON</button>";
+    html += "<button class='btn-warning' onclick='sendCommand(\"/car/turn-signal\", \"POST\", \"side=right&state=on\")'>Right ON</button>";
+    html += "<button class='btn-danger' onclick='sendCommand(\"/car/turn-signal\", \"POST\", \"side=both&state=off\")'>All OFF</button>";
+    html += "</div></div>";
+
+    html += "<div class='section'>";
+    html += "<h2>Car Status</h2>";
+    html += "<button class='btn-primary' onclick='getStatus()' style='width: 100%;'>Refresh Status</button>";
+    html += "<div class='status' id='status'>Click 'Refresh Status' to load car data...</div>";
+    html += "</div>";
+
+    html += "<div id='message' class='message'></div>";
+
+    html += "<script>";
+    html += "const API_KEY = '" + configured_api_key + "';";
+    html += "function showMessage(msg, isError) {";
+    html += "  const el = document.getElementById('message');";
+    html += "  el.textContent = msg;";
+    html += "  el.className = 'message ' + (isError ? 'error' : 'success');";
+    html += "  setTimeout(() => el.className = 'message', 3000);";
+    html += "}";
+    html += "function sendCommand(url, method, body) {";
+    html += "  const options = { method: method, headers: { 'X-API-Key': API_KEY } };";
+    html += "  if (body) {";
+    html += "    options.headers['Content-Type'] = 'application/x-www-form-urlencoded';";
+    html += "    options.body = body;";
+    html += "  }";
+    html += "  fetch(url, options)";
+    html += "    .then(r => r.json())";
+    html += "    .then(data => {";
+    html += "      if (data.success) showMessage(data.message || 'Success!', false);";
+    html += "      else showMessage(data.message || 'Failed', true);";
+    html += "    })";
+    html += "    .catch(e => showMessage('Error: ' + e.message, true));";
+    html += "}";
+    html += "function getStatus() {";
+    html += "  fetch('/car/status')";
+    html += "    .then(r => r.json())";
+    html += "    .then(data => {";
+    html += "      let html = '';";
+    html += "      html += '<div class=\"status-item\"><strong>Locks:</strong> ' + (data.controls.car_lock ? 'LOCKED' : 'UNLOCKED') + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>Accessory Power:</strong> ' + (data.controls.accessory_power ? 'ON' : 'OFF') + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>Windows:</strong> ' + (data.window_close_active ? 'Closing (' + Math.round(data.window_close_remaining_ms/1000) + 's)' : 'Idle') + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>Doors:</strong> FL:' + (data.doors.front_left ? 'OPEN' : 'CLOSED') + ' FR:' + (data.doors.front_right ? 'OPEN' : 'CLOSED') + ' Trunk:' + (data.doors.trunk ? 'OPEN' : 'CLOSED') + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>Lights:</strong> Demi:' + (data.lights.demi_light ? 'ON' : 'OFF') + ' Normal:' + (data.lights.normal_light ? 'ON' : 'OFF') + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>Seats:</strong> FL:' + (data.seats.front_left_occupied ? 'OCCUPIED' : 'EMPTY') + ' FR:' + (data.seats.front_right_occupied ? 'OCCUPIED' : 'EMPTY') + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>Seatbelts:</strong> FL:' + (data.seats.front_left_seatbelt ? 'FASTENED' : 'UNFASTENED') + ' FR:' + (data.seats.front_right_seatbelt ? 'FASTENED' : 'UNFASTENED') + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>Proximity:</strong> L:' + (data.proximity.rear_left ? 'DETECTED' : 'CLEAR') + ' R:' + (data.proximity.rear_right ? 'DETECTED' : 'CLEAR') + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>Speed:</strong> ' + data.sensors.vehicle_speed + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>Pedals:</strong> Accel:' + data.sensors.accelerator + ' Brake:' + data.sensors.brake + '</div>';";
+    html += "      html += '<div class=\"status-item\"><strong>Steering:</strong> ' + data.sensors.steering_angle + '</div>';";
+    html += "      document.getElementById('status').innerHTML = html;";
+    html += "    })";
+    html += "    .catch(e => showMessage('Error loading status: ' + e.message, true));";
+    html += "}";
+    html += "window.onload = getStatus;";
+    html += "</script>";
     html += "</body></html>";
     request->send(200, "text/html", html);
   });
@@ -634,6 +760,7 @@ void setupOnboardingServer() {
   // Onboarding home page with configuration form
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     String html = "<!DOCTYPE html><html><head>";
+    html += "<meta charset='UTF-8'>";
     html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
     html += "<title>VF3 Smart - Setup</title>";
     html += "<style>";
@@ -643,17 +770,25 @@ void setupOnboardingServer() {
     html += "button { background: #e71e2c; color: white; padding: 15px; width: 100%; border: none; cursor: pointer; font-size: 16px; }";
     html += "button:hover { background: #c51a26; }";
     html += ".info { background: #f0f0f0; padding: 15px; margin: 20px 0; border-radius: 5px; }";
+    html += ".warning { background: #fff3e0; color: #e65100; padding: 15px; margin: 20px 0; border-radius: 5px; }";
     html += "</style>";
     html += "</head><body>";
     html += "<h1>VF3 Smart Setup</h1>";
-    html += "<div class='info'>Welcome! Configure your VF3 Smart device with WiFi credentials and security settings.</div>";
+
+    // Show different message based on whether reconfiguring or initial setup
+    if (is_configured) {
+      html += "<div class='warning'>WARNING: Reconfiguration Mode - Previous WiFi connection failed or you requested to reconfigure.</div>";
+    } else {
+      html += "<div class='info'>Welcome! Configure your VF3 Smart device with WiFi credentials and security settings.</div>";
+    }
+
     html += "<form action='/configure' method='POST'>";
     html += "<label>WiFi SSID (Network Name)</label>";
-    html += "<input type='text' name='ssid' placeholder='Enter WiFi SSID' required>";
+    html += "<input type='text' name='ssid' placeholder='Enter WiFi SSID' value='" + configured_ssid + "' required>";
     html += "<label>WiFi Password</label>";
-    html += "<input type='password' name='password' placeholder='Enter WiFi Password' required>";
+    html += "<input type='password' name='password' placeholder='Enter WiFi Password' value='" + configured_password + "' required>";
     html += "<label>API Key (for secure control)</label>";
-    html += "<input type='text' name='api_key' placeholder='Enter API Key' required>";
+    html += "<input type='text' name='api_key' placeholder='Enter API Key' value='" + configured_api_key + "' required>";
     html += "<div class='info'>API Key can be any string (minimum 8 characters). Save it securely - you'll need it to control your car.</div>";
     html += "<button type='submit'>Save Configuration</button>";
     html += "</form>";
@@ -680,6 +815,7 @@ void setupOnboardingServer() {
     // Validate inputs
     if (ssid.length() < 1 || password.length() < 1 || api_key.length() < 8) {
       String html = "<!DOCTYPE html><html><head>";
+      html += "<meta charset='UTF-8'>";
       html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
       html += "<title>VF3 Smart - Error</title>";
       html += "<style>";
@@ -701,6 +837,7 @@ void setupOnboardingServer() {
 
     // Success page with restart instruction
     String html = "<!DOCTYPE html><html><head>";
+    html += "<meta charset='UTF-8'>";
     html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
     html += "<title>VF3 Smart - Success</title>";
     html += "<style>";
@@ -727,6 +864,7 @@ void setupOnboardingServer() {
   // Restart endpoint
   server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request){
     String html = "<!DOCTYPE html><html><head>";
+    html += "<meta charset='UTF-8'>";
     html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
     html += "<title>VF3 Smart - Restarting</title>";
     html += "<style>";
