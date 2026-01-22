@@ -1,0 +1,13 @@
+#ifndef MQTT_CONFIG_H
+#define MQTT_CONFIG_H
+
+// MQTT Configuration Template
+// Copy this file to mqtt_config.h and fill in your credentials
+// mqtt_config.h is gitignored and will not be committed
+
+#define MQTT_BROKER "your-mqtt-broker.com"
+#define MQTT_PORT 1883
+#define MQTT_USERNAME "your-username"
+#define MQTT_PASSWORD "your-password"
+
+#endif

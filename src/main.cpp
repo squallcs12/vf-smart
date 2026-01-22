@@ -3,6 +3,8 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
+#include <PubSubClient.h>
+#include "mqtt_config.h"
 
 // VinFast VF3 Electric Car - Input and Output Definitions
 // =========================================================
@@ -14,12 +16,24 @@ String configured_password = "";
 String configured_api_key = "";
 bool is_configured = false;
 
+// ===== MQTT CONFIGURATION (Build-time constants from mqtt_config.h) =====
+const char* mqtt_broker = MQTT_BROKER;
+const int mqtt_port = MQTT_PORT;
+const char* mqtt_username = MQTT_USERNAME;
+const char* mqtt_password = MQTT_PASSWORD;
+
 // ===== DEFAULT ONBOARDING AP =====
 const char* onboarding_ssid = "VF3-SETUP";
 const char* onboarding_password = "setup123";
 
 // ===== WEB SERVER =====
 AsyncWebServer server(80);
+
+// ===== MQTT CLIENT =====
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
+unsigned long lastMqttReconnectAttempt = 0;
+#define MQTT_RECONNECT_INTERVAL 5000    // Try to reconnect every 5 seconds
 
 // ===== ANALOG INPUTS (Sensors) - Use input-only pins =====
 #define VF3_ACCELERATOR_PEDAL 34       // GPIO 34 - Accelerator pedal position (input only)
@@ -89,6 +103,10 @@ String getCarStatusJSON();
 bool authenticateRequest(AsyncWebServerRequest *request);
 void loadConfiguration();
 void saveConfiguration(String ssid, String password, String api_key);
+void mqttCallback(char* topic, byte* payload, unsigned int length);
+bool mqttReconnect();
+void mqttPublishStatus();
+void setupMQTT();
 
 void setup() {
   // Initialize Serial Communication
@@ -155,6 +173,10 @@ void setup() {
 
       // Setup normal web server
       setupWebServer();
+
+      // Setup MQTT client
+      setupMQTT();
+
       Serial.println("VinFast VF3 MCU System Ready!");
     } else {
       // Connection failed - start AP mode for reconfiguration
@@ -200,11 +222,27 @@ void setup() {
 }
 
 void loop() {
+  // ===== MQTT CONNECTION HANDLING =====
+  // Only attempt MQTT if device is configured (has API key for topics)
+  if (is_configured && configured_api_key.length() >= 8) {
+    if (!mqttClient.connected()) {
+      unsigned long now = millis();
+      if (now - lastMqttReconnectAttempt > MQTT_RECONNECT_INTERVAL) {
+        lastMqttReconnectAttempt = now;
+        if (mqttReconnect()) {
+          lastMqttReconnectAttempt = 0;
+        }
+      }
+    } else {
+      mqttClient.loop();
+    }
+  }
+
   // ===== READ ANALOG SENSORS =====
   vf3_accelerator = analogRead(VF3_ACCELERATOR_PEDAL);
   vf3_brake = analogRead(VF3_BRAKE_PEDAL);
   vf3_steering_angle = analogRead(VF3_STEERING_ANGLE);
-  
+
   // ===== READ DIGITAL SENSORS =====
   vf3_vehicle_speed = digitalRead(VF3_SPEED_SENSOR);
   vf3_door_fl = digitalRead(VF3_DOOR_FL);
@@ -227,7 +265,7 @@ void loop() {
 
   // Handle accessory power
   handleAccessoryPower();
-  
+
   delay(50);  // 50ms control loop cycle
 }
 
@@ -278,6 +316,8 @@ void loadConfiguration() {
     Serial.println("Configuration loaded from flash");
     Serial.print("SSID: ");
     Serial.println(configured_ssid);
+    Serial.print("MQTT Broker: ");
+    Serial.println(mqtt_broker);
   } else {
     Serial.println("Device not configured - entering onboarding mode");
   }
@@ -379,6 +419,192 @@ String getCarStatusJSON() {
   String output;
   serializeJson(doc, output);
   return output;
+}
+
+// ===== MQTT FUNCTIONS =====
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  // Convert payload to string
+  String message = "";
+  for (unsigned int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+
+  Serial.print("MQTT message received on topic: ");
+  Serial.println(topic);
+  Serial.print("Message: ");
+  Serial.println(message);
+
+  String topicStr = String(topic);
+  String cmdPrefix = configured_api_key + "/command/";
+  String reqPrefix = configured_api_key + "/request/";
+
+  // Handle status request
+  if (topicStr == reqPrefix + "status") {
+    mqttPublishStatus();
+    Serial.println("MQTT: Status request received, publishing status");
+  }
+  // Handle lock command
+  else if (topicStr == cmdPrefix + "lock") {
+    vf3_car_lock = HIGH;
+    vf3_car_unlock = LOW;
+    digitalWrite(VF3_CAR_LOCK, HIGH);
+    digitalWrite(VF3_CAR_UNLOCK, LOW);
+    Serial.println("MQTT: Car locked");
+  }
+  // Handle unlock command
+  else if (topicStr == cmdPrefix + "unlock") {
+    vf3_car_lock = LOW;
+    vf3_car_unlock = HIGH;
+    digitalWrite(VF3_CAR_LOCK, LOW);
+    digitalWrite(VF3_CAR_UNLOCK, HIGH);
+    Serial.println("MQTT: Car unlocked");
+  }
+  // Handle accessory power command
+  else if (topicStr == cmdPrefix + "accessory-power") {
+    if (message == "on") {
+      vf3_accessory_power = HIGH;
+      digitalWrite(VF3_ACCESSORY_POWER, HIGH);
+      Serial.println("MQTT: Accessory power ON");
+    } else if (message == "off") {
+      vf3_accessory_power = LOW;
+      digitalWrite(VF3_ACCESSORY_POWER, LOW);
+      Serial.println("MQTT: Accessory power OFF");
+    } else if (message == "toggle") {
+      vf3_accessory_power = !vf3_accessory_power;
+      digitalWrite(VF3_ACCESSORY_POWER, vf3_accessory_power);
+      Serial.println("MQTT: Accessory power toggled");
+    }
+  }
+  // Handle window close command
+  else if (topicStr == cmdPrefix + "windows/close") {
+    window_close_timer = millis();
+    digitalWrite(VF3_WINDOW_LEFT, HIGH);
+    digitalWrite(VF3_WINDOW_RIGHT, HIGH);
+    Serial.println("MQTT: Windows closing");
+  }
+  // Handle window stop command
+  else if (topicStr == cmdPrefix + "windows/stop") {
+    window_close_timer = 0;
+    digitalWrite(VF3_WINDOW_LEFT, LOW);
+    digitalWrite(VF3_WINDOW_RIGHT, LOW);
+    Serial.println("MQTT: Windows stopped");
+  }
+  // Handle buzzer command
+  else if (topicStr == cmdPrefix + "buzzer") {
+    if (message == "on") {
+      digitalWrite(VF3_BUZZER, HIGH);
+      Serial.println("MQTT: Buzzer ON");
+    } else if (message == "off") {
+      digitalWrite(VF3_BUZZER, LOW);
+      Serial.println("MQTT: Buzzer OFF");
+    } else if (message.startsWith("beep:")) {
+      int duration = message.substring(5).toInt();
+      if (duration > 0 && duration <= 5000) {
+        digitalWrite(VF3_BUZZER, HIGH);
+        delay(duration);
+        digitalWrite(VF3_BUZZER, LOW);
+        Serial.print("MQTT: Buzzer beep for ");
+        Serial.print(duration);
+        Serial.println("ms");
+      }
+    }
+  }
+  // Handle turn signal left command
+  else if (topicStr == cmdPrefix + "turn-signal/left") {
+    if (message == "on") {
+      digitalWrite(VF3_TURN_SIGNAL_L, HIGH);
+      Serial.println("MQTT: Left turn signal ON");
+    } else if (message == "off") {
+      digitalWrite(VF3_TURN_SIGNAL_L, LOW);
+      Serial.println("MQTT: Left turn signal OFF");
+    }
+  }
+  // Handle turn signal right command
+  else if (topicStr == cmdPrefix + "turn-signal/right") {
+    if (message == "on") {
+      digitalWrite(VF3_TURN_SIGNAL_R, HIGH);
+      Serial.println("MQTT: Right turn signal ON");
+    } else if (message == "off") {
+      digitalWrite(VF3_TURN_SIGNAL_R, LOW);
+      Serial.println("MQTT: Right turn signal OFF");
+    }
+  }
+  // Handle turn signal both off command
+  else if (topicStr == cmdPrefix + "turn-signal/both-off") {
+    digitalWrite(VF3_TURN_SIGNAL_L, LOW);
+    digitalWrite(VF3_TURN_SIGNAL_R, LOW);
+    Serial.println("MQTT: Both turn signals OFF");
+  }
+}
+
+bool mqttReconnect() {
+  Serial.print("Attempting MQTT connection to ");
+  Serial.print(mqtt_broker);
+  Serial.print(":");
+  Serial.print(mqtt_port);
+  Serial.println("...");
+
+  // Create a unique client ID
+  String clientId = "VF3-";
+  clientId += String(random(0xffff), HEX);
+
+  // Attempt to connect with credentials
+  bool connected = mqttClient.connect(clientId.c_str(), mqtt_username, mqtt_password);
+
+  if (connected) {
+    Serial.println("MQTT connected!");
+
+    // Subscribe to command topics
+    String cmdPrefix = configured_api_key + "/command/";
+    mqttClient.subscribe((cmdPrefix + "lock").c_str());
+    mqttClient.subscribe((cmdPrefix + "unlock").c_str());
+    mqttClient.subscribe((cmdPrefix + "accessory-power").c_str());
+    mqttClient.subscribe((cmdPrefix + "windows/close").c_str());
+    mqttClient.subscribe((cmdPrefix + "windows/stop").c_str());
+    mqttClient.subscribe((cmdPrefix + "buzzer").c_str());
+    mqttClient.subscribe((cmdPrefix + "turn-signal/left").c_str());
+    mqttClient.subscribe((cmdPrefix + "turn-signal/right").c_str());
+    mqttClient.subscribe((cmdPrefix + "turn-signal/both-off").c_str());
+
+    // Subscribe to request topics
+    String reqPrefix = configured_api_key + "/request/";
+    mqttClient.subscribe((reqPrefix + "status").c_str());
+
+    Serial.print("Subscribed to command topics with prefix: ");
+    Serial.println(cmdPrefix);
+    Serial.print("Subscribed to request topics with prefix: ");
+    Serial.println(reqPrefix);
+  } else {
+    Serial.print("MQTT connection failed, rc=");
+    Serial.println(mqttClient.state());
+  }
+
+  return connected;
+}
+
+void mqttPublishStatus() {
+  if (!mqttClient.connected()) {
+    return;
+  }
+
+  String statusTopic = configured_api_key + "/status";
+  String statusJSON = getCarStatusJSON();
+
+  if (mqttClient.publish(statusTopic.c_str(), statusJSON.c_str())) {
+    Serial.println("MQTT: Status published");
+  } else {
+    Serial.println("MQTT: Status publish failed");
+  }
+}
+
+void setupMQTT() {
+  mqttClient.setServer(mqtt_broker, mqtt_port);
+  mqttClient.setCallback(mqttCallback);
+  mqttClient.setBufferSize(1024);  // Increase buffer size for large JSON payloads
+
+  Serial.println("MQTT client configured");
+  Serial.print("MQTT Broker: ");
+  Serial.println(mqtt_broker);
 }
 
 void setupWebServer() {
@@ -622,6 +848,140 @@ void setupWebServer() {
     request->send(200, "application/json", output);
   });
 
+  // GET /configure - Reconfiguration page
+  server.on("/configure", HTTP_GET, [](AsyncWebServerRequest *request){
+    if (!authenticateRequest(request)) {
+      sendUnauthorized(request);
+      return;
+    }
+
+    String html = "<!DOCTYPE html><html><head>";
+    html += "<meta charset='UTF-8'>";
+    html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+    html += "<title>VF3 Smart - Reconfigure</title>";
+    html += "<style>";
+    html += "body { font-family: Arial; max-width: 500px; margin: 50px auto; padding: 20px; }";
+    html += "h1 { color: #e71e2c; }";
+    html += "h3 { color: #333; border-bottom: 2px solid #e71e2c; padding-bottom: 10px; }";
+    html += "input { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; border: 1px solid #ddd; border-radius: 5px; }";
+    html += "button { background: #e71e2c; color: white; padding: 15px; width: 100%; border: none; cursor: pointer; font-size: 16px; border-radius: 5px; margin-top: 10px; }";
+    html += "button:hover { background: #c51a26; }";
+    html += ".btn-secondary { background: #666; }";
+    html += ".btn-secondary:hover { background: #555; }";
+    html += ".info { background: #f0f0f0; padding: 15px; margin: 20px 0; border-radius: 5px; }";
+    html += ".warning { background: #fff3e0; color: #e65100; padding: 15px; margin: 20px 0; border-radius: 5px; font-weight: bold; }";
+    html += "label { font-weight: bold; display: block; margin-top: 15px; }";
+    html += "</style>";
+    html += "</head><body>";
+    html += "<h1>\xF0\x9F\x94\xA7 VF3 Smart Reconfiguration</h1>";
+    html += "<div class='warning'>\xE2\x9A\xA0\xEF\xB8\x8F Warning: Changing these settings will restart the device and may disconnect you.</div>";
+
+    html += "<form action='/configure' method='POST'>";
+    html += "<h3>WiFi Configuration</h3>";
+    html += "<label>WiFi SSID (Network Name)</label>";
+    html += "<input type='text' name='ssid' placeholder='Enter WiFi SSID' value='" + configured_ssid + "' required>";
+    html += "<label>WiFi Password</label>";
+    html += "<input type='password' name='password' placeholder='Enter WiFi Password' value='" + configured_password + "' required>";
+    html += "<label>API Key (for secure control)</label>";
+    html += "<input type='text' name='api_key' placeholder='Enter API Key' value='" + configured_api_key + "' required>";
+    html += "<div class='info'>API Key must be at least 8 characters. This key is used for HTTP API authentication and as MQTT topic prefix.</div>";
+
+    html += "<button type='submit'>\xF0\x9F\x92\xBE Save Configuration & Restart</button>";
+    html += "</form>";
+    html += "<button class='btn-secondary' onclick='window.location.href=\"/\"' style='margin-top: 10px;'>\xE2\xAC\x85 Back to Dashboard</button>";
+    html += "</body></html>";
+    request->send(200, "text/html", html);
+  });
+
+  // POST /configure - Handle reconfiguration submission
+  server.on("/configure", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (!authenticateRequest(request)) {
+      sendUnauthorized(request);
+      return;
+    }
+
+    String ssid = "";
+    String password = "";
+    String api_key = "";
+
+    if (request->hasParam("ssid", true)) {
+      ssid = request->getParam("ssid", true)->value();
+    }
+    if (request->hasParam("password", true)) {
+      password = request->getParam("password", true)->value();
+    }
+    if (request->hasParam("api_key", true)) {
+      api_key = request->getParam("api_key", true)->value();
+    }
+
+    // Validate inputs
+    if (ssid.length() < 1 || password.length() < 1 || api_key.length() < 8) {
+      String html = "<!DOCTYPE html><html><head>";
+      html += "<meta charset='UTF-8'>";
+      html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+      html += "<title>VF3 Smart - Error</title>";
+      html += "<style>";
+      html += "body { font-family: Arial; max-width: 500px; margin: 50px auto; padding: 20px; text-align: center; }";
+      html += ".error { background: #ffebee; color: #c62828; padding: 20px; border-radius: 5px; margin: 20px 0; }";
+      html += "a { color: #e71e2c; text-decoration: none; font-weight: bold; }";
+      html += "</style>";
+      html += "</head><body>";
+      html += "<h1>Configuration Error</h1>";
+      html += "<div class='error'>Invalid configuration. API Key must be at least 8 characters.</div>";
+      html += "<a href='/configure'>Go Back</a>";
+      html += "</body></html>";
+      request->send(400, "text/html", html);
+      return;
+    }
+
+    // Save configuration
+    saveConfiguration(ssid, password, api_key);
+
+    // Success page with restart instruction
+    String html = "<!DOCTYPE html><html><head>";
+    html += "<meta charset='UTF-8'>";
+    html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+    html += "<title>VF3 Smart - Success</title>";
+    html += "<style>";
+    html += "body { font-family: Arial; max-width: 500px; margin: 50px auto; padding: 20px; text-align: center; }";
+    html += "h1 { color: #4caf50; }";
+    html += ".success { background: #e8f5e9; color: #2e7d32; padding: 20px; border-radius: 5px; margin: 20px 0; }";
+    html += ".info { background: #fff3e0; color: #e65100; padding: 15px; margin: 20px 0; border-radius: 5px; }";
+    html += "</style>";
+    html += "</head><body>";
+    html += "<h1>\xE2\x9C\x85 Configuration Updated!</h1>";
+    html += "<div class='success'>";
+    html += "Your VF3 Smart device configuration has been updated successfully.<br><br>";
+    html += "<strong>SSID:</strong> " + ssid + "<br>";
+    html += "<strong>API Key:</strong> " + api_key + " (save this securely!)";
+    html += "</div>";
+    html += "<div class='info'>The device will restart in 3 seconds. Please reconnect to the WiFi network: <strong>" + ssid + "</strong></div>";
+    html += "<script>setTimeout(function(){ window.location.href='/restart'; }, 3000);</script>";
+    html += "</body></html>";
+    request->send(200, "text/html", html);
+  });
+
+  // GET /restart - Restart the device
+  server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request){
+    String html = "<!DOCTYPE html><html><head>";
+    html += "<meta charset='UTF-8'>";
+    html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+    html += "<title>VF3 Smart - Restarting</title>";
+    html += "<style>";
+    html += "body { font-family: Arial; max-width: 500px; margin: 50px auto; padding: 20px; text-align: center; }";
+    html += ".info { background: #e3f2fd; color: #0d47a1; padding: 20px; border-radius: 5px; margin: 20px 0; }";
+    html += "</style>";
+    html += "</head><body>";
+    html += "<h1>\xF0\x9F\x94\x84 Restarting...</h1>";
+    html += "<div class='info'>Device is restarting. Please wait 10 seconds then reconnect to your WiFi network.</div>";
+    html += "</body></html>";
+    request->send(200, "text/html", html);
+
+    // Restart after 1 second
+    delay(1000);
+    ESP.restart();
+  });
+
   // Root endpoint - Control dashboard
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     String html = "<!DOCTYPE html><html><head>";
@@ -650,9 +1010,21 @@ void setupWebServer() {
     html += ".message.success { background: #d4edda; color: #155724; display: block; }";
     html += ".message.error { background: #f8d7da; color: #721c24; display: block; }";
     html += "input { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; border: 1px solid #ddd; border-radius: 5px; }";
+    html += ".auth-section { background: #fff3e0; border-left: 4px solid #ff9800; }";
+    html += ".auth-section input { margin: 5px 0; }";
+    html += ".auth-status { padding: 8px; margin: 10px 0; border-radius: 5px; font-size: 14px; text-align: center; }";
+    html += ".auth-status.authenticated { background: #d4edda; color: #155724; }";
+    html += ".auth-status.not-authenticated { background: #f8d7da; color: #721c24; }";
     html += "</style>";
     html += "</head><body>";
     html += "<h1>\xF0\x9F\x9A\x97 VF3 Smart Control</h1>";
+
+    html += "<div class='section auth-section'>";
+    html += "<h2>\xF0\x9F\x94\x91 Authentication</h2>";
+    html += "<input type='text' id='apiKeyInput' placeholder='Enter your API Key' value=''>";
+    html += "<button class='btn-primary' onclick='setApiKey()' style='width: 100%;'>Save API Key</button>";
+    html += "<div id='authStatus' class='auth-status not-authenticated'>Not authenticated - Please enter your API Key</div>";
+    html += "</div>";
 
     html += "<div class='section'>";
     html += "<h2>\xF0\x9F\x94\x90 Lock / Unlock</h2>";
@@ -697,10 +1069,46 @@ void setupWebServer() {
     html += "<div class='status' id='status'>Click 'Refresh Status' to load car data...</div>";
     html += "</div>";
 
+    html += "<div class='section'>";
+    html += "<h2>\xF0\x9F\x94\xA7 Settings</h2>";
+    html += "<button class='btn-warning' onclick='goToReconfigure()' style='width: 100%;'>\xF0\x9F\x94\xA7 Reconfigure Device</button>";
+    html += "</div>";
+
     html += "<div id='message' class='message'></div>";
 
     html += "<script>";
-    html += "const API_KEY = '" + configured_api_key + "';";
+    html += "function getStoredApiKey() {";
+    html += "  return localStorage.getItem('vf3_api_key') || '';";
+    html += "}";
+    html += "function goToReconfigure() {";
+    html += "  const apiKey = getStoredApiKey();";
+    html += "  if (!apiKey || apiKey.length < 8) {";
+    html += "    showMessage('Please enter your API Key first', true);";
+    html += "    return;";
+    html += "  }";
+    html += "  window.location.href = '/configure?api_key=' + encodeURIComponent(apiKey);";
+    html += "}";
+    html += "function setApiKey() {";
+    html += "  const key = document.getElementById('apiKeyInput').value.trim();";
+    html += "  if (key.length < 8) {";
+    html += "    showMessage('API Key must be at least 8 characters', true);";
+    html += "    return;";
+    html += "  }";
+    html += "  localStorage.setItem('vf3_api_key', key);";
+    html += "  updateAuthStatus();";
+    html += "  showMessage('API Key saved successfully!', false);";
+    html += "}";
+    html += "function updateAuthStatus() {";
+    html += "  const key = getStoredApiKey();";
+    html += "  const statusEl = document.getElementById('authStatus');";
+    html += "  if (key.length >= 8) {";
+    html += "    statusEl.textContent = '\xE2\x9C\x85 Authenticated (Key: ' + key.substring(0, 4) + '****)';";
+    html += "    statusEl.className = 'auth-status authenticated';";
+    html += "  } else {";
+    html += "    statusEl.textContent = '\xE2\x9D\x8C Not authenticated - Please enter your API Key';";
+    html += "    statusEl.className = 'auth-status not-authenticated';";
+    html += "  }";
+    html += "}";
     html += "function showMessage(msg, isError) {";
     html += "  const el = document.getElementById('message');";
     html += "  el.textContent = msg;";
@@ -708,7 +1116,12 @@ void setupWebServer() {
     html += "  setTimeout(() => el.className = 'message', 3000);";
     html += "}";
     html += "function sendCommand(url, method, body) {";
-    html += "  const options = { method: method, headers: { 'X-API-Key': API_KEY } };";
+    html += "  const apiKey = getStoredApiKey();";
+    html += "  if (!apiKey || apiKey.length < 8) {";
+    html += "    showMessage('Please enter your API Key first', true);";
+    html += "    return;";
+    html += "  }";
+    html += "  const options = { method: method, headers: { 'X-API-Key': apiKey } };";
     html += "  if (body) {";
     html += "    options.headers['Content-Type'] = 'application/x-www-form-urlencoded';";
     html += "    options.body = body;";
@@ -741,7 +1154,14 @@ void setupWebServer() {
     html += "    })";
     html += "    .catch(e => showMessage('Error loading status: ' + e.message, true));";
     html += "}";
-    html += "window.onload = getStatus;";
+    html += "window.onload = function() {";
+    html += "  const storedKey = getStoredApiKey();";
+    html += "  if (storedKey) {";
+    html += "    document.getElementById('apiKeyInput').value = storedKey;";
+    html += "  }";
+    html += "  updateAuthStatus();";
+    html += "  getStatus();";
+    html += "};";
     html += "</script>";
     html += "</body></html>";
     request->send(200, "text/html", html);
@@ -783,13 +1203,14 @@ void setupOnboardingServer() {
     }
 
     html += "<form action='/configure' method='POST'>";
+    html += "<h3>WiFi Configuration</h3>";
     html += "<label>WiFi SSID (Network Name)</label>";
     html += "<input type='text' name='ssid' placeholder='Enter WiFi SSID' value='" + configured_ssid + "' required>";
     html += "<label>WiFi Password</label>";
     html += "<input type='password' name='password' placeholder='Enter WiFi Password' value='" + configured_password + "' required>";
     html += "<label>API Key (for secure control)</label>";
     html += "<input type='text' name='api_key' placeholder='Enter API Key' value='" + configured_api_key + "' required>";
-    html += "<div class='info'>API Key can be any string (minimum 8 characters). Save it securely - you'll need it to control your car.</div>";
+    html += "<div class='info'>API Key can be any string (minimum 8 characters). Save it securely - you'll need it to control your car via HTTP API and MQTT.</div>";
     html += "<button type='submit'>Save Configuration</button>";
     html += "</form>";
     html += "</body></html>";
