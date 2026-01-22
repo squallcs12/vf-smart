@@ -2,16 +2,21 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
+#include <Preferences.h>
 
 // VinFast VF3 Electric Car - Input and Output Definitions
 // =========================================================
 
-// ===== WIFI CONFIGURATION =====
-const char* ssid = "VF3_SMART";           // WiFi SSID
-const char* password = "vf3smart123";     // WiFi Password
+// ===== CONFIGURATION STORAGE =====
+Preferences preferences;
+String configured_ssid = "";
+String configured_password = "";
+String configured_api_key = "";
+bool is_configured = false;
 
-// ===== API AUTHENTICATION =====
-const char* api_key = "VF3-SMART-2024-SECRET-KEY-9876";  // Fixed API key for authentication
+// ===== DEFAULT ONBOARDING AP =====
+const char* onboarding_ssid = "VF3-SETUP";
+const char* onboarding_password = "setup123";
 
 // ===== WEB SERVER =====
 AsyncWebServer server(80);
@@ -83,14 +88,20 @@ int vf3_door_locked = LOW;            // 0=unlocked, 1=locked
 void handleAccessoryPower();
 void handleWindowControl();
 void setupWebServer();
+void setupOnboardingServer();
 String getCarStatusJSON();
 bool authenticateRequest(AsyncWebServerRequest *request);
+void loadConfiguration();
+void saveConfiguration(String ssid, String password, String api_key);
 
 void setup() {
   // Initialize Serial Communication
   Serial.begin(9600);
   Serial.println("VinFast VF3 MCU Control System Initializing...");
-  
+
+  // Load configuration from flash
+  loadConfiguration();
+
   // Initialize Digital Input Pins
   pinMode(VF3_SPEED_SENSOR, INPUT);
   pinMode(VF3_DOOR_FL, INPUT);
@@ -121,17 +132,38 @@ void setup() {
   // Turn on accessory power on startup
   digitalWrite(VF3_ACCESSORY_POWER, HIGH);
 
-  // Initialize WiFi
+  // Initialize WiFi based on configuration status
   WiFi.mode(WIFI_AP);
-  WiFi.softAP(ssid, password);
-  Serial.println("WiFi AP Started");
-  Serial.print("AP IP address: ");
-  Serial.println(WiFi.softAPIP());
 
-  // Setup web server
-  setupWebServer();
+  if (is_configured) {
+    // Use configured credentials
+    WiFi.softAP(configured_ssid.c_str(), configured_password.c_str());
+    Serial.println("WiFi AP Started with configured credentials");
+    Serial.print("SSID: ");
+    Serial.println(configured_ssid);
+    Serial.print("AP IP address: ");
+    Serial.println(WiFi.softAPIP());
 
-  Serial.println("VinFast VF3 MCU System Ready!");
+    // Setup normal web server
+    setupWebServer();
+    Serial.println("VinFast VF3 MCU System Ready!");
+  } else {
+    // Use onboarding AP
+    WiFi.softAP(onboarding_ssid, onboarding_password);
+    Serial.println("===========================================");
+    Serial.println("ONBOARDING MODE - Device not configured");
+    Serial.println("===========================================");
+    Serial.print("Connect to WiFi: ");
+    Serial.println(onboarding_ssid);
+    Serial.print("Password: ");
+    Serial.println(onboarding_password);
+    Serial.print("Then visit: http://");
+    Serial.println(WiFi.softAPIP());
+    Serial.println("===========================================");
+
+    // Setup onboarding web server
+    setupOnboardingServer();
+  }
 }
 
 void loop() {
@@ -210,11 +242,44 @@ void handleAccessoryPower() {
   }
 }
 
+void loadConfiguration() {
+  preferences.begin("vf3-config", false);
+
+  is_configured = preferences.getBool("configured", false);
+
+  if (is_configured) {
+    configured_ssid = preferences.getString("ssid", "");
+    configured_password = preferences.getString("password", "");
+    configured_api_key = preferences.getString("api_key", "");
+
+    Serial.println("Configuration loaded from flash");
+    Serial.print("SSID: ");
+    Serial.println(configured_ssid);
+  } else {
+    Serial.println("Device not configured - entering onboarding mode");
+  }
+
+  preferences.end();
+}
+
+void saveConfiguration(String ssid, String password, String api_key) {
+  preferences.begin("vf3-config", false);
+
+  preferences.putString("ssid", ssid);
+  preferences.putString("password", password);
+  preferences.putString("api_key", api_key);
+  preferences.putBool("configured", true);
+
+  preferences.end();
+
+  Serial.println("Configuration saved to flash");
+}
+
 bool authenticateRequest(AsyncWebServerRequest *request) {
   // Check for API key in X-API-Key header
   if (request->hasHeader("X-API-Key")) {
     String headerKey = request->header("X-API-Key");
-    if (headerKey == api_key) {
+    if (headerKey == configured_api_key) {
       return true;
     }
   }
@@ -222,7 +287,7 @@ bool authenticateRequest(AsyncWebServerRequest *request) {
   // Check for API key in query parameter
   if (request->hasParam("api_key")) {
     String paramKey = request->getParam("api_key")->value();
-    if (paramKey == api_key) {
+    if (paramKey == configured_api_key) {
       return true;
     }
   }
@@ -563,4 +628,127 @@ void setupWebServer() {
 
   server.begin();
   Serial.println("Web server started on port 80");
+}
+
+void setupOnboardingServer() {
+  // Onboarding home page with configuration form
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    String html = "<!DOCTYPE html><html><head>";
+    html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+    html += "<title>VF3 Smart - Setup</title>";
+    html += "<style>";
+    html += "body { font-family: Arial; max-width: 500px; margin: 50px auto; padding: 20px; }";
+    html += "h1 { color: #e71e2c; }";
+    html += "input { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }";
+    html += "button { background: #e71e2c; color: white; padding: 15px; width: 100%; border: none; cursor: pointer; font-size: 16px; }";
+    html += "button:hover { background: #c51a26; }";
+    html += ".info { background: #f0f0f0; padding: 15px; margin: 20px 0; border-radius: 5px; }";
+    html += "</style>";
+    html += "</head><body>";
+    html += "<h1>VF3 Smart Setup</h1>";
+    html += "<div class='info'>Welcome! Configure your VF3 Smart device with WiFi credentials and security settings.</div>";
+    html += "<form action='/configure' method='POST'>";
+    html += "<label>WiFi SSID (Network Name)</label>";
+    html += "<input type='text' name='ssid' placeholder='Enter WiFi SSID' required>";
+    html += "<label>WiFi Password</label>";
+    html += "<input type='password' name='password' placeholder='Enter WiFi Password' required>";
+    html += "<label>API Key (for secure control)</label>";
+    html += "<input type='text' name='api_key' placeholder='Enter API Key' required>";
+    html += "<div class='info'>API Key can be any string (minimum 8 characters). Save it securely - you'll need it to control your car.</div>";
+    html += "<button type='submit'>Save Configuration</button>";
+    html += "</form>";
+    html += "</body></html>";
+    request->send(200, "text/html", html);
+  });
+
+  // Handle configuration submission
+  server.on("/configure", HTTP_POST, [](AsyncWebServerRequest *request){
+    String ssid = "";
+    String password = "";
+    String api_key = "";
+
+    if (request->hasParam("ssid", true)) {
+      ssid = request->getParam("ssid", true)->value();
+    }
+    if (request->hasParam("password", true)) {
+      password = request->getParam("password", true)->value();
+    }
+    if (request->hasParam("api_key", true)) {
+      api_key = request->getParam("api_key", true)->value();
+    }
+
+    // Validate inputs
+    if (ssid.length() < 1 || password.length() < 1 || api_key.length() < 8) {
+      String html = "<!DOCTYPE html><html><head>";
+      html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+      html += "<title>VF3 Smart - Error</title>";
+      html += "<style>";
+      html += "body { font-family: Arial; max-width: 500px; margin: 50px auto; padding: 20px; text-align: center; }";
+      html += ".error { background: #ffebee; color: #c62828; padding: 20px; border-radius: 5px; margin: 20px 0; }";
+      html += "a { color: #e71e2c; text-decoration: none; font-weight: bold; }";
+      html += "</style>";
+      html += "</head><body>";
+      html += "<h1>Configuration Error</h1>";
+      html += "<div class='error'>Invalid configuration. API Key must be at least 8 characters.</div>";
+      html += "<a href='/'>Go Back</a>";
+      html += "</body></html>";
+      request->send(400, "text/html", html);
+      return;
+    }
+
+    // Save configuration
+    saveConfiguration(ssid, password, api_key);
+
+    // Success page with restart instruction
+    String html = "<!DOCTYPE html><html><head>";
+    html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+    html += "<title>VF3 Smart - Success</title>";
+    html += "<style>";
+    html += "body { font-family: Arial; max-width: 500px; margin: 50px auto; padding: 20px; text-align: center; }";
+    html += "h1 { color: #4caf50; }";
+    html += ".success { background: #e8f5e9; color: #2e7d32; padding: 20px; border-radius: 5px; margin: 20px 0; }";
+    html += ".info { background: #fff3e0; color: #e65100; padding: 15px; margin: 20px 0; border-radius: 5px; }";
+    html += "button { background: #e71e2c; color: white; padding: 15px 30px; border: none; cursor: pointer; font-size: 16px; margin-top: 20px; }";
+    html += "button:hover { background: #c51a26; }";
+    html += "</style>";
+    html += "</head><body>";
+    html += "<h1>Configuration Saved!</h1>";
+    html += "<div class='success'>";
+    html += "Your VF3 Smart device has been configured successfully.<br><br>";
+    html += "<strong>SSID:</strong> " + ssid + "<br>";
+    html += "<strong>API Key:</strong> " + api_key + " (save this securely!)";
+    html += "</div>";
+    html += "<div class='info'>The device will restart in 3 seconds. After restart, connect to the WiFi network you configured.</div>";
+    html += "<script>setTimeout(function(){ window.location.href='/restart'; }, 3000);</script>";
+    html += "</body></html>";
+    request->send(200, "text/html", html);
+  });
+
+  // Restart endpoint
+  server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request){
+    String html = "<!DOCTYPE html><html><head>";
+    html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+    html += "<title>VF3 Smart - Restarting</title>";
+    html += "<style>";
+    html += "body { font-family: Arial; max-width: 500px; margin: 50px auto; padding: 20px; text-align: center; }";
+    html += ".info { background: #e3f2fd; color: #0d47a1; padding: 20px; border-radius: 5px; margin: 20px 0; }";
+    html += "</style>";
+    html += "</head><body>";
+    html += "<h1>Restarting...</h1>";
+    html += "<div class='info'>Device is restarting. Please wait 10 seconds then connect to your configured WiFi network.</div>";
+    html += "</body></html>";
+    request->send(200, "text/html", html);
+
+    // Restart after 1 second
+    delay(1000);
+    ESP.restart();
+  });
+
+  // Handle 404
+  server.onNotFound([](AsyncWebServerRequest *request){
+    request->send(404, "text/plain", "Not found - Please visit / for setup");
+  });
+
+  server.begin();
+  Serial.println("Onboarding web server started on port 80");
 }

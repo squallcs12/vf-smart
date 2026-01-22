@@ -103,27 +103,58 @@ State is managed through global variables that mirror physical sensor/actuator s
 
 The system includes an async web server that exposes car status via HTTP endpoints.
 
-### WiFi Configuration
+### Device Onboarding
+
+On first boot, the device enters **onboarding mode** to allow configuration of WiFi credentials and API key.
+
+#### Onboarding Process
+
+1. **Initial Boot** - Device creates an open WiFi network:
+   - **SSID**: `VF3-SETUP`
+   - **Password**: `setup123`
+   - **IP Address**: `192.168.4.1`
+
+2. **Connect to Setup Network**
+   - Connect your phone/computer to `VF3-SETUP`
+   - Visit `http://192.168.4.1` in a web browser
+
+3. **Configure Device**
+   - Enter your desired WiFi SSID (network name)
+   - Enter WiFi password
+   - Create an API key (minimum 8 characters)
+   - **Important**: Save the API key securely - you'll need it for all control operations
+
+4. **Device Restart**
+   - Configuration is saved to flash memory
+   - Device automatically restarts
+   - After restart, device creates its own AP with your configured credentials
+
+#### Configuration Storage
+- All configuration is stored in ESP32 NVS (Non-Volatile Storage)
+- Survives power cycles and firmware updates
+- To reconfigure, you must erase flash or modify code to reset configuration
+
+### WiFi Configuration (After Onboarding)
 - **Mode**: Access Point (AP)
-- **SSID**: `VF3_SMART`
-- **Password**: `vf3smart123`
+- **SSID**: Configured during onboarding
+- **Password**: Configured during onboarding
 - **Default IP**: 192.168.4.1 (ESP32 AP default)
 
 ### API Authentication
 All control endpoints (POST requests) require API key authentication for security.
 
-**API Key**: `VF3-SMART-2024-SECRET-KEY-9876`
+**API Key**: Configured during onboarding (user-defined)
 
 **Authentication Methods:**
 1. **HTTP Header** (Recommended):
    ```bash
    curl -X POST http://192.168.4.1/car/lock \
-     -H "X-API-Key: VF3-SMART-2024-SECRET-KEY-9876"
+     -H "X-API-Key: YOUR_API_KEY"
    ```
 
 2. **Query Parameter**:
    ```bash
-   curl -X POST "http://192.168.4.1/car/lock?api_key=VF3-SMART-2024-SECRET-KEY-9876"
+   curl -X POST "http://192.168.4.1/car/lock?api_key=YOUR_API_KEY"
    ```
 
 **Unauthorized Response** (401):
@@ -224,7 +255,7 @@ Control accessory power. Requires `state` parameter.
 **Example Request:**
 ```bash
 curl -X POST http://192.168.4.1/car/accessory-power \
-  -H "X-API-Key: VF3-SMART-2024-SECRET-KEY-9876" \
+  -H "X-API-Key: YOUR_API_KEY" \
   -d "state=on"
 ```
 
@@ -273,17 +304,17 @@ Control the buzzer/alarm.
 ```bash
 # Turn on buzzer
 curl -X POST http://192.168.4.1/car/buzzer \
-  -H "X-API-Key: VF3-SMART-2024-SECRET-KEY-9876" \
+  -H "X-API-Key: YOUR_API_KEY" \
   -d "state=on"
 
 # Beep for 500ms
 curl -X POST http://192.168.4.1/car/buzzer \
-  -H "X-API-Key: VF3-SMART-2024-SECRET-KEY-9876" \
+  -H "X-API-Key: YOUR_API_KEY" \
   -d "state=beep&duration=500"
 
 # Turn off buzzer
 curl -X POST http://192.168.4.1/car/buzzer \
-  -H "X-API-Key: VF3-SMART-2024-SECRET-KEY-9876" \
+  -H "X-API-Key: YOUR_API_KEY" \
   -d "state=off"
 ```
 
@@ -306,12 +337,12 @@ Control turn signals.
 ```bash
 # Turn on left turn signal
 curl -X POST http://192.168.4.1/car/turn-signal \
-  -H "X-API-Key: VF3-SMART-2024-SECRET-KEY-9876" \
+  -H "X-API-Key: YOUR_API_KEY" \
   -d "side=left&state=on"
 
 # Turn off both turn signals
 curl -X POST http://192.168.4.1/car/turn-signal \
-  -H "X-API-Key: VF3-SMART-2024-SECRET-KEY-9876" \
+  -H "X-API-Key: YOUR_API_KEY" \
   -d "side=both&state=off"
 ```
 
@@ -328,9 +359,9 @@ curl -X POST http://192.168.4.1/car/turn-signal \
 ### Testing the API
 
 ```bash
-# Connect to VF3_SMART WiFi network (password: vf3smart123)
-# Set API key for convenience
-API_KEY="VF3-SMART-2024-SECRET-KEY-9876"
+# Connect to your configured WiFi network
+# Set your configured API key
+API_KEY="YOUR_CONFIGURED_API_KEY"
 
 # Get car status (no auth required)
 curl http://192.168.4.1/car/status
