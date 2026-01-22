@@ -23,6 +23,7 @@
 #define VF3_NORMAL_LIGHT 19            // GPIO 19 - Normal/high beam light (0=off, 1=on)
 #define VF3_PROXIMITY_REAR_L 20        // GPIO 20 - Rear left proximity/parking detection
 #define VF3_PROXIMITY_REAR_R 21        // GPIO 21 - Rear right proximity/parking detection
+#define VF3_ACCESSORY_POWER_BUTTON 22  // GPIO 22 - Accessory power button (manual toggle)
 
 // ===== DIGITAL OUTPUTS (Controls & Indicators) =====
 #define VF3_CAR_LOCK 5                 // GPIO 5 - Car lock control
@@ -33,6 +34,7 @@
 #define VF3_WINDOW_LEFT 10             // GPIO 10 - Front left window control
 #define VF3_WINDOW_RIGHT 11            // GPIO 11 - Front right window control
 #define VF3_ACCESSORY_POWER 7          // GPIO 7 - Accessory power control
+#define VF3_BRAKE_SIGNAL 12            // GPIO 12 - Brake signal/brake light
 
 // ===== INPUT VARIABLES =====
 int vf3_motor_temp = 0;               // Motor temperature (°C)
@@ -52,6 +54,8 @@ int vf3_proximity_rear_l = LOW;       // Rear left proximity sensor (0=clear, 1=
 int vf3_proximity_rear_r = LOW;       // Rear right proximity sensor (0=clear, 1=detected)
 int vf3_demi_light = LOW;             // Demi/low beam light (0=off, 1=on)
 int vf3_normal_light = LOW;           // Normal/high beam light (0=off, 1=on)
+int vf3_accessory_power_button = LOW; // Accessory power button state (0=not pressed, 1=pressed)
+int vf3_accessory_power_button_last = LOW; // Last button state for edge detection
 
 // ===== OUTPUT VARIABLES =====
 int vf3_car_lock = LOW;               // Car lock control
@@ -85,6 +89,7 @@ void setup() {
   pinMode(VF3_NORMAL_LIGHT, INPUT);
   pinMode(VF3_PROXIMITY_REAR_L, INPUT);
   pinMode(VF3_PROXIMITY_REAR_R, INPUT);
+  pinMode(VF3_ACCESSORY_POWER_BUTTON, INPUT);
   
   // Initialize Digital Output Pins (Control Systems)
   pinMode(VF3_CAR_LOCK, OUTPUT);
@@ -124,6 +129,7 @@ void loop() {
   vf3_normal_light = digitalRead(VF3_NORMAL_LIGHT);
   vf3_proximity_rear_l = digitalRead(VF3_PROXIMITY_REAR_L);
   vf3_proximity_rear_r = digitalRead(VF3_PROXIMITY_REAR_R);
+  vf3_accessory_power_button = digitalRead(VF3_ACCESSORY_POWER_BUTTON);
   
   // ===== CONTROL LOGIC =====
   
@@ -157,14 +163,23 @@ void handleWindowControl() {
 }
 
 void handleAccessoryPower() {
+  // Manual button toggle (on button press - rising edge detection)
+  if (vf3_accessory_power_button == HIGH && vf3_accessory_power_button_last == LOW) {
+    // Toggle accessory power
+    vf3_accessory_power = !vf3_accessory_power;
+    digitalWrite(VF3_ACCESSORY_POWER, vf3_accessory_power);
+  }
+  vf3_accessory_power_button_last = vf3_accessory_power_button;
+
   // Turn off accessory power when car is locked
   if (vf3_car_lock == HIGH) {
     digitalWrite(VF3_ACCESSORY_POWER, LOW);
     vf3_accessory_power = LOW;
   }
-  
+
   // Turn on accessory power when car is unlocked
   if (vf3_car_unlock == HIGH) {
     digitalWrite(VF3_ACCESSORY_POWER, HIGH);
     vf3_accessory_power = HIGH;
   }
+}
