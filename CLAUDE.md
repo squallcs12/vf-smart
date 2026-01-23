@@ -405,5 +405,197 @@ open http://192.168.4.1
 ```
 
 ### Dependencies
-- **ESPAsyncWebServer-esphome**: Async web server for ESP32
+- **ESPAsyncWebServer-esphome**: Async web server for ESP32 (includes WebSocket support)
 - **ArduinoJson**: JSON serialization/deserialization
+
+## WebSocket Real-Time Communication
+
+The system provides a WebSocket server for real-time bidirectional communication with clients.
+
+### WebSocket Connection
+
+- **Endpoint**: `ws://192.168.4.1/ws`
+- **Protocol**: WebSocket (RFC 6455)
+- **Auto-broadcast**: Status updates sent every 1 second to all connected clients
+
+### Connection Behavior
+
+1. **On Connect**: Server immediately sends current car status as JSON
+2. **Periodic Updates**: Status broadcast every 1 second to all clients
+3. **Command Response**: Status update sent immediately after command execution
+
+### WebSocket Commands
+
+Commands are sent as JSON objects with this format:
+```json
+{
+  "command": "command-name",
+  "action": "optional-action"
+}
+```
+
+#### Available Commands
+
+**Lock/Unlock**
+```json
+{"command": "lock"}
+{"command": "unlock"}
+```
+
+**Accessory Power**
+```json
+{"command": "accessory-power", "action": "on"}
+{"command": "accessory-power", "action": "off"}
+{"command": "accessory-power", "action": "toggle"}
+```
+
+**Windows**
+```json
+{"command": "windows-close"}
+{"command": "windows-stop"}
+```
+
+**Buzzer**
+```json
+{"command": "buzzer", "action": "on"}
+{"command": "buzzer", "action": "off"}
+{"command": "buzzer", "action": "beep:500"}  // Duration in ms
+```
+
+**Turn Signals**
+```json
+{"command": "turn-signal-left", "action": "on"}
+{"command": "turn-signal-left", "action": "off"}
+{"command": "turn-signal-right", "action": "on"}
+{"command": "turn-signal-right", "action": "off"}
+{"command": "turn-signal-both-off"}
+```
+
+**Request Status**
+```json
+{"command": "status"}
+```
+
+### JavaScript WebSocket Client Example
+
+```javascript
+// Connect to WebSocket
+const ws = new WebSocket('ws://192.168.4.1/ws');
+
+// Handle connection open
+ws.onopen = function() {
+  console.log('Connected to VF3 Smart');
+
+  // Request current status
+  ws.send(JSON.stringify({command: "status"}));
+};
+
+// Handle incoming messages (status updates)
+ws.onmessage = function(event) {
+  const status = JSON.parse(event.data);
+  console.log('Car status:', status);
+
+  // Example: Check if car is locked
+  if (status.controls.car_lock === 1) {
+    console.log('Car is locked');
+  }
+
+  // Example: Check nighttime status
+  if (status.time && status.time.is_night) {
+    console.log('It is nighttime - headlights reminder active');
+  }
+};
+
+// Send commands
+function lockCar() {
+  ws.send(JSON.stringify({command: "lock"}));
+}
+
+function unlockCar() {
+  ws.send(JSON.stringify({command: "unlock"}));
+}
+
+function toggleAccessoryPower() {
+  ws.send(JSON.stringify({
+    command: "accessory-power",
+    action: "toggle"
+  }));
+}
+
+function beep(duration = 500) {
+  ws.send(JSON.stringify({
+    command: "buzzer",
+    action: `beep:${duration}`
+  }));
+}
+
+function closeWindows() {
+  ws.send(JSON.stringify({command: "windows-close"}));
+}
+
+// Handle errors
+ws.onerror = function(error) {
+  console.error('WebSocket error:', error);
+};
+
+// Handle disconnection
+ws.onclose = function() {
+  console.log('Disconnected from VF3 Smart');
+  // Optionally implement reconnection logic
+};
+```
+
+### Python WebSocket Client Example
+
+```python
+import asyncio
+import websockets
+import json
+
+async def vf3_control():
+    uri = "ws://192.168.4.1/ws"
+
+    async with websockets.connect(uri) as websocket:
+        print("Connected to VF3 Smart")
+
+        # Receive initial status
+        status = await websocket.recv()
+        print(f"Initial status: {status}")
+
+        # Lock the car
+        await websocket.send(json.dumps({"command": "lock"}))
+        response = await websocket.recv()
+        print(f"Lock response: {response}")
+
+        # Wait 3 seconds
+        await asyncio.sleep(3)
+
+        # Unlock the car
+        await websocket.send(json.dumps({"command": "unlock"}))
+        response = await websocket.recv()
+        print(f"Unlock response: {response}")
+
+        # Listen for status updates
+        while True:
+            status = await websocket.recv()
+            data = json.loads(status)
+            print(f"Speed: {data['sensors']['vehicle_speed']}, " +
+                  f"Gear: {'D' if data['sensors']['gear_drive'] else 'Other'}")
+
+# Run the client
+asyncio.run(vf3_control())
+```
+
+### WebSocket vs HTTP API
+
+**Use WebSocket when:**
+- Real-time status monitoring needed
+- Low latency control required
+- Building interactive dashboards
+- Implementing mobile apps with live updates
+
+**Use HTTP API when:**
+- Simple one-off commands
+- Integration with existing HTTP-based systems
+- Testing with curl/Postman
+- No need for real-time updates

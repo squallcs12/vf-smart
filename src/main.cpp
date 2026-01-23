@@ -3,9 +3,7 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
-#include <PubSubClient.h>
 #include <time.h>
-#include "mqtt_config.h"
 
 // VinFast VF3 Electric Car - Input and Output Definitions
 // =========================================================
@@ -16,12 +14,6 @@ String configured_ssid = "";
 String configured_password = "";
 String configured_api_key = "";
 bool is_configured = false;
-
-// ===== MQTT CONFIGURATION (Build-time constants from mqtt_config.h) =====
-const char* mqtt_broker = MQTT_BROKER;
-const int mqtt_port = MQTT_PORT;
-const char* mqtt_username = MQTT_USERNAME;
-const char* mqtt_password = MQTT_PASSWORD;
 
 // ===== DEFAULT ONBOARDING AP =====
 const char* onboarding_ssid = "VF3-SETUP";
@@ -36,12 +28,11 @@ bool time_synced = false;
 
 // ===== WEB SERVER =====
 AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
 
-// ===== MQTT CLIENT =====
-WiFiClient espClient;
-PubSubClient mqttClient(espClient);
-unsigned long lastMqttReconnectAttempt = 0;
-#define MQTT_RECONNECT_INTERVAL 5000    // Try to reconnect every 5 seconds
+// ===== WEBSOCKET STATUS BROADCAST =====
+unsigned long lastStatusBroadcast = 0;
+#define STATUS_BROADCAST_INTERVAL 1000  // Broadcast status every 1 second
 
 // ===== ANALOG INPUTS (Sensors) - Use input-only pins =====
 #define VF3_ACCELERATOR_PEDAL 34       // GPIO 34 - Accelerator pedal position (input only)
@@ -124,10 +115,9 @@ String getCarStatusJSON();
 bool authenticateRequest(AsyncWebServerRequest *request);
 void loadConfiguration();
 void saveConfiguration(String ssid, String password, String api_key);
-void mqttCallback(char* topic, byte* payload, unsigned int length);
-bool mqttReconnect();
-void mqttPublishStatus();
-void setupMQTT();
+void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
+void handleWebSocketMessage(AsyncWebSocketClient *client, uint8_t *data, size_t len);
+void broadcastStatus();
 
 void setup() {
   // Initialize Serial Communication
@@ -196,9 +186,6 @@ void setup() {
       // Setup normal web server
       setupWebServer();
 
-      // Setup MQTT client
-      setupMQTT();
-
       // Sync time with NTP server
       syncTime();
 
@@ -247,20 +234,14 @@ void setup() {
 }
 
 void loop() {
-  // ===== MQTT CONNECTION HANDLING =====
-  // Only attempt MQTT if device is configured and WiFi is connected
-  if (is_configured && configured_api_key.length() >= 8 && WiFi.status() == WL_CONNECTED) {
-    if (!mqttClient.connected()) {
-      unsigned long now = millis();
-      if (now - lastMqttReconnectAttempt > MQTT_RECONNECT_INTERVAL) {
-        lastMqttReconnectAttempt = now;
-        if (mqttReconnect()) {
-          lastMqttReconnectAttempt = 0;
-        }
-      }
-    } else {
-      mqttClient.loop();
-    }
+  // ===== WEBSOCKET HANDLING =====
+  ws.cleanupClients();
+
+  // Broadcast status periodically
+  unsigned long now = millis();
+  if (now - lastStatusBroadcast > STATUS_BROADCAST_INTERVAL) {
+    lastStatusBroadcast = now;
+    broadcastStatus();
   }
 
   // ===== READ ANALOG SENSORS =====
@@ -446,8 +427,6 @@ void loadConfiguration() {
     Serial.println("Configuration loaded from flash");
     Serial.print("SSID: ");
     Serial.println(configured_ssid);
-    Serial.print("MQTT Broker: ");
-    Serial.println(mqtt_broker);
   } else {
     Serial.println("Device not configured - entering onboarding mode");
   }
@@ -573,193 +552,160 @@ String getCarStatusJSON() {
   return output;
 }
 
-// ===== MQTT FUNCTIONS =====
-void mqttCallback(char* topic, byte* payload, unsigned int length) {
-  // Convert payload to string
-  String message = "";
-  for (unsigned int i = 0; i < length; i++) {
-    message += (char)payload[i];
+// ===== WEBSOCKET FUNCTIONS =====
+void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
+  switch (type) {
+    case WS_EVT_CONNECT:
+      Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+      // Send current status to newly connected client
+      client->text(getCarStatusJSON());
+      break;
+
+    case WS_EVT_DISCONNECT:
+      Serial.printf("WebSocket client #%u disconnected\n", client->id());
+      break;
+
+    case WS_EVT_DATA:
+      handleWebSocketMessage(client, data, len);
+      break;
+
+    case WS_EVT_PONG:
+    case WS_EVT_ERROR:
+      break;
+  }
+}
+
+void handleWebSocketMessage(AsyncWebSocketClient *client, uint8_t *data, size_t len) {
+  // Parse incoming JSON command
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, data, len);
+
+  if (error) {
+    Serial.print("JSON parse error: ");
+    Serial.println(error.c_str());
+    return;
   }
 
-  Serial.print("MQTT message received on topic: ");
-  Serial.println(topic);
-  Serial.print("Message: ");
-  Serial.println(message);
+  const char* command = doc["command"];
+  const char* action = doc["action"];
 
-  String topicStr = String(topic);
-  String cmdPrefix = configured_api_key + "/command/";
-  String reqPrefix = configured_api_key + "/request/";
-
-  // Handle status request
-  if (topicStr == reqPrefix + "status") {
-    mqttPublishStatus();
-    Serial.println("MQTT: Status request received, publishing status");
+  if (command == nullptr) {
+    Serial.println("WebSocket: No command specified");
+    return;
   }
-  // Handle lock command
-  else if (topicStr == cmdPrefix + "lock") {
+
+  Serial.print("WebSocket command: ");
+  Serial.print(command);
+  if (action) {
+    Serial.print(" action: ");
+    Serial.println(action);
+  } else {
+    Serial.println();
+  }
+
+  // Handle commands
+  if (strcmp(command, "lock") == 0) {
     vf3_car_lock = HIGH;
     vf3_car_unlock = LOW;
     digitalWrite(VF3_CAR_LOCK, HIGH);
     digitalWrite(VF3_CAR_UNLOCK, LOW);
-    Serial.println("MQTT: Car locked");
+    Serial.println("WS: Car locked");
   }
-  // Handle unlock command
-  else if (topicStr == cmdPrefix + "unlock") {
+  else if (strcmp(command, "unlock") == 0) {
     vf3_car_lock = LOW;
     vf3_car_unlock = HIGH;
     digitalWrite(VF3_CAR_LOCK, LOW);
     digitalWrite(VF3_CAR_UNLOCK, HIGH);
-    Serial.println("MQTT: Car unlocked");
+    Serial.println("WS: Car unlocked");
   }
-  // Handle accessory power command
-  else if (topicStr == cmdPrefix + "accessory-power") {
-    if (message == "on") {
+  else if (strcmp(command, "accessory-power") == 0 && action) {
+    if (strcmp(action, "on") == 0) {
       vf3_accessory_power = HIGH;
       digitalWrite(VF3_ACCESSORY_POWER, HIGH);
-      Serial.println("MQTT: Accessory power ON");
-    } else if (message == "off") {
+      Serial.println("WS: Accessory power ON");
+    } else if (strcmp(action, "off") == 0) {
       vf3_accessory_power = LOW;
       digitalWrite(VF3_ACCESSORY_POWER, LOW);
-      Serial.println("MQTT: Accessory power OFF");
-    } else if (message == "toggle") {
+      Serial.println("WS: Accessory power OFF");
+    } else if (strcmp(action, "toggle") == 0) {
       vf3_accessory_power = !vf3_accessory_power;
       digitalWrite(VF3_ACCESSORY_POWER, vf3_accessory_power);
-      Serial.println("MQTT: Accessory power toggled");
+      Serial.println("WS: Accessory power toggled");
     }
   }
-  // Handle window close command
-  else if (topicStr == cmdPrefix + "windows/close") {
+  else if (strcmp(command, "windows-close") == 0) {
     window_close_timer = millis();
     digitalWrite(VF3_WINDOW_LEFT, HIGH);
     digitalWrite(VF3_WINDOW_RIGHT, HIGH);
-    Serial.println("MQTT: Windows closing");
+    Serial.println("WS: Windows closing");
   }
-  // Handle window stop command
-  else if (topicStr == cmdPrefix + "windows/stop") {
+  else if (strcmp(command, "windows-stop") == 0) {
     window_close_timer = 0;
     digitalWrite(VF3_WINDOW_LEFT, LOW);
     digitalWrite(VF3_WINDOW_RIGHT, LOW);
-    Serial.println("MQTT: Windows stopped");
+    Serial.println("WS: Windows stopped");
   }
-  // Handle buzzer command
-  else if (topicStr == cmdPrefix + "buzzer") {
-    if (message == "on") {
+  else if (strcmp(command, "buzzer") == 0 && action) {
+    if (strcmp(action, "on") == 0) {
       digitalWrite(VF3_BUZZER, HIGH);
-      Serial.println("MQTT: Buzzer ON");
-    } else if (message == "off") {
+      Serial.println("WS: Buzzer ON");
+    } else if (strcmp(action, "off") == 0) {
       digitalWrite(VF3_BUZZER, LOW);
-      Serial.println("MQTT: Buzzer OFF");
-    } else if (message.startsWith("beep:")) {
-      int duration = message.substring(5).toInt();
+      Serial.println("WS: Buzzer OFF");
+    } else if (strncmp(action, "beep:", 5) == 0) {
+      int duration = atoi(action + 5);
       if (duration > 0 && duration <= 5000) {
         digitalWrite(VF3_BUZZER, HIGH);
         delay(duration);
         digitalWrite(VF3_BUZZER, LOW);
-        Serial.print("MQTT: Buzzer beep for ");
-        Serial.print(duration);
-        Serial.println("ms");
+        Serial.printf("WS: Buzzer beep for %dms\n", duration);
       }
     }
   }
-  // Handle turn signal left command
-  else if (topicStr == cmdPrefix + "turn-signal/left") {
-    if (message == "on") {
+  else if (strcmp(command, "turn-signal-left") == 0 && action) {
+    if (strcmp(action, "on") == 0) {
       digitalWrite(VF3_TURN_SIGNAL_L, HIGH);
-      Serial.println("MQTT: Left turn signal ON");
-    } else if (message == "off") {
+      Serial.println("WS: Left turn signal ON");
+    } else if (strcmp(action, "off") == 0) {
       digitalWrite(VF3_TURN_SIGNAL_L, LOW);
-      Serial.println("MQTT: Left turn signal OFF");
+      Serial.println("WS: Left turn signal OFF");
     }
   }
-  // Handle turn signal right command
-  else if (topicStr == cmdPrefix + "turn-signal/right") {
-    if (message == "on") {
+  else if (strcmp(command, "turn-signal-right") == 0 && action) {
+    if (strcmp(action, "on") == 0) {
       digitalWrite(VF3_TURN_SIGNAL_R, HIGH);
-      Serial.println("MQTT: Right turn signal ON");
-    } else if (message == "off") {
+      Serial.println("WS: Right turn signal ON");
+    } else if (strcmp(action, "off") == 0) {
       digitalWrite(VF3_TURN_SIGNAL_R, LOW);
-      Serial.println("MQTT: Right turn signal OFF");
+      Serial.println("WS: Right turn signal OFF");
     }
   }
-  // Handle turn signal both off command
-  else if (topicStr == cmdPrefix + "turn-signal/both-off") {
+  else if (strcmp(command, "turn-signal-both-off") == 0) {
     digitalWrite(VF3_TURN_SIGNAL_L, LOW);
     digitalWrite(VF3_TURN_SIGNAL_R, LOW);
-    Serial.println("MQTT: Both turn signals OFF");
+    Serial.println("WS: Both turn signals OFF");
   }
+  else if (strcmp(command, "status") == 0) {
+    // Send status immediately to requesting client
+    client->text(getCarStatusJSON());
+    Serial.println("WS: Status sent");
+  }
+
+  // Broadcast updated status to all connected clients
+  broadcastStatus();
 }
 
-bool mqttReconnect() {
-  Serial.print("Attempting MQTT connection to ");
-  Serial.print(mqtt_broker);
-  Serial.print(":");
-  Serial.print(mqtt_port);
-  Serial.println("...");
-
-  // Create a unique client ID
-  String clientId = "VF3-";
-  clientId += String(random(0xffff), HEX);
-
-  // Attempt to connect with credentials
-  bool connected = mqttClient.connect(clientId.c_str(), mqtt_username, mqtt_password);
-
-  if (connected) {
-    Serial.println("MQTT connected!");
-
-    // Subscribe to command topics
-    String cmdPrefix = configured_api_key + "/command/";
-    mqttClient.subscribe((cmdPrefix + "lock").c_str());
-    mqttClient.subscribe((cmdPrefix + "unlock").c_str());
-    mqttClient.subscribe((cmdPrefix + "accessory-power").c_str());
-    mqttClient.subscribe((cmdPrefix + "windows/close").c_str());
-    mqttClient.subscribe((cmdPrefix + "windows/stop").c_str());
-    mqttClient.subscribe((cmdPrefix + "buzzer").c_str());
-    mqttClient.subscribe((cmdPrefix + "turn-signal/left").c_str());
-    mqttClient.subscribe((cmdPrefix + "turn-signal/right").c_str());
-    mqttClient.subscribe((cmdPrefix + "turn-signal/both-off").c_str());
-
-    // Subscribe to request topics
-    String reqPrefix = configured_api_key + "/request/";
-    mqttClient.subscribe((reqPrefix + "status").c_str());
-
-    Serial.print("Subscribed to command topics with prefix: ");
-    Serial.println(cmdPrefix);
-    Serial.print("Subscribed to request topics with prefix: ");
-    Serial.println(reqPrefix);
-  } else {
-    Serial.print("MQTT connection failed, rc=");
-    Serial.println(mqttClient.state());
+void broadcastStatus() {
+  if (ws.count() > 0) {
+    ws.textAll(getCarStatusJSON());
   }
-
-  return connected;
-}
-
-void mqttPublishStatus() {
-  if (!mqttClient.connected()) {
-    return;
-  }
-
-  String statusTopic = configured_api_key + "/status";
-  String statusJSON = getCarStatusJSON();
-
-  if (mqttClient.publish(statusTopic.c_str(), statusJSON.c_str())) {
-    Serial.println("MQTT: Status published");
-  } else {
-    Serial.println("MQTT: Status publish failed");
-  }
-}
-
-void setupMQTT() {
-  mqttClient.setServer(mqtt_broker, mqtt_port);
-  mqttClient.setCallback(mqttCallback);
-  mqttClient.setBufferSize(1024);  // Increase buffer size for large JSON payloads
-
-  Serial.println("MQTT client configured");
-  Serial.print("MQTT Broker: ");
-  Serial.println(mqtt_broker);
 }
 
 void setupWebServer() {
+  // Setup WebSocket
+  ws.onEvent(onWebSocketEvent);
+  server.addHandler(&ws);
+
   // GET /car/status - Return all car status as JSON
   server.on("/car/status", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(200, "application/json", getCarStatusJSON());
