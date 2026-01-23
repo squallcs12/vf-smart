@@ -1,6 +1,8 @@
 #ifndef PINS_H
 #define PINS_H
 
+#include <Arduino.h>
+
 // ===== ANALOG INPUTS (Sensors) - Use input-only pins =====
 #define VF3_ACCELERATOR_PEDAL 34       // GPIO 34 - Accelerator pedal position (input only)
 #define VF3_BRAKE_PEDAL 39             // GPIO 39 - Brake pedal sensor (input only)

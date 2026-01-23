@@ -1,6 +1,4 @@
 #include "sensors.h"
-#include "pins.h"
-#include <Arduino.h>
 
 void readSensors() {
   // Read analog sensors

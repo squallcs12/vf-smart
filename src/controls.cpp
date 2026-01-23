@@ -1,8 +1,4 @@
 #include "controls.h"
-#include "config.h"
-#include "pins.h"
-#include "time_sync.h"
-#include <Arduino.h>
 
 void handleWindowControl() {
   // Auto close windows when car is locked (on for 30s, then off)

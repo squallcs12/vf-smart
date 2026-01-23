@@ -1,8 +1,4 @@
 #include "discovery.h"
-#include <Arduino.h>
-#include <WiFi.h>
-#include <WiFiUdp.h>
-#include <ArduinoJson.h>
 
 // UDP Discovery Configuration
 #define UDP_BROADCAST_PORT 8888

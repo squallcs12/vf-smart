@@ -1,8 +1,4 @@
 #include "websocket.h"
-#include "config.h"
-#include "pins.h"
-#include "status.h"
-#include <ArduinoJson.h>
 
 AsyncWebSocket ws("/ws");
 

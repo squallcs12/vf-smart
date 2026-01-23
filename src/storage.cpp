@@ -1,5 +1,4 @@
 #include "storage.h"
-#include "config.h"
 
 void loadConfiguration() {
   preferences.begin("vf3-config", false);

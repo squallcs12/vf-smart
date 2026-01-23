@@ -2,6 +2,10 @@
 #define WEBSOCKET_H
 
 #include <ESPAsyncWebServer.h>
+#include "config.h"
+#include "pins.h"
+#include "status.h"
+#include <ArduinoJson.h>
 
 extern AsyncWebSocket ws;
 

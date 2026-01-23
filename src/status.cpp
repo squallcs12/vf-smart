@@ -1,8 +1,4 @@
 #include "status.h"
-#include "config.h"
-#include "pins.h"
-#include "time_sync.h"
-#include <ArduinoJson.h>
 #include <time.h>
 
 String getCarStatusJSON() {

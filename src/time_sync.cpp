@@ -1,6 +1,4 @@
 #include "time_sync.h"
-#include "config.h"
-#include <Arduino.h>
 #include <time.h>
 
 void syncTime() {
