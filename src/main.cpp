@@ -8,6 +8,7 @@
 #include "storage.h"
 #include "websocket.h"
 #include "webserver.h"
+#include "discovery.h"
 
 void setup() {
   // Initialize Serial Communication
@@ -51,6 +52,9 @@ void setup() {
 
       // Sync time with NTP server
       syncTime();
+
+      // Initialize UDP discovery broadcasting
+      initDiscovery();
 
       Serial.println("VinFast VF3 MCU System Ready!");
     } else {
@@ -106,6 +110,9 @@ void loop() {
     lastStatusBroadcast = now;
     broadcastStatus();
   }
+
+  // Broadcast UDP discovery message
+  handleDiscoveryBroadcast();
 
   // Read all sensors
   readSensors();

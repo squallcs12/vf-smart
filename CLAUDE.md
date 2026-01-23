@@ -140,6 +140,92 @@ On first boot, the device enters **onboarding mode** to allow configuration of W
 - **Password**: Configured during onboarding
 - **Default IP**: 192.168.4.1 (ESP32 AP default)
 
+### UDP Device Discovery
+
+When connected to WiFi in Station mode, the device broadcasts UDP messages for automatic network discovery.
+
+**Discovery Configuration:**
+- **Port**: 8888 (UDP broadcast)
+- **Broadcast Address**: 255.255.255.255
+- **Interval**: Every 10 seconds
+- **Protocol**: JSON over UDP
+
+**Broadcast Message Format:**
+```json
+{
+  "device": "VF3-Smart",
+  "type": "car-control",
+  "ip": "192.168.1.100",
+  "mac": "AA:BB:CC:DD:EE:FF",
+  "hostname": "esp32-xxxxxx"
+}
+```
+
+**Stopping Broadcast with Confirmation:**
+
+Once you discover the device, send a confirmation message to stop further broadcasts and reduce network traffic:
+
+**Confirmation Message Format (either format works):**
+```json
+{"command": "confirm"}
+```
+or
+```json
+{"action": "discovered"}
+```
+
+**Listening for Discovery (Python Example):**
+```python
+import socket
+import json
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+sock.bind(('', 8888))
+
+print("Listening for VF3-Smart devices...")
+while True:
+    data, addr = sock.recvfrom(1024)
+    device_info = json.loads(data.decode())
+    if device_info.get('device') == 'VF3-Smart':
+        print(f"Found device at {device_info['ip']}")
+        print(f"MAC: {device_info['mac']}")
+
+        # Send confirmation to stop broadcasting
+        confirm = json.dumps({"command": "confirm"})
+        sock.sendto(confirm.encode(), (device_info['ip'], 8888))
+        print("Confirmation sent - device will stop broadcasting")
+        break
+```
+
+**Listening for Discovery (Node.js Example):**
+```javascript
+const dgram = require('dgram');
+const server = dgram.createSocket('udp4');
+
+server.on('message', (msg, rinfo) => {
+  const deviceInfo = JSON.parse(msg.toString());
+  if (deviceInfo.device === 'VF3-Smart') {
+    console.log(`Found device at ${deviceInfo.ip}`);
+    console.log(`MAC: ${deviceInfo.mac}`);
+
+    // Send confirmation to stop broadcasting
+    const confirm = Buffer.from(JSON.stringify({command: 'confirm'}));
+    server.send(confirm, 8888, deviceInfo.ip, (err) => {
+      if (!err) {
+        console.log('Confirmation sent - device will stop broadcasting');
+      }
+    });
+  }
+});
+
+server.bind(8888);
+console.log('Listening for VF3-Smart devices...');
+```
+
+**Note**: UDP discovery only works when the device is in Station mode (connected to your WiFi network). It does not broadcast in AP (Access Point) mode.
+
 ### API Authentication
 All control endpoints (POST requests) require API key authentication for security.
 
