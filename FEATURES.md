@@ -11,12 +11,18 @@
 - [x] UDP device discovery (port 8888)
 - [x] NTP time synchronization
 - [x] Onboarding mode (AP: VF3-SETUP / setup123)
+- [ ] Cloud connectivity
+- [ ] MQTT broker integration
+- [ ] Remote access via internet
 
 ## Web Interface
 - [x] HTTP REST API (port 80)
 - [x] WebSocket real-time updates (1 second interval)
 - [x] Web dashboard with controls
 - [x] API key authentication
+- [ ] User management (multiple users)
+- [ ] Mobile responsive UI improvements
+- [ ] Progressive Web App (PWA)
 
 ## Control Features
 - [x] Auto-close windows when locked (30 seconds)
@@ -26,20 +32,55 @@
 - [x] Window control (close/stop)
 - [x] Turn signals (left/right/both off)
 - [x] Buzzer control (on/off/beep with duration)
+- [ ] Remote engine start/stop
+- [ ] Climate control
+- [ ] Scheduled operations
+- [ ] Geofencing actions
 
 ## Safety Features
 - [x] Headlight reminder at night when driving
 - [x] Real-time sensor monitoring (50ms loop)
 - [x] WebSocket status broadcasting
+- [ ] Speed limit alerts
+- [ ] Collision detection alerts
+- [ ] Door open while moving alert
+- [ ] Seatbelt reminder
+- [ ] Emergency brake assist
 
 ## Configuration
 - [x] Persistent WiFi credentials (NVS storage)
 - [x] Persistent API key (minimum 8 characters)
 - [x] Web-based reconfiguration
 - [x] Automatic AP fallback on connection failure
+- [ ] OTA (Over-The-Air) firmware updates
+- [ ] Backup/restore configuration
+- [ ] Factory reset option
 
 ## Monitoring
 - [x] Real-time sensor data via HTTP/WebSocket
 - [x] Control state monitoring
 - [x] Time tracking (boot time, current time, night mode)
 - [x] Window operation status with countdown timer
+- [ ] Battery voltage monitoring
+- [ ] GPS location tracking
+- [ ] Trip statistics (distance, fuel efficiency)
+- [ ] Maintenance reminders
+- [ ] Diagnostic trouble codes (DTC)
+- [ ] Data logging and export
+
+## Integration
+- [ ] Mobile app (iOS/Android)
+- [ ] Voice assistant (Alexa/Google Home)
+- [ ] Home automation integration
+- [ ] Calendar integration for scheduled tasks
+- [ ] Weather-based automation
+- [ ] Smartwatch notifications
+
+## Advanced Features
+- [ ] AI-based predictive maintenance
+- [ ] Driver behavior analysis
+- [ ] Automated parking assist
+- [ ] Tire pressure monitoring
+- [ ] Fuel level monitoring
+- [ ] Charging status (for EV)
+- [ ] Range estimation
