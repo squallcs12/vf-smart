@@ -1,4 +1,5 @@
 #include "pins.h"
+#include <Arduino.h>
 
 // ===== INPUT VARIABLES =====
 int vf3_accelerator = 0;

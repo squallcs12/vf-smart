@@ -1,3 +1,5 @@
+#include <Arduino.h>
+#include <ESPAsyncWebServer.h>
 #include "webserver.h"
 #include "config.h"
 #include "pins.h"
