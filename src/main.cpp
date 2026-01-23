@@ -4,6 +4,7 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <PubSubClient.h>
+#include <time.h>
 #include "mqtt_config.h"
 
 // VinFast VF3 Electric Car - Input and Output Definitions
@@ -26,6 +27,13 @@ const char* mqtt_password = MQTT_PASSWORD;
 const char* onboarding_ssid = "VF3-SETUP";
 const char* onboarding_password = "setup123";
 
+// ===== NTP TIME CONFIGURATION =====
+const char* ntp_server = "pool.ntp.org";
+const long gmt_offset_sec = 7 * 3600;     // GMT+7 for Vietnam
+const int daylight_offset_sec = 0;        // No daylight saving in Vietnam
+struct tm boot_time;
+bool time_synced = false;
+
 // ===== WEB SERVER =====
 AsyncWebServer server(80);
 
@@ -42,6 +50,7 @@ unsigned long lastMqttReconnectAttempt = 0;
 
 // ===== DIGITAL INPUTS (Sensors & Switches) =====
 #define VF3_SPEED_SENSOR 35            // GPIO 35 - Vehicle speed sensor (input only)
+#define VF3_GEAR_DRIVE 37              // GPIO 37 - Gear in Drive position (1=D, 0=other) (input only)
 #define VF3_DOOR_FL 4                  // GPIO 4 - Front left door open/close sensor
 #define VF3_DOOR_FR 16                 // GPIO 16 - Front right door open/close sensor
 #define VF3_DOOR_TRUNK 17              // GPIO 17 - Trunk/tailgate open/close sensor
@@ -72,6 +81,7 @@ int vf3_accelerator = 0;              // Accelerator pedal (0-100%)
 int vf3_brake = 0;                    // Brake pedal (0-100%)
 int vf3_steering_angle = 0;           // Steering angle (-180 to +180°)
 int vf3_vehicle_speed = 0;            // Vehicle speed (km/h)
+int vf3_gear_drive = LOW;             // Gear in Drive position (0=not in D, 1=in D)
 int vf3_door_fl = LOW;                // Front left door (0=closed, 1=open)
 int vf3_door_fr = LOW;                // Front right door (0=closed, 1=open)
 int vf3_door_trunk = LOW;             // Trunk/tailgate (0=closed, 1=open)
@@ -94,9 +104,20 @@ unsigned long window_close_timer = 0; // Timer for auto-close windows feature
 #define VF3_DOOR_LOCK 13               // GPIO 13 - Door lock/unlock relay
 int vf3_door_locked = LOW;            // 0=unlocked, 1=locked
 
+// ===== LIGHT REMINDER VARIABLES =====
+unsigned long light_reminder_timer = 0;        // Timer for light reminder
+unsigned long last_light_reminder = 0;         // Last time reminder was triggered
+#define LIGHT_REMINDER_INTERVAL 30000          // Remind every 30 seconds
+#define LIGHT_REMINDER_BEEP_DURATION 200       // Beep duration in milliseconds
+#define NIGHT_START_HOUR 18                    // 6 PM
+#define NIGHT_END_HOUR 6                       // 6 AM
+
 // ===== FUNCTION DECLARATIONS =====
 void handleAccessoryPower();
 void handleWindowControl();
+void handleLightReminder();
+bool isNightTime();
+void syncTime();
 void setupWebServer();
 void setupOnboardingServer();
 String getCarStatusJSON();
@@ -118,6 +139,7 @@ void setup() {
 
   // Initialize Digital Input Pins
   pinMode(VF3_SPEED_SENSOR, INPUT);
+  pinMode(VF3_GEAR_DRIVE, INPUT);
   pinMode(VF3_DOOR_FL, INPUT);
   pinMode(VF3_DOOR_FR, INPUT);
   pinMode(VF3_DOOR_TRUNK, INPUT);
@@ -176,6 +198,9 @@ void setup() {
 
       // Setup MQTT client
       setupMQTT();
+
+      // Sync time with NTP server
+      syncTime();
 
       Serial.println("VinFast VF3 MCU System Ready!");
     } else {
@@ -245,6 +270,7 @@ void loop() {
 
   // ===== READ DIGITAL SENSORS =====
   vf3_vehicle_speed = digitalRead(VF3_SPEED_SENSOR);
+  vf3_gear_drive = digitalRead(VF3_GEAR_DRIVE);
   vf3_door_fl = digitalRead(VF3_DOOR_FL);
   vf3_door_fr = digitalRead(VF3_DOOR_FR);
   vf3_door_trunk = digitalRead(VF3_DOOR_TRUNK);
@@ -265,6 +291,9 @@ void loop() {
 
   // Handle accessory power
   handleAccessoryPower();
+
+  // Handle light reminder
+  handleLightReminder();
 
   delay(50);  // 50ms control loop cycle
 }
@@ -301,6 +330,107 @@ void handleAccessoryPower() {
     digitalWrite(VF3_ACCESSORY_POWER, HIGH);
     vf3_accessory_power = HIGH;
   }
+}
+
+void syncTime() {
+  Serial.println("Syncing time with NTP server...");
+
+  // Configure time with NTP server
+  configTime(gmt_offset_sec, daylight_offset_sec, ntp_server);
+
+  // Wait for time to be set
+  struct tm timeinfo;
+  int retry = 0;
+  const int max_retry = 10;
+
+  while (!getLocalTime(&timeinfo) && retry < max_retry) {
+    Serial.print(".");
+    delay(1000);
+    retry++;
+  }
+
+  if (retry < max_retry) {
+    time_synced = true;
+    boot_time = timeinfo;
+
+    Serial.println("\nTime synced successfully!");
+    Serial.print("Device boot time: ");
+    Serial.printf("%04d-%02d-%02d %02d:%02d:%02d\n",
+                  boot_time.tm_year + 1900,
+                  boot_time.tm_mon + 1,
+                  boot_time.tm_mday,
+                  boot_time.tm_hour,
+                  boot_time.tm_min,
+                  boot_time.tm_sec);
+  } else {
+    Serial.println("\nFailed to sync time with NTP server");
+    time_synced = false;
+  }
+}
+
+bool isNightTime() {
+  if (!time_synced) {
+    return false;  // Can't determine time, don't trigger reminder
+  }
+
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    return false;
+  }
+
+  int hour = timeinfo.tm_hour;
+
+  // Night time is from 18:00 (6 PM) to 06:00 (6 AM)
+  // This means hour >= 18 OR hour < 6
+  return (hour >= NIGHT_START_HOUR || hour < NIGHT_END_HOUR);
+}
+
+void handleLightReminder() {
+  // Only remind if:
+  // 1. Time is synced
+  // 2. It's nighttime (6pm - 6am)
+  // 3. Gear is in Drive (D)
+  // 4. Normal light is off
+
+  // Guard clause: Time not synced yet
+  if (!time_synced) {
+    return;
+  }
+
+  // Guard clause: Not nighttime
+  if (!isNightTime()) {
+    last_light_reminder = 0;
+    return;
+  }
+
+  // Guard clause: Not in drive
+  if (vf3_gear_drive != HIGH) {
+    last_light_reminder = 0;
+    return;
+  }
+
+  // Guard clause: Normal light is on
+  if (vf3_normal_light != LOW) {
+    last_light_reminder = 0;
+    return;
+  }
+
+  // All conditions met, check if enough time has passed since last reminder
+  unsigned long current_time = millis();
+
+  if (current_time - last_light_reminder < LIGHT_REMINDER_INTERVAL) {
+    return;
+  }
+
+  // Trigger reminder beep
+  digitalWrite(VF3_BUZZER, HIGH);
+  delay(LIGHT_REMINDER_BEEP_DURATION);
+  digitalWrite(VF3_BUZZER, LOW);
+
+  // Update last reminder time
+  last_light_reminder = current_time;
+
+  Serial.println("Light reminder: Please turn on headlights!");
 }
 
 void loadConfiguration() {
@@ -376,6 +506,7 @@ String getCarStatusJSON() {
   sensors["brake"] = vf3_brake;
   sensors["steering_angle"] = vf3_steering_angle;
   sensors["vehicle_speed"] = vf3_vehicle_speed;
+  sensors["gear_drive"] = vf3_gear_drive;
 
   // Door status
   JsonObject doors = doc["doors"].to<JsonObject>();
@@ -414,6 +545,27 @@ String getCarStatusJSON() {
     doc["window_close_remaining_ms"] = WINDOW_CLOSE_DURATION - (millis() - window_close_timer);
   } else {
     doc["window_close_remaining_ms"] = 0;
+  }
+
+  // Time information
+  JsonObject time_info = doc["time"].to<JsonObject>();
+  time_info["synced"] = time_synced;
+  if (time_synced) {
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)) {
+      char current_time_str[64];
+      char boot_time_str[64];
+      sprintf(current_time_str, "%04d-%02d-%02d %02d:%02d:%02d",
+              timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+              timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+      sprintf(boot_time_str, "%04d-%02d-%02d %02d:%02d:%02d",
+              boot_time.tm_year + 1900, boot_time.tm_mon + 1, boot_time.tm_mday,
+              boot_time.tm_hour, boot_time.tm_min, boot_time.tm_sec);
+
+      time_info["current_time"] = current_time_str;
+      time_info["boot_time"] = boot_time_str;
+      time_info["is_night"] = isNightTime();
+    }
   }
 
   String output;
