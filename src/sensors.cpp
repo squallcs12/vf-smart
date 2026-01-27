@@ -21,4 +21,9 @@ void readSensors() {
   vf3_normal_light = digitalRead(VF3_NORMAL_LIGHT);
   vf3_proximity_rear_l = digitalRead(VF3_PROXIMITY_REAR_L);
   vf3_proximity_rear_r = digitalRead(VF3_PROXIMITY_REAR_R);
+
+  vf3_car_lock = digitalRead(VF3_CAR_LOCK);
+  vf3_car_unlock = digitalRead(VF3_CAR_UNLOCK);
+  self_accessory_power = digitalRead(SELF_ACCESSORY_POWER);
+  self_inside_cameras = digitalRead(SELF_INSIDE_CARMERAS);
 }

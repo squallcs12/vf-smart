@@ -69,16 +69,16 @@ void handleWebSocketMessage(AsyncWebSocketClient *client, uint8_t *data, size_t 
   }
   else if (strcmp(command, "accessory-power") == 0 && action) {
     if (strcmp(action, "on") == 0) {
-      vf3_accessory_power = HIGH;
-      digitalWrite(VF3_ACCESSORY_POWER, HIGH);
+      self_accessory_power = HIGH;
+      digitalWrite(SELF_ACCESSORY_POWER, HIGH);
       Serial.println("WS: Accessory power ON");
     } else if (strcmp(action, "off") == 0) {
-      vf3_accessory_power = LOW;
-      digitalWrite(VF3_ACCESSORY_POWER, LOW);
+      self_accessory_power = LOW;
+      digitalWrite(SELF_ACCESSORY_POWER, LOW);
       Serial.println("WS: Accessory power OFF");
     } else if (strcmp(action, "toggle") == 0) {
-      vf3_accessory_power = !vf3_accessory_power;
-      digitalWrite(VF3_ACCESSORY_POWER, vf3_accessory_power);
+      self_accessory_power = !self_accessory_power;
+      digitalWrite(SELF_ACCESSORY_POWER, self_accessory_power);
       Serial.println("WS: Accessory power toggled");
     }
   }

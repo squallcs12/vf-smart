@@ -39,7 +39,7 @@ String getCarStatusJSON() {
   // Controls status
   JsonObject controls = doc["controls"].to<JsonObject>();
   controls["brake_pressed"] = vf3_brake_pressed;
-  controls["accessory_power"] = vf3_accessory_power;
+  controls["accessory_power"] = self_accessory_power;
   controls["car_lock"] = vf3_car_lock;
   controls["car_unlock"] = vf3_car_unlock;
 

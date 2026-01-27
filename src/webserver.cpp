@@ -101,14 +101,14 @@ void setupWebServer() {
     }
 
     if (state == "on") {
-      vf3_accessory_power = HIGH;
-      digitalWrite(VF3_ACCESSORY_POWER, HIGH);
+      self_accessory_power = HIGH;
+      digitalWrite(SELF_ACCESSORY_POWER, HIGH);
     } else if (state == "off") {
-      vf3_accessory_power = LOW;
-      digitalWrite(VF3_ACCESSORY_POWER, LOW);
+      self_accessory_power = LOW;
+      digitalWrite(SELF_ACCESSORY_POWER, LOW);
     } else if (state == "toggle") {
-      vf3_accessory_power = !vf3_accessory_power;
-      digitalWrite(VF3_ACCESSORY_POWER, vf3_accessory_power);
+      self_accessory_power = !self_accessory_power;
+      digitalWrite(SELF_ACCESSORY_POWER, self_accessory_power);
     } else {
       JsonDocument doc;
       doc["success"] = false;
@@ -123,7 +123,7 @@ void setupWebServer() {
     JsonDocument doc;
     doc["success"] = true;
     doc["message"] = "Accessory power updated";
-    doc["accessory_power"] = vf3_accessory_power;
+    doc["accessory_power"] = self_accessory_power;
 
     String output;
     serializeJson(doc, output);

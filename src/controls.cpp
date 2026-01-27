@@ -22,14 +22,14 @@ void handleWindowControl() {
 void handleAccessoryPower() {
   // Turn off accessory power when car is locked
   if (vf3_car_lock == HIGH) {
-    digitalWrite(VF3_ACCESSORY_POWER, LOW);
-    vf3_accessory_power = LOW;
+    digitalWrite(SELF_ACCESSORY_POWER, LOW);
+    self_accessory_power = LOW;
   }
 
   // Turn on accessory power when car is unlocked
   if (vf3_car_unlock == HIGH) {
-    digitalWrite(VF3_ACCESSORY_POWER, HIGH);
-    vf3_accessory_power = HIGH;
+    digitalWrite(SELF_ACCESSORY_POWER, HIGH);
+    self_accessory_power = HIGH;
   }
 }
 

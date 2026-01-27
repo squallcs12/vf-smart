@@ -23,7 +23,8 @@ int vf3_normal_light = LOW;
 // ===== OUTPUT VARIABLES =====
 int vf3_car_lock = LOW;
 int vf3_car_unlock = LOW;
-int vf3_accessory_power = HIGH;
+int self_accessory_power = HIGH;
+int self_inside_cameras = LOW;
 int vf3_door_locked = LOW;
 
 void initializePins() {
@@ -52,8 +53,10 @@ void initializePins() {
   pinMode(VF3_BUZZER, OUTPUT);
   pinMode(VF3_WINDOW_LEFT, OUTPUT);
   pinMode(VF3_WINDOW_RIGHT, OUTPUT);
-  pinMode(VF3_ACCESSORY_POWER, OUTPUT);
+  pinMode(SELF_ACCESSORY_POWER, OUTPUT);
+  pinMode(SELF_INSIDE_CARMERAS, OUTPUT);
 
   // Turn on accessory power on startup
-  digitalWrite(VF3_ACCESSORY_POWER, HIGH);
+  digitalWrite(SELF_ACCESSORY_POWER, WRITE_ON);
+  digitalWrite(SELF_INSIDE_CARMERAS, WRITE_OFF);
 }
