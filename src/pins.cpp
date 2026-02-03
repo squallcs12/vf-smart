@@ -28,7 +28,7 @@ int self_inside_cameras = LOW;
 int vf3_door_locked = LOW;
 
 void initializePins() {
-  // Initialize Digital Input Pins
+  // Initialize Digital Input Pins (ESP32 GPIO)
   pinMode(VF3_SPEED_SENSOR, INPUT);
   pinMode(VF3_GEAR_DRIVE, INPUT);
   pinMode(VF3_DOOR_FL, INPUT);
@@ -44,19 +44,30 @@ void initializePins() {
   pinMode(VF3_PROXIMITY_REAR_L, INPUT);
   pinMode(VF3_PROXIMITY_REAR_R, INPUT);
 
-  // Initialize Digital Output Pins (Control Systems)
-  pinMode(VF3_CAR_LOCK, OUTPUT);
-  pinMode(VF3_CAR_UNLOCK, OUTPUT);
-  pinMode(VF3_DOOR_LOCK, OUTPUT);
-  pinMode(VF3_TURN_SIGNAL_L, OUTPUT);
-  pinMode(VF3_TURN_SIGNAL_R, OUTPUT);
-  pinMode(VF3_BUZZER, OUTPUT);
-  pinMode(VF3_WINDOW_LEFT, OUTPUT);
-  pinMode(VF3_WINDOW_RIGHT, OUTPUT);
-  pinMode(SELF_ACCESSORY_POWER, OUTPUT);
-  pinMode(SELF_INSIDE_CARMERAS, OUTPUT);
+  // Initialize PCF8575 I2C I/O Expander for all digital outputs
+  if (!initPCF8575()) {
+    Serial.println("FATAL ERROR: Failed to initialize PCF8575!");
+    Serial.println("Check I2C connections (SDA=21, SCL=22) and I2C address (0x20)");
+    // Continue anyway - outputs just won't work
+  }
 
-  // Turn on accessory power on startup
-  digitalWrite(SELF_ACCESSORY_POWER, WRITE_ON);
-  digitalWrite(SELF_INSIDE_CARMERAS, WRITE_OFF);
+  // Initialize all PCF8575 outputs to OFF state
+  pcfDigitalWrite(VF3_CAR_LOCK, WRITE_OFF);
+  pcfDigitalWrite(VF3_CAR_UNLOCK, WRITE_OFF);
+  pcfDigitalWrite(VF3_DOOR_LOCK, WRITE_OFF);
+  pcfDigitalWrite(VF3_BUZZER, WRITE_OFF);
+  pcfDigitalWrite(VF3_WINDOW_LEFT_UP, WRITE_OFF);
+  pcfDigitalWrite(VF3_WINDOW_RIGHT_UP, WRITE_OFF);
+  pcfDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_OFF);
+  pcfDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_OFF);
+  pcfDigitalWrite(SELF_DASHCAM, WRITE_OFF);
+  pcfDigitalWrite(SELF_SIDE_MIRRORS_OPEN, WRITE_OFF);
+  pcfDigitalWrite(SELF_SIDE_MIRRORS_CLOSE, WRITE_OFF);
+  pcfDigitalWrite(SELF_ODO_SCREEN, WRITE_OFF);
+  pcfDigitalWrite(SELF_ARMREST, WRITE_OFF);
+  pcfDigitalWrite(VF3_CHARGER_UNLOCK, WRITE_OFF);
+
+  // Turn on accessory power and inside cameras on startup
+  pcfDigitalWrite(SELF_ACCESSORY_POWER, WRITE_ON);
+  pcfDigitalWrite(SELF_INSIDE_CARMERAS, WRITE_OFF);
 }

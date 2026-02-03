@@ -5,16 +5,16 @@ void handleWindowControl() {
   if (vf3_car_lock == HIGH) {
     // Lock signal detected, start/reset timer
     window_close_timer = millis();
-    digitalWrite(VF3_WINDOW_LEFT, HIGH);
-    digitalWrite(VF3_WINDOW_RIGHT, HIGH);
+    pcfDigitalWrite(VF3_WINDOW_LEFT, WRITE_OFF);
+    pcfDigitalWrite(VF3_WINDOW_RIGHT, WRITE_OFF);
   } else if (window_close_timer != 0 && millis() - window_close_timer < WINDOW_CLOSE_DURATION) {
     // Keep windows closing for 30 seconds
-    digitalWrite(VF3_WINDOW_LEFT, HIGH);
-    digitalWrite(VF3_WINDOW_RIGHT, HIGH);
+    pcfDigitalWrite(VF3_WINDOW_LEFT, WRITE_OFF);
+    pcfDigitalWrite(VF3_WINDOW_RIGHT, WRITE_OFF);
   } else {
     // Timer expired or lock not active
-    digitalWrite(VF3_WINDOW_LEFT, LOW);
-    digitalWrite(VF3_WINDOW_RIGHT, LOW);
+    pcfDigitalWrite(VF3_WINDOW_LEFT, WRITE_ON);
+    pcfDigitalWrite(VF3_WINDOW_RIGHT, WRITE_ON);
     window_close_timer = 0;
   }
 }
@@ -22,13 +22,13 @@ void handleWindowControl() {
 void handleAccessoryPower() {
   // Turn off accessory power when car is locked
   if (vf3_car_lock == HIGH) {
-    digitalWrite(SELF_ACCESSORY_POWER, LOW);
+    pcfDigitalWrite(SELF_ACCESSORY_POWER, WRITE_ON);
     self_accessory_power = LOW;
   }
 
   // Turn on accessory power when car is unlocked
   if (vf3_car_unlock == HIGH) {
-    digitalWrite(SELF_ACCESSORY_POWER, HIGH);
+    pcfDigitalWrite(SELF_ACCESSORY_POWER, WRITE_OFF);
     self_accessory_power = HIGH;
   }
 }
@@ -71,9 +71,9 @@ void handleLightReminder() {
   }
 
   // Trigger reminder beep
-  digitalWrite(VF3_BUZZER, HIGH);
+  pcfDigitalWrite(VF3_BUZZER, WRITE_OFF);
   delay(LIGHT_REMINDER_BEEP_DURATION);
-  digitalWrite(VF3_BUZZER, LOW);
+  pcfDigitalWrite(VF3_BUZZER, WRITE_ON);
 
   // Update last reminder time
   last_light_reminder = current_time;

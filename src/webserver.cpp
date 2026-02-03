@@ -51,8 +51,8 @@ void setupWebServer() {
 
     vf3_car_lock = HIGH;
     vf3_car_unlock = LOW;
-    digitalWrite(VF3_CAR_LOCK, HIGH);
-    digitalWrite(VF3_CAR_UNLOCK, LOW);
+    pcfDigitalWrite(VF3_CAR_LOCK, WRITE_OFF);
+    pcfDigitalWrite(VF3_CAR_UNLOCK, WRITE_ON);
 
     JsonDocument doc;
     doc["success"] = true;
@@ -74,8 +74,8 @@ void setupWebServer() {
 
     vf3_car_lock = LOW;
     vf3_car_unlock = HIGH;
-    digitalWrite(VF3_CAR_LOCK, LOW);
-    digitalWrite(VF3_CAR_UNLOCK, HIGH);
+    pcfDigitalWrite(VF3_CAR_LOCK, WRITE_ON);
+    pcfDigitalWrite(VF3_CAR_UNLOCK, WRITE_OFF);
 
     JsonDocument doc;
     doc["success"] = true;
@@ -102,13 +102,13 @@ void setupWebServer() {
 
     if (state == "on") {
       self_accessory_power = HIGH;
-      digitalWrite(SELF_ACCESSORY_POWER, HIGH);
+      pcfDigitalWrite(SELF_ACCESSORY_POWER, WRITE_OFF);
     } else if (state == "off") {
       self_accessory_power = LOW;
-      digitalWrite(SELF_ACCESSORY_POWER, LOW);
+      pcfDigitalWrite(SELF_ACCESSORY_POWER, WRITE_ON);
     } else if (state == "toggle") {
       self_accessory_power = !self_accessory_power;
-      digitalWrite(SELF_ACCESSORY_POWER, self_accessory_power);
+      pcfDigitalWrite(SELF_ACCESSORY_POWER, self_accessory_power);
     } else {
       JsonDocument doc;
       doc["success"] = false;
@@ -138,8 +138,8 @@ void setupWebServer() {
     }
 
     window_close_timer = millis();
-    digitalWrite(VF3_WINDOW_LEFT, HIGH);
-    digitalWrite(VF3_WINDOW_RIGHT, HIGH);
+    pcfDigitalWrite(VF3_WINDOW_LEFT, WRITE_OFF);
+    pcfDigitalWrite(VF3_WINDOW_RIGHT, WRITE_OFF);
 
     JsonDocument doc;
     doc["success"] = true;
@@ -160,8 +160,8 @@ void setupWebServer() {
     }
 
     window_close_timer = 0;
-    digitalWrite(VF3_WINDOW_LEFT, LOW);
-    digitalWrite(VF3_WINDOW_RIGHT, LOW);
+    pcfDigitalWrite(VF3_WINDOW_LEFT, WRITE_ON);
+    pcfDigitalWrite(VF3_WINDOW_RIGHT, WRITE_ON);
 
     JsonDocument doc;
     doc["success"] = true;
@@ -191,13 +191,13 @@ void setupWebServer() {
     }
 
     if (state == "on") {
-      digitalWrite(VF3_BUZZER, HIGH);
+      pcfDigitalWrite(VF3_BUZZER, WRITE_OFF);
     } else if (state == "off") {
-      digitalWrite(VF3_BUZZER, LOW);
+      pcfDigitalWrite(VF3_BUZZER, WRITE_ON);
     } else if (state == "beep" && duration > 0) {
-      digitalWrite(VF3_BUZZER, HIGH);
+      pcfDigitalWrite(VF3_BUZZER, WRITE_OFF);
       delay(duration);
-      digitalWrite(VF3_BUZZER, LOW);
+      pcfDigitalWrite(VF3_BUZZER, WRITE_ON);
     } else {
       JsonDocument doc;
       doc["success"] = false;
@@ -218,8 +218,8 @@ void setupWebServer() {
     request->send(200, "application/json", output);
   });
 
-  // POST /car/turn-signal - Control turn signals
-  server.on("/car/turn-signal", HTTP_POST, [](AsyncWebServerRequest *request){
+  // POST /car/windows/down - Control windows down
+  server.on("/car/windows/down", HTTP_POST, [](AsyncWebServerRequest *request){
     if (!authenticateRequest(request)) {
       sendUnauthorized(request);
       return;
@@ -238,20 +238,24 @@ void setupWebServer() {
     bool validRequest = false;
 
     if (side == "left" && state == "on") {
-      digitalWrite(VF3_TURN_SIGNAL_L, HIGH);
+      pcfDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_OFF);
       validRequest = true;
     } else if (side == "left" && state == "off") {
-      digitalWrite(VF3_TURN_SIGNAL_L, LOW);
+      pcfDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_ON);
       validRequest = true;
     } else if (side == "right" && state == "on") {
-      digitalWrite(VF3_TURN_SIGNAL_R, HIGH);
+      pcfDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_OFF);
       validRequest = true;
     } else if (side == "right" && state == "off") {
-      digitalWrite(VF3_TURN_SIGNAL_R, LOW);
+      pcfDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_ON);
+      validRequest = true;
+    } else if (side == "both" && state == "on") {
+      pcfDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_OFF);
+      pcfDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_OFF);
       validRequest = true;
     } else if (side == "both" && state == "off") {
-      digitalWrite(VF3_TURN_SIGNAL_L, LOW);
-      digitalWrite(VF3_TURN_SIGNAL_R, LOW);
+      pcfDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_ON);
+      pcfDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_ON);
       validRequest = true;
     }
 
@@ -268,7 +272,7 @@ void setupWebServer() {
 
     JsonDocument doc;
     doc["success"] = true;
-    doc["message"] = "Turn signal updated";
+    doc["message"] = "Window down control updated";
     doc["side"] = side;
     doc["state"] = state;
 
@@ -485,11 +489,12 @@ void setupWebServer() {
     html += "</div></div>";
 
     html += "<div class='section'>";
-    html += "<h2>\xF0\x9F\x9A\xA6 Turn Signals</h2>";
+    html += "<h2>\xF0\x9F\xAA\x9F Window Down Control</h2>";
     html += "<div class='button-group'>";
-    html += "<button class='btn-warning' onclick='sendCommand(\"/car/turn-signal\", \"POST\", \"side=left&state=on\")'>\xE2\xAC\x85 Left ON</button>";
-    html += "<button class='btn-warning' onclick='sendCommand(\"/car/turn-signal\", \"POST\", \"side=right&state=on\")'>Right ON \xE2\x9E\xA1</button>";
-    html += "<button class='btn-danger' onclick='sendCommand(\"/car/turn-signal\", \"POST\", \"side=both&state=off\")'>All OFF</button>";
+    html += "<button class='btn-primary' onclick='sendCommand(\"/car/windows/down\", \"POST\", \"side=left&state=on\")'>\xE2\xAC\x87 Left Down</button>";
+    html += "<button class='btn-primary' onclick='sendCommand(\"/car/windows/down\", \"POST\", \"side=right&state=on\")'>\xE2\xAC\x87 Right Down</button>";
+    html += "<button class='btn-primary' onclick='sendCommand(\"/car/windows/down\", \"POST\", \"side=both&state=on\")'>\xE2\xAC\x87 Both Down</button>";
+    html += "<button class='btn-danger' onclick='sendCommand(\"/car/windows/down\", \"POST\", \"side=both&state=off\")'>Stop All</button>";
     html += "</div></div>";
 
     html += "<div class='section'>";

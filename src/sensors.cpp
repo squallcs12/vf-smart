@@ -1,12 +1,12 @@
 #include "sensors.h"
 
 void readSensors() {
-  // Read analog sensors
+  // Read analog sensors (ESP32 ADC)
   vf3_accelerator = analogRead(VF3_ACCELERATOR_PEDAL);
   vf3_brake = analogRead(VF3_BRAKE_PEDAL);
   vf3_steering_angle = analogRead(VF3_STEERING_ANGLE);
 
-  // Read digital sensors
+  // Read digital sensors (ESP32 GPIO)
   vf3_vehicle_speed = digitalRead(VF3_SPEED_SENSOR);
   vf3_gear_drive = digitalRead(VF3_GEAR_DRIVE);
   vf3_door_fl = digitalRead(VF3_DOOR_FL);
@@ -22,8 +22,9 @@ void readSensors() {
   vf3_proximity_rear_l = digitalRead(VF3_PROXIMITY_REAR_L);
   vf3_proximity_rear_r = digitalRead(VF3_PROXIMITY_REAR_R);
 
-  vf3_car_lock = digitalRead(VF3_CAR_LOCK);
-  vf3_car_unlock = digitalRead(VF3_CAR_UNLOCK);
-  self_accessory_power = digitalRead(SELF_ACCESSORY_POWER);
-  self_inside_cameras = digitalRead(SELF_INSIDE_CARMERAS);
+  // Read output states from PCF8575 (for status reporting)
+  vf3_car_lock = pcfDigitalRead(VF3_CAR_LOCK);
+  vf3_car_unlock = pcfDigitalRead(VF3_CAR_UNLOCK);
+  self_accessory_power = pcfDigitalRead(SELF_ACCESSORY_POWER);
+  self_inside_cameras = pcfDigitalRead(SELF_INSIDE_CARMERAS);
 }

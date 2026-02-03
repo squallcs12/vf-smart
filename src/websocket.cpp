@@ -56,83 +56,83 @@ void handleWebSocketMessage(AsyncWebSocketClient *client, uint8_t *data, size_t 
   if (strcmp(command, "lock") == 0) {
     vf3_car_lock = HIGH;
     vf3_car_unlock = LOW;
-    digitalWrite(VF3_CAR_LOCK, HIGH);
-    digitalWrite(VF3_CAR_UNLOCK, LOW);
+    pcfDigitalWrite(VF3_CAR_LOCK, WRITE_OFF);
+    pcfDigitalWrite(VF3_CAR_UNLOCK, WRITE_ON);
     Serial.println("WS: Car locked");
   }
   else if (strcmp(command, "unlock") == 0) {
     vf3_car_lock = LOW;
     vf3_car_unlock = HIGH;
-    digitalWrite(VF3_CAR_LOCK, LOW);
-    digitalWrite(VF3_CAR_UNLOCK, HIGH);
+    pcfDigitalWrite(VF3_CAR_LOCK, WRITE_ON);
+    pcfDigitalWrite(VF3_CAR_UNLOCK, WRITE_OFF);
     Serial.println("WS: Car unlocked");
   }
   else if (strcmp(command, "accessory-power") == 0 && action) {
     if (strcmp(action, "on") == 0) {
       self_accessory_power = HIGH;
-      digitalWrite(SELF_ACCESSORY_POWER, HIGH);
+      pcfDigitalWrite(SELF_ACCESSORY_POWER, WRITE_OFF);
       Serial.println("WS: Accessory power ON");
     } else if (strcmp(action, "off") == 0) {
       self_accessory_power = LOW;
-      digitalWrite(SELF_ACCESSORY_POWER, LOW);
+      pcfDigitalWrite(SELF_ACCESSORY_POWER, WRITE_ON);
       Serial.println("WS: Accessory power OFF");
     } else if (strcmp(action, "toggle") == 0) {
       self_accessory_power = !self_accessory_power;
-      digitalWrite(SELF_ACCESSORY_POWER, self_accessory_power);
+      pcfDigitalWrite(SELF_ACCESSORY_POWER, self_accessory_power);
       Serial.println("WS: Accessory power toggled");
     }
   }
   else if (strcmp(command, "windows-close") == 0) {
     window_close_timer = millis();
-    digitalWrite(VF3_WINDOW_LEFT, HIGH);
-    digitalWrite(VF3_WINDOW_RIGHT, HIGH);
+    pcfDigitalWrite(VF3_WINDOW_LEFT, WRITE_OFF);
+    pcfDigitalWrite(VF3_WINDOW_RIGHT, WRITE_OFF);
     Serial.println("WS: Windows closing");
   }
   else if (strcmp(command, "windows-stop") == 0) {
     window_close_timer = 0;
-    digitalWrite(VF3_WINDOW_LEFT, LOW);
-    digitalWrite(VF3_WINDOW_RIGHT, LOW);
+    pcfDigitalWrite(VF3_WINDOW_LEFT, WRITE_ON);
+    pcfDigitalWrite(VF3_WINDOW_RIGHT, WRITE_ON);
     Serial.println("WS: Windows stopped");
   }
   else if (strcmp(command, "buzzer") == 0 && action) {
     if (strcmp(action, "on") == 0) {
-      digitalWrite(VF3_BUZZER, HIGH);
+      pcfDigitalWrite(VF3_BUZZER, WRITE_OFF);
       Serial.println("WS: Buzzer ON");
     } else if (strcmp(action, "off") == 0) {
-      digitalWrite(VF3_BUZZER, LOW);
+      pcfDigitalWrite(VF3_BUZZER, WRITE_ON);
       Serial.println("WS: Buzzer OFF");
     } else if (strncmp(action, "beep:", 5) == 0) {
       int duration = atoi(action + 5);
       if (duration > 0 && duration <= 5000) {
-        digitalWrite(VF3_BUZZER, HIGH);
+        pcfDigitalWrite(VF3_BUZZER, WRITE_OFF);
         delay(duration);
-        digitalWrite(VF3_BUZZER, LOW);
+        pcfDigitalWrite(VF3_BUZZER, WRITE_ON);
         Serial.printf("WS: Buzzer beep for %dms\n", duration);
       }
     }
   }
-  else if (strcmp(command, "turn-signal-left") == 0 && action) {
+  else if (strcmp(command, "window-left-down") == 0 && action) {
     if (strcmp(action, "on") == 0) {
-      digitalWrite(VF3_TURN_SIGNAL_L, HIGH);
-      Serial.println("WS: Left turn signal ON");
+      pcfDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_OFF);
+      Serial.println("WS: Left window DOWN");
     } else if (strcmp(action, "off") == 0) {
-      digitalWrite(VF3_TURN_SIGNAL_L, LOW);
-      Serial.println("WS: Left turn signal OFF");
+      pcfDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_ON);
+      Serial.println("WS: Left window down STOP");
     }
   }
-  else if (strcmp(command, "turn-signal-right") == 0 && action) {
+  else if (strcmp(command, "window-right-down") == 0 && action) {
     if (strcmp(action, "on") == 0) {
-      digitalWrite(VF3_TURN_SIGNAL_R, HIGH);
-      Serial.println("WS: Right turn signal ON");
+      pcfDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_OFF);
+      Serial.println("WS: Right window DOWN");
     } else if (strcmp(action, "off") == 0) {
-      digitalWrite(VF3_TURN_SIGNAL_R, LOW);
-      Serial.println("WS: Right turn signal OFF");
+      pcfDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_ON);
+      Serial.println("WS: Right window down STOP");
     }
   }
-  else if (strcmp(command, "turn-signal-both-off") == 0) {
-    digitalWrite(VF3_TURN_SIGNAL_L, LOW);
-    digitalWrite(VF3_TURN_SIGNAL_R, LOW);
-    Serial.println("WS: Both turn signals OFF");
+  else if (strcmp(command, "windows-down-stop") == 0) {
+    pcfDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_ON);
+    pcfDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_ON);
+    Serial.println("WS: All windows down STOP");
   }
   else if (strcmp(command, "status") == 0) {
     // Send status immediately to requesting client
