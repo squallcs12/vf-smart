@@ -12,8 +12,14 @@ This is an ESP32-based MCU control system for a VinFast VF3 electric car. The pr
 # Build the project
 pio run
 
-# Upload to ESP32 device
+# Upload firmware to ESP32 device
 pio run --target upload
+
+# Upload filesystem (HTML files) to ESP32
+pio run --target uploadfs
+
+# Full deployment (firmware + filesystem)
+pio run --target uploadfs && pio run --target upload
 
 # Clean build files
 pio run --target clean
@@ -24,6 +30,8 @@ pio device monitor
 # Build and upload in one command
 pio run --target upload && pio device monitor
 ```
+
+**Note**: The filesystem must be uploaded separately using `uploadfs`. HTML files are stored in the `data/` directory and served via LittleFS.
 
 ## System Architecture
 
