@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <LittleFS.h>
 #include "config.h"
 #include "pins.h"
 #include "sensors.h"
@@ -14,6 +15,13 @@ void setup() {
   // Initialize Serial Communication
   Serial.begin(9600);
   Serial.println("VinFast VF3 MCU Control System Initializing...");
+
+  // Initialize LittleFS for HTML file storage
+  if (!LittleFS.begin(true)) {
+    Serial.println("LittleFS Mount Failed - HTML files unavailable");
+  } else {
+    Serial.println("LittleFS Mounted Successfully");
+  }
 
   // Load configuration from flash
   loadConfiguration();

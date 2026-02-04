@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VF3 Smart Control</title>
+  <style>
+    body { font-family: Arial; max-width: 600px; margin: 20px auto; padding: 20px; background: #f5f5f5; }
+    h1 { color: #e71e2c; text-align: center; }
+    .section { background: white; padding: 20px; margin: 15px 0; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .section h2 { margin-top: 0; color: #333; font-size: 18px; border-bottom: 2px solid #e71e2c; padding-bottom: 10px; }
+    .button-group { display: flex; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
+    button { flex: 1; min-width: 120px; padding: 15px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; transition: all 0.3s; }
+    button:active { transform: scale(0.95); }
+    .btn-primary { background: #e71e2c; color: white; }
+    .btn-primary:hover { background: #c51a26; }
+    .btn-secondary { background: #4CAF50; color: white; }
+    .btn-secondary:hover { background: #45a049; }
+    .btn-warning { background: #ff9800; color: white; }
+    .btn-warning:hover { background: #e68900; }
+    .btn-danger { background: #f44336; color: white; }
+    .btn-danger:hover { background: #da190b; }
+    .status { padding: 10px; background: #f0f0f0; border-radius: 5px; margin: 10px 0; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; }
+    .status-item { margin: 5px 0; }
+    .message { padding: 10px; margin: 10px 0; border-radius: 5px; text-align: center; display: none; }
+    .message.success { background: #d4edda; color: #155724; display: block; }
+    .message.error { background: #f8d7da; color: #721c24; display: block; }
+    input { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; border: 1px solid #ddd; border-radius: 5px; }
+    .auth-section { background: #fff3e0; border-left: 4px solid #ff9800; }
+    .auth-section input { margin: 5px 0; }
+    .auth-status { padding: 8px; margin: 10px 0; border-radius: 5px; font-size: 14px; text-align: center; }
+    .auth-status.authenticated { background: #d4edda; color: #155724; }
+    .auth-status.not-authenticated { background: #f8d7da; color: #721c24; }
+  </style>
+</head>
+<body>
+  <h1>🚗 VF3 Smart Control</h1>
+
+  <div class="section auth-section">
+    <h2>🔑 Authentication</h2>
+    <input type="text" id="apiKeyInput" placeholder="Enter your API Key" value="">
+    <button class="btn-primary" onclick="setApiKey()" style="width: 100%;">Save API Key</button>
+    <div id="authStatus" class="auth-status not-authenticated">Not authenticated - Please enter your API Key</div>
+  </div>
+
+  <div class="section">
+    <h2>🔐 Lock / Unlock</h2>
+    <div class="button-group">
+      <button class="btn-primary" onclick="sendCommand('/car/lock', 'POST')">🔒 Lock Car</button>
+      <button class="btn-secondary" onclick="sendCommand('/car/unlock', 'POST')">🔓 Unlock Car</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>⚡ Accessory Power</h2>
+    <div class="button-group">
+      <button class="btn-secondary" onclick="sendCommand('/car/accessory-power', 'POST', 'state=on')">Power ON</button>
+      <button class="btn-danger" onclick="sendCommand('/car/accessory-power', 'POST', 'state=off')">Power OFF</button>
+      <button class="btn-warning" onclick="sendCommand('/car/accessory-power', 'POST', 'state=toggle')">Toggle</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>🪟 Windows</h2>
+    <div class="button-group">
+      <button class="btn-primary" onclick="sendCommand('/car/windows/close', 'POST')">Close Windows (30s)</button>
+      <button class="btn-danger" onclick="sendCommand('/car/windows/stop', 'POST')">⏹ Stop</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>🔔 Buzzer</h2>
+    <div class="button-group">
+      <button class="btn-warning" onclick="sendCommand('/car/buzzer', 'POST', 'state=beep&duration=500')">Beep (0.5s)</button>
+      <button class="btn-warning" onclick="sendCommand('/car/buzzer', 'POST', 'state=beep&duration=1000')">Beep (1s)</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>🪟 Window Down Control</h2>
+    <div class="button-group">
+      <button class="btn-primary" onclick="sendCommand('/car/windows/down', 'POST', 'side=left&state=on')">⬇ Left Down</button>
+      <button class="btn-primary" onclick="sendCommand('/car/windows/down', 'POST', 'side=right&state=on')">⬇ Right Down</button>
+      <button class="btn-primary" onclick="sendCommand('/car/windows/down', 'POST', 'side=both&state=on')">⬇ Both Down</button>
+      <button class="btn-danger" onclick="sendCommand('/car/windows/down', 'POST', 'side=both&state=off')">Stop All</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>📊 Car Status</h2>
+    <button class="btn-primary" onclick="getStatus()" style="width: 100%;">🔄 Refresh Status</button>
+    <div class="status" id="status">Click 'Refresh Status' to load car data...</div>
+  </div>
+
+  <div class="section">
+    <h2>🔧 Settings</h2>
+    <button class="btn-warning" onclick="goToReconfigure()" style="width: 100%;">🔧 Reconfigure Device</button>
+  </div>
+
+  <div id="message" class="message"></div>
+
+  <script>
+    function getStoredApiKey() {
+      return localStorage.getItem('vf3_api_key') || '';
+    }
+
+    function goToReconfigure() {
+      const apiKey = getStoredApiKey();
+      if (!apiKey || apiKey.length < 8) {
+        showMessage('Please enter your API Key first', true);
+        return;
+      }
+      window.location.href = '/configure?api_key=' + encodeURIComponent(apiKey);
+    }
+
+    function setApiKey() {
+      const key = document.getElementById('apiKeyInput').value.trim();
+      if (key.length < 8) {
+        showMessage('API Key must be at least 8 characters', true);
+        return;
+      }
+      localStorage.setItem('vf3_api_key', key);
+      updateAuthStatus();
+      showMessage('API Key saved successfully!', false);
+    }
+
+    function updateAuthStatus() {
+      const key = getStoredApiKey();
+      const statusEl = document.getElementById('authStatus');
+      if (key.length >= 8) {
+        statusEl.textContent = '✅ Authenticated (Key: ' + key.substring(0, 4) + '****)';
+        statusEl.className = 'auth-status authenticated';
+      } else {
+        statusEl.textContent = '❌ Not authenticated - Please enter your API Key';
+        statusEl.className = 'auth-status not-authenticated';
+      }
+    }
+
+    function showMessage(msg, isError) {
+      const el = document.getElementById('message');
+      el.textContent = msg;
+      el.className = 'message ' + (isError ? 'error' : 'success');
+      setTimeout(() => el.className = 'message', 3000);
+    }
+
+    function sendCommand(url, method, body) {
+      const apiKey = getStoredApiKey();
+      if (!apiKey || apiKey.length < 8) {
+        showMessage('Please enter your API Key first', true);
+        return;
+      }
+      const options = { method: method, headers: { 'X-API-Key': apiKey } };
+      if (body) {
+        options.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+        options.body = body;
+      }
+      fetch(url, options)
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) showMessage(data.message || 'Success!', false);
+          else showMessage(data.message || 'Failed', true);
+        })
+        .catch(e => showMessage('Error: ' + e.message, true));
+    }
+
+    function getStatus() {
+      fetch('/car/status')
+        .then(r => r.json())
+        .then(data => {
+          let html = '';
+          html += '<div class="status-item"><strong>🔐 Locks:</strong> ' + (data.controls.car_lock ? '🔒 Locked' : '🔓 Unlocked') + '</div>';
+          html += '<div class="status-item"><strong>⚡ Accessory Power:</strong> ' + (data.controls.accessory_power ? '✅ ON' : '❌ OFF') + '</div>';
+          html += '<div class="status-item"><strong>🪟 Windows:</strong> ' + (data.window_close_active ? '⏳ Closing (' + Math.round(data.window_close_remaining_ms/1000) + 's)' : '✅ Idle') + '</div>';
+          html += '<div class="status-item"><strong>🚪 Doors:</strong> FL:' + (data.doors.front_left ? '🔴' : '🟢') + ' FR:' + (data.doors.front_right ? '🔴' : '🟢') + ' Trunk:' + (data.doors.trunk ? '🔴' : '🟢') + '</div>';
+          html += '<div class="status-item"><strong>💡 Lights:</strong> Demi:' + (data.lights.demi_light ? '💡' : '⚫') + ' Normal:' + (data.lights.normal_light ? '💡' : '⚫') + '</div>';
+          html += '<div class="status-item"><strong>🪑 Seats:</strong> FL:' + (data.seats.front_left_occupied ? '👤' : '⚫') + ' FR:' + (data.seats.front_right_occupied ? '👤' : '⚫') + '</div>';
+          html += '<div class="status-item"><strong>🔗 Seatbelts:</strong> FL:' + (data.seats.front_left_seatbelt ? '✅' : '⚠️') + ' FR:' + (data.seats.front_right_seatbelt ? '✅' : '⚠️') + '</div>';
+          html += '<div class="status-item"><strong>📡 Proximity:</strong> L:' + (data.proximity.rear_left ? '🚨' : '✅') + ' R:' + (data.proximity.rear_right ? '🚨' : '✅') + '</div>';
+          html += '<div class="status-item"><strong>🚗 Speed:</strong> ' + data.sensors.vehicle_speed + '</div>';
+          html += '<div class="status-item"><strong>🎮 Pedals:</strong> Accel:' + data.sensors.accelerator + ' Brake:' + data.sensors.brake + '</div>';
+          html += '<div class="status-item"><strong>🎛 Steering:</strong> ' + data.sensors.steering_angle + '</div>';
+          document.getElementById('status').innerHTML = html;
+        })
+        .catch(e => showMessage('Error loading status: ' + e.message, true));
+    }
+
+    window.onload = function() {
+      const storedKey = getStoredApiKey();
+      if (storedKey) {
+        document.getElementById('apiKeyInput').value = storedKey;
+      }
+      updateAuthStatus();
+      getStatus();
+    };
+  </script>
+</body>
+</html>

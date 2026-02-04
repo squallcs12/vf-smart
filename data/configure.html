@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VF3 Smart - Reconfigure</title>
+  <style>
+    body { font-family: Arial; max-width: 500px; margin: 50px auto; padding: 20px; }
+    h1 { color: #e71e2c; }
+    h3 { color: #333; border-bottom: 2px solid #e71e2c; padding-bottom: 10px; }
+    input { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; border: 1px solid #ddd; border-radius: 5px; }
+    button { background: #e71e2c; color: white; padding: 15px; width: 100%; border: none; cursor: pointer; font-size: 16px; border-radius: 5px; margin-top: 10px; }
+    button:hover { background: #c51a26; }
+    .btn-secondary { background: #666; }
+    .btn-secondary:hover { background: #555; }
+    .info { background: #f0f0f0; padding: 15px; margin: 20px 0; border-radius: 5px; }
+    .warning { background: #fff3e0; color: #e65100; padding: 15px; margin: 20px 0; border-radius: 5px; font-weight: bold; }
+    label { font-weight: bold; display: block; margin-top: 15px; }
+  </style>
+</head>
+<body>
+  <h1>🔧 VF3 Smart Reconfiguration</h1>
+  <div class="warning">⚠️ Warning: Changing these settings will restart the device and may disconnect you.</div>
+
+  <form action="/configure" method="POST">
+    <h3>WiFi Configuration</h3>
+    <label>WiFi SSID (Network Name)</label>
+    <input type="text" name="ssid" id="ssid" placeholder="Enter WiFi SSID" required>
+
+    <label>WiFi Password</label>
+    <input type="password" name="password" id="password" placeholder="Enter WiFi Password" required>
+
+    <label>API Key (for secure control)</label>
+    <input type="text" name="api_key" id="api_key" placeholder="Enter API Key" required>
+
+    <div class="info">API Key must be at least 8 characters. This key is used for HTTP API authentication.</div>
+
+    <button type="submit">💾 Save Configuration & Restart</button>
+  </form>
+
+  <button class="btn-secondary" onclick="window.location.href='/'" style="margin-top: 10px;">⬅ Back to Dashboard</button>
+
+  <script>
+    // Get values from URL parameters (populated by server)
+    const params = new URLSearchParams(window.location.search);
+    const ssid = params.get('current_ssid') || '';
+    const password = params.get('current_password') || '';
+    const apiKey = params.get('current_api_key') || '';
+
+    if (ssid) document.getElementById('ssid').value = ssid;
+    if (password) document.getElementById('password').value = password;
+    if (apiKey) document.getElementById('api_key').value = apiKey;
+  </script>
+</body>
+</html>

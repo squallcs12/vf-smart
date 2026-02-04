@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VF3 Smart - Setup</title>
+  <style>
+    body { font-family: Arial; max-width: 500px; margin: 50px auto; padding: 20px; }
+    h1 { color: #e71e2c; }
+    input { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }
+    button { background: #e71e2c; color: white; padding: 15px; width: 100%; border: none; cursor: pointer; font-size: 16px; }
+    button:hover { background: #c51a26; }
+    .info { background: #f0f0f0; padding: 15px; margin: 20px 0; border-radius: 5px; }
+    .warning { background: #fff3e0; color: #e65100; padding: 15px; margin: 20px 0; border-radius: 5px; }
+    label { font-weight: bold; display: block; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>VF3 Smart Setup</h1>
+
+  <div id="message-area"></div>
+
+  <form action="/configure" method="POST">
+    <h3>WiFi Configuration</h3>
+    <label>WiFi SSID (Network Name)</label>
+    <input type="text" name="ssid" id="ssid" placeholder="Enter WiFi SSID" required>
+
+    <label>WiFi Password</label>
+    <input type="password" name="password" id="password" placeholder="Enter WiFi Password" required>
+
+    <label>API Key (for secure control)</label>
+    <input type="text" name="api_key" id="api_key" placeholder="Enter API Key" required>
+
+    <div class="info">API Key can be any string (minimum 8 characters). Save it securely - you'll need it to control your car via HTTP API.</div>
+
+    <button type="submit">Save Configuration</button>
+  </form>
+
+  <script>
+    // Get values from URL parameters (populated by server for reconfiguration)
+    const params = new URLSearchParams(window.location.search);
+    const ssid = params.get('current_ssid') || '';
+    const password = params.get('current_password') || '';
+    const apiKey = params.get('current_api_key') || '';
+    const isReconfig = params.get('reconfig') === 'true';
+
+    if (ssid) document.getElementById('ssid').value = ssid;
+    if (password) document.getElementById('password').value = password;
+    if (apiKey) document.getElementById('api_key').value = apiKey;
+
+    // Show message based on mode
+    const messageArea = document.getElementById('message-area');
+    if (isReconfig) {
+      messageArea.innerHTML = '<div class="warning">⚠️ Reconfiguration Mode - Previous WiFi connection failed or you requested to reconfigure.</div>';
+    } else {
+      messageArea.innerHTML = '<div class="info">Welcome! Configure your VF3 Smart device with WiFi credentials and security settings.</div>';
+    }
+  </script>
+</body>
+</html>

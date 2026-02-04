@@ -3,51 +3,26 @@
 #include "../config.h"
 #include "../storage.h"
 #include <Arduino.h>
+#include <LittleFS.h>
 
 void registerConfigureEndpoints(AsyncWebServer& server) {
-  // GET /configure - Reconfiguration page
+  // GET /configure - Reconfiguration page (serve from LittleFS with current values)
   server.on("/configure", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!authenticateRequest(request)) {
       sendUnauthorized(request);
       return;
     }
 
-    String html = "<!DOCTYPE html><html><head>";
-    html += "<meta charset='UTF-8'>";
-    html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
-    html += "<title>VF3 Smart - Reconfigure</title>";
-    html += "<style>";
-    html += "body { font-family: Arial; max-width: 500px; margin: 50px auto; padding: 20px; }";
-    html += "h1 { color: #e71e2c; }";
-    html += "h3 { color: #333; border-bottom: 2px solid #e71e2c; padding-bottom: 10px; }";
-    html += "input { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; border: 1px solid #ddd; border-radius: 5px; }";
-    html += "button { background: #e71e2c; color: white; padding: 15px; width: 100%; border: none; cursor: pointer; font-size: 16px; border-radius: 5px; margin-top: 10px; }";
-    html += "button:hover { background: #c51a26; }";
-    html += ".btn-secondary { background: #666; }";
-    html += ".btn-secondary:hover { background: #555; }";
-    html += ".info { background: #f0f0f0; padding: 15px; margin: 20px 0; border-radius: 5px; }";
-    html += ".warning { background: #fff3e0; color: #e65100; padding: 15px; margin: 20px 0; border-radius: 5px; font-weight: bold; }";
-    html += "label { font-weight: bold; display: block; margin-top: 15px; }";
-    html += "</style>";
-    html += "</head><body>";
-    html += "<h1>\xF0\x9F\x94\xA7 VF3 Smart Reconfiguration</h1>";
-    html += "<div class='warning'>\xE2\x9A\xA0\xEF\xB8\x8F Warning: Changing these settings will restart the device and may disconnect you.</div>";
+    // Redirect to configure.html with current values as URL parameters
+    String redirectUrl = "/configure.html?current_ssid=" + configured_ssid;
+    redirectUrl += "&current_password=" + configured_password;
+    redirectUrl += "&current_api_key=" + configured_api_key;
+    request->redirect(redirectUrl);
+  });
 
-    html += "<form action='/configure' method='POST'>";
-    html += "<h3>WiFi Configuration</h3>";
-    html += "<label>WiFi SSID (Network Name)</label>";
-    html += "<input type='text' name='ssid' placeholder='Enter WiFi SSID' value='" + configured_ssid + "' required>";
-    html += "<label>WiFi Password</label>";
-    html += "<input type='password' name='password' placeholder='Enter WiFi Password' value='" + configured_password + "' required>";
-    html += "<label>API Key (for secure control)</label>";
-    html += "<input type='text' name='api_key' placeholder='Enter API Key' value='" + configured_api_key + "' required>";
-    html += "<div class='info'>API Key must be at least 8 characters. This key is used for HTTP API authentication and as MQTT topic prefix.</div>";
-
-    html += "<button type='submit'>\xF0\x9F\x92\xBE Save Configuration & Restart</button>";
-    html += "</form>";
-    html += "<button class='btn-secondary' onclick='window.location.href=\"/\"' style='margin-top: 10px;'>\xE2\xAC\x85 Back to Dashboard</button>";
-    html += "</body></html>";
-    request->send(200, "text/html", html);
+  // Serve the actual HTML file
+  server.on("/configure.html", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(LittleFS, "/configure.html", "text/html");
   });
 
   // POST /configure - Handle reconfiguration submission

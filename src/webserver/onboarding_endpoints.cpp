@@ -2,46 +2,22 @@
 #include "../config.h"
 #include "../storage.h"
 #include <Arduino.h>
+#include <LittleFS.h>
 
 void registerOnboardingEndpoints(AsyncWebServer& server) {
-  // Onboarding home page with configuration form
+  // Onboarding home page with configuration form (serve from LittleFS)
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    String html = "<!DOCTYPE html><html><head>";
-    html += "<meta charset='UTF-8'>";
-    html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
-    html += "<title>VF3 Smart - Setup</title>";
-    html += "<style>";
-    html += "body { font-family: Arial; max-width: 500px; margin: 50px auto; padding: 20px; }";
-    html += "h1 { color: #e71e2c; }";
-    html += "input { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }";
-    html += "button { background: #e71e2c; color: white; padding: 15px; width: 100%; border: none; cursor: pointer; font-size: 16px; }";
-    html += "button:hover { background: #c51a26; }";
-    html += ".info { background: #f0f0f0; padding: 15px; margin: 20px 0; border-radius: 5px; }";
-    html += ".warning { background: #fff3e0; color: #e65100; padding: 15px; margin: 20px 0; border-radius: 5px; }";
-    html += "</style>";
-    html += "</head><body>";
-    html += "<h1>VF3 Smart Setup</h1>";
+    // Redirect to onboarding.html with current values and reconfig flag
+    String redirectUrl = "/onboarding.html?current_ssid=" + configured_ssid;
+    redirectUrl += "&current_password=" + configured_password;
+    redirectUrl += "&current_api_key=" + configured_api_key;
+    redirectUrl += "&reconfig=" + String(is_configured ? "true" : "false");
+    request->redirect(redirectUrl);
+  });
 
-    // Show different message based on whether reconfiguring or initial setup
-    if (is_configured) {
-      html += "<div class='warning'>\xE2\x9A\xA0\xEF\xB8\x8F Reconfiguration Mode - Previous WiFi connection failed or you requested to reconfigure.</div>";
-    } else {
-      html += "<div class='info'>Welcome! Configure your VF3 Smart device with WiFi credentials and security settings.</div>";
-    }
-
-    html += "<form action='/configure' method='POST'>";
-    html += "<h3>WiFi Configuration</h3>";
-    html += "<label>WiFi SSID (Network Name)</label>";
-    html += "<input type='text' name='ssid' placeholder='Enter WiFi SSID' value='" + configured_ssid + "' required>";
-    html += "<label>WiFi Password</label>";
-    html += "<input type='password' name='password' placeholder='Enter WiFi Password' value='" + configured_password + "' required>";
-    html += "<label>API Key (for secure control)</label>";
-    html += "<input type='text' name='api_key' placeholder='Enter API Key' value='" + configured_api_key + "' required>";
-    html += "<div class='info'>API Key can be any string (minimum 8 characters). Save it securely - you'll need it to control your car via HTTP API and MQTT.</div>";
-    html += "<button type='submit'>Save Configuration</button>";
-    html += "</form>";
-    html += "</body></html>";
-    request->send(200, "text/html", html);
+  // Serve the actual HTML file
+  server.on("/onboarding.html", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(LittleFS, "/onboarding.html", "text/html");
   });
 
   // Handle configuration submission
