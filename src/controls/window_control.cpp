@@ -5,7 +5,7 @@ void handleWindowControl() {
   static int lock_pulse_count = 0;
   static int prev_car_lock = LOW;
   static unsigned long last_pulse_time = 0;
-  const unsigned long PULSE_TIMEOUT = 3000;  // 3 seconds timeout between pulses
+  const unsigned long PULSE_TIMEOUT = 2000;  // 2 seconds timeout between pulses
 
   // Reset pulse count if timeout exceeded
   if (lock_pulse_count > 0 && (millis() - last_pulse_time) > PULSE_TIMEOUT) {
