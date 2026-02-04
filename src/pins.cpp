@@ -2,10 +2,8 @@
 #include <Arduino.h>
 
 // ===== INPUT VARIABLES =====
-int vf3_accelerator = 0;
 int vf3_brake = 0;
 int vf3_steering_angle = 0;
-int vf3_vehicle_speed = 0;
 int vf3_gear_drive = LOW;
 int vf3_door_fl = LOW;
 int vf3_door_fr = LOW;
@@ -33,7 +31,6 @@ int vf3_door_locked = LOW;
 
 void initializePins() {
   // Initialize Digital Input Pins (ESP32 GPIO)
-  pinMode(VF3_SPEED_SENSOR, INPUT);
   pinMode(VF3_GEAR_DRIVE, INPUT);
   pinMode(VF3_DOOR_FL, INPUT);
   pinMode(VF3_DOOR_FR, INPUT);

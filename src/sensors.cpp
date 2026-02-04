@@ -1,10 +1,8 @@
 #include "sensors.h"
 
 // Previous sensor values for change detection
-static int prev_vf3_accelerator = -1;
 static int prev_vf3_brake = -1;
 static int prev_vf3_steering_angle = -1;
-static int prev_vf3_vehicle_speed = -1;
 static int prev_vf3_gear_drive = -1;
 static int prev_vf3_door_fl = -1;
 static int prev_vf3_door_fr = -1;
@@ -31,12 +29,10 @@ bool readSensors() {
   bool changed = false;
 
   // Read analog sensors (ESP32 ADC)
-  int new_accelerator = analogRead(VF3_ACCELERATOR_PEDAL);
   int new_brake = analogRead(VF3_BRAKE_PEDAL);
   int new_steering_angle = analogRead(VF3_STEERING_ANGLE);
 
   // Read digital sensors (ESP32 GPIO)
-  int new_vehicle_speed = digitalRead(VF3_SPEED_SENSOR);
   int new_gear_drive = digitalRead(VF3_GEAR_DRIVE);
   int new_door_fl = digitalRead(VF3_DOOR_FL);
   int new_door_fr = digitalRead(VF3_DOOR_FR);
@@ -62,12 +58,10 @@ bool readSensors() {
   int new_armrest = pcf8575.digitalRead(SELF_ARMREST);
 
   // Check for changes (using threshold for analog values to avoid noise)
-  if (abs(new_accelerator - prev_vf3_accelerator) > 10) changed = true;
   if (abs(new_brake - prev_vf3_brake) > 10) changed = true;
   if (abs(new_steering_angle - prev_vf3_steering_angle) > 10) changed = true;
 
   // Check digital sensors
-  if (new_vehicle_speed != prev_vf3_vehicle_speed) changed = true;
   if (new_gear_drive != prev_vf3_gear_drive) changed = true;
   if (new_door_fl != prev_vf3_door_fl) changed = true;
   if (new_door_fr != prev_vf3_door_fr) changed = true;
@@ -91,10 +85,8 @@ bool readSensors() {
   if (new_armrest != prev_self_armrest) changed = true;
 
   // Update global variables
-  vf3_accelerator = new_accelerator;
   vf3_brake = new_brake;
   vf3_steering_angle = new_steering_angle;
-  vf3_vehicle_speed = new_vehicle_speed;
   vf3_gear_drive = new_gear_drive;
   vf3_door_fl = new_door_fl;
   vf3_door_fr = new_door_fr;
@@ -118,10 +110,8 @@ bool readSensors() {
   self_armrest = new_armrest;
 
   // Update previous values
-  prev_vf3_accelerator = new_accelerator;
   prev_vf3_brake = new_brake;
   prev_vf3_steering_angle = new_steering_angle;
-  prev_vf3_vehicle_speed = new_vehicle_speed;
   prev_vf3_gear_drive = new_gear_drive;
   prev_vf3_door_fl = new_door_fl;
   prev_vf3_door_fr = new_door_fr;

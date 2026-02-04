@@ -5,12 +5,10 @@
 #include "pcf8575_io.h"
 
 // ===== ANALOG INPUTS (Sensors) - Use input-only pins =====
-#define VF3_ACCELERATOR_PEDAL 34       // GPIO 34 - Accelerator pedal position (input only)
 #define VF3_BRAKE_PEDAL 39             // GPIO 39 - Brake pedal sensor (input only)
 #define VF3_STEERING_ANGLE 36          // GPIO 36 - Steering angle sensor (input only)
 
 // ===== DIGITAL INPUTS (Sensors & Switches) - ESP32 GPIO Pins =====
-#define VF3_SPEED_SENSOR 35            // GPIO 35 - Vehicle speed sensor (input only)
 #define VF3_GEAR_DRIVE 37              // GPIO 37 - Gear in Drive position (1=D, 0=other) (input only)
 #define VF3_DOOR_FL 4                  // GPIO 4 - Front left door open/close sensor
 #define VF3_DOOR_FR 16                 // GPIO 16 - Front right door open/close sensor
@@ -51,10 +49,8 @@
 
 
 // ===== INPUT VARIABLES =====
-extern int vf3_accelerator;
 extern int vf3_brake;
 extern int vf3_steering_angle;
-extern int vf3_vehicle_speed;
 extern int vf3_gear_drive;
 extern int vf3_door_fl;
 extern int vf3_door_fr;

@@ -6,10 +6,8 @@ String getCarStatusJSON() {
 
   // Analog sensor values
   JsonObject sensors = doc["sensors"].to<JsonObject>();
-  sensors["accelerator"] = vf3_accelerator;
   sensors["brake"] = vf3_brake;
   sensors["steering_angle"] = vf3_steering_angle;
-  sensors["vehicle_speed"] = vf3_vehicle_speed;
   sensors["gear_drive"] = vf3_gear_drive;
 
   // Door status
