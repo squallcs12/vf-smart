@@ -1,7 +1,7 @@
 #include "window_endpoints.h"
 #include "auth.h"
 #include "../pins.h"
-#include "../window_control.h"
+#include "../controls/window_control.h"
 #include "../websocket.h"
 #include <ArduinoJson.h>
 

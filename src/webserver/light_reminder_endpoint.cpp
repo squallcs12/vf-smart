@@ -1,6 +1,6 @@
 #include "light_reminder_endpoint.h"
 #include "auth.h"
-#include "../light_reminder.h"
+#include "../controls/light_reminder.h"
 #include "../websocket.h"
 #include <ArduinoJson.h>
 

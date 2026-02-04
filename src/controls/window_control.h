@@ -1,8 +1,8 @@
 #ifndef WINDOW_CONTROL_H
 #define WINDOW_CONTROL_H
 
-#include "config.h"
-#include "pins.h"
+#include "../config.h"
+#include "../pins.h"
 
 void handleWindowControl();
 

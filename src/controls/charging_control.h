@@ -1,8 +1,8 @@
 #ifndef CHARGING_CONTROL_H
 #define CHARGING_CONTROL_H
 
-#include "config.h"
-#include "pins.h"
+#include "../config.h"
+#include "../pins.h"
 
 void handleChargingControl();
 
