@@ -14,8 +14,8 @@ void registerWindowEndpoints(AsyncWebServer& server) {
     }
 
     window_close_timer = millis();
-    pcf8575.digitalWrite(VF3_WINDOW_LEFT, WRITE_OFF);
-    pcf8575.digitalWrite(VF3_WINDOW_RIGHT, WRITE_OFF);
+    pcf8575.digitalWrite(VF3_WINDOW_LEFT_UP, WRITE_OFF);
+    pcf8575.digitalWrite(VF3_WINDOW_RIGHT_UP, WRITE_OFF);
 
     JsonDocument doc;
     doc["success"] = true;
@@ -39,8 +39,8 @@ void registerWindowEndpoints(AsyncWebServer& server) {
     }
 
     window_close_timer = 0;
-    pcf8575.digitalWrite(VF3_WINDOW_LEFT, WRITE_ON);
-    pcf8575.digitalWrite(VF3_WINDOW_RIGHT, WRITE_ON);
+    pcf8575.digitalWrite(VF3_WINDOW_LEFT_UP, WRITE_ON);
+    pcf8575.digitalWrite(VF3_WINDOW_RIGHT_UP, WRITE_ON);
 
     JsonDocument doc;
     doc["success"] = true;

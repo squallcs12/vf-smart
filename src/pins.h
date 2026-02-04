@@ -46,11 +46,6 @@
 #define VF3_WINDOW_LEFT_DOWN PCF_P14     // P14 - Window left DOWN control
 #define VF3_WINDOW_RIGHT_DOWN PCF_P15    // P15 - Window right DOWN control
 
-// Legacy aliases for backward compatibility (will be removed)
-#define VF3_WINDOW_LEFT VF3_WINDOW_LEFT_UP
-#define VF3_WINDOW_RIGHT VF3_WINDOW_RIGHT_UP
-
-
 #define WRITE_ON LOW
 #define WRITE_OFF HIGH
 
