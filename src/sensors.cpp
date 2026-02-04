@@ -18,6 +18,7 @@ static int prev_vf3_demi_light = -1;
 static int prev_vf3_normal_light = -1;
 static int prev_vf3_proximity_rear_l = -1;
 static int prev_vf3_proximity_rear_r = -1;
+static int prev_vf3_charging_status = -1;
 static int prev_vf3_car_lock = -1;
 static int prev_vf3_car_unlock = -1;
 static int prev_self_accessory_power = -1;
@@ -49,6 +50,7 @@ bool readSensors() {
   int new_normal_light = digitalRead(VF3_NORMAL_LIGHT);
   int new_proximity_rear_l = digitalRead(VF3_PROXIMITY_REAR_L);
   int new_proximity_rear_r = digitalRead(VF3_PROXIMITY_REAR_R);
+  int new_charging_status = digitalRead(VF3_CHARGING_STATUS);
 
   // Read output states from PCF8575 (for status reporting)
   int new_car_lock = pcf8575.digitalRead(VF3_CAR_LOCK);
@@ -79,6 +81,7 @@ bool readSensors() {
   if (new_normal_light != prev_vf3_normal_light) changed = true;
   if (new_proximity_rear_l != prev_vf3_proximity_rear_l) changed = true;
   if (new_proximity_rear_r != prev_vf3_proximity_rear_r) changed = true;
+  if (new_charging_status != prev_vf3_charging_status) changed = true;
   if (new_car_lock != prev_vf3_car_lock) changed = true;
   if (new_car_unlock != prev_vf3_car_unlock) changed = true;
   if (new_accessory_power != prev_self_accessory_power) changed = true;
@@ -105,6 +108,7 @@ bool readSensors() {
   vf3_normal_light = new_normal_light;
   vf3_proximity_rear_l = new_proximity_rear_l;
   vf3_proximity_rear_r = new_proximity_rear_r;
+  vf3_charging_status = new_charging_status;
   vf3_car_lock = new_car_lock;
   vf3_car_unlock = new_car_unlock;
   self_accessory_power = new_accessory_power;
@@ -131,6 +135,7 @@ bool readSensors() {
   prev_vf3_normal_light = new_normal_light;
   prev_vf3_proximity_rear_l = new_proximity_rear_l;
   prev_vf3_proximity_rear_r = new_proximity_rear_r;
+  prev_vf3_charging_status = new_charging_status;
   prev_vf3_car_lock = new_car_lock;
   prev_vf3_car_unlock = new_car_unlock;
   prev_self_accessory_power = new_accessory_power;

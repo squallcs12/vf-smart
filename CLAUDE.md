@@ -480,6 +480,24 @@ curl -X POST http://192.168.4.1/car/light-reminder \
 }
 ```
 
+##### POST /car/charger-unlock
+Manually unlock the charger port. The charger port also automatically unlocks when charging stops.
+
+**Example Request:**
+```bash
+# Unlock charger port
+curl -X POST http://192.168.4.1/car/charger-unlock \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Charger port unlocked"
+}
+```
+
 ### Testing the API
 
 ```bash
@@ -530,6 +548,10 @@ curl -X POST http://192.168.4.1/car/light-reminder \
 curl -X POST http://192.168.4.1/car/light-reminder \
   -H "X-API-Key: $API_KEY" \
   -d "state=on"
+
+# Unlock charger port
+curl -X POST http://192.168.4.1/car/charger-unlock \
+  -H "X-API-Key: $API_KEY"
 
 # Alternative: Using query parameter for authentication
 curl -X POST "http://192.168.4.1/car/lock?api_key=$API_KEY"

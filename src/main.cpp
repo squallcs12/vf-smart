@@ -117,6 +117,7 @@ void loop() {
   handleWindowControl();
   handleAccessoryPower();
   handleLightReminder();
+  handleChargingControl();
 
   // 50ms control loop cycle
   delay(50);

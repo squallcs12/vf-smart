@@ -24,6 +24,7 @@
 #define VF3_NORMAL_LIGHT 25            // GPIO 25 - Normal/high beam light (0=off, 1=on)
 #define VF3_PROXIMITY_REAR_L 33        // GPIO 33 - Rear left proximity/parking detection
 #define VF3_PROXIMITY_REAR_R 32        // GPIO 32 - Rear right proximity/parking detection
+#define VF3_CHARGING_STATUS 13         // GPIO 13 - Charging status (1=charging, 0=not charging)
 
 // ===== DIGITAL OUTPUTS (Controls & Indicators) - PCF8575 I2C I/O Expander =====
 // All outputs now controlled via PCF8575 at I2C address 0x20 (pins P0-P15)
@@ -72,6 +73,7 @@ extern int vf3_proximity_rear_l;
 extern int vf3_proximity_rear_r;
 extern int vf3_demi_light;
 extern int vf3_normal_light;
+extern int vf3_charging_status;
 
 // ===== OUTPUT VARIABLES =====
 extern int vf3_car_lock;

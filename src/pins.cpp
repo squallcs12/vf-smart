@@ -19,6 +19,7 @@ int vf3_proximity_rear_l = LOW;
 int vf3_proximity_rear_r = LOW;
 int vf3_demi_light = LOW;
 int vf3_normal_light = LOW;
+int vf3_charging_status = LOW;
 
 // ===== OUTPUT VARIABLES =====
 int vf3_car_lock = LOW;
@@ -46,6 +47,7 @@ void initializePins() {
   pinMode(VF3_NORMAL_LIGHT, INPUT);
   pinMode(VF3_PROXIMITY_REAR_L, INPUT);
   pinMode(VF3_PROXIMITY_REAR_R, INPUT);
+  pinMode(VF3_CHARGING_STATUS, INPUT);
 
   // Initialize PCF8575 I2C I/O Expander for all digital outputs
   if (!initPCF8575()) {

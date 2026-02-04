@@ -31,6 +31,9 @@ String getCarStatusJSON() {
   lights["demi_light"] = vf3_demi_light;
   lights["normal_light"] = vf3_normal_light;
 
+  // Charging status
+  doc["charging_status"] = vf3_charging_status;
+
   // Proximity sensors
   JsonObject proximity = doc["proximity"].to<JsonObject>();
   proximity["rear_left"] = vf3_proximity_rear_l;
