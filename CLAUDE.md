@@ -544,137 +544,106 @@ open http://192.168.4.1
 
 ## WebSocket Real-Time Communication
 
-The system provides a WebSocket server for real-time bidirectional communication with clients.
+The system provides a WebSocket server for **real-time status monitoring only**.
+
+**⚠️ Important: WebSocket is for monitoring, not for sending commands.**
+- Use **HTTP API endpoints** (POST requests) to trigger commands and control the car
+- Use **WebSocket** only to receive real-time status updates
 
 ### WebSocket Connection
 
 - **Endpoint**: `ws://192.168.4.1/ws`
 - **Protocol**: WebSocket (RFC 6455)
 - **Auto-broadcast**: Status updates sent every 1 second to all connected clients
+- **No Authentication Required**: WebSocket is read-only for status monitoring
 
 ### Connection Behavior
 
 1. **On Connect**: Server immediately sends current car status as JSON
 2. **Periodic Updates**: Status broadcast every 1 second to all clients
-3. **Command Response**: Status update sent immediately after command execution
+3. **Status Format**: Same JSON structure as `GET /car/status` endpoint
 
-### WebSocket Commands
+### Status Message Format
 
-Commands are sent as JSON objects with this format:
+The WebSocket sends car status updates as JSON with the same structure as `GET /car/status`:
+
 ```json
 {
-  "command": "command-name",
-  "action": "optional-action"
+  "sensors": {
+    "accelerator": 0,
+    "brake": 0,
+    "steering_angle": 0,
+    "vehicle_speed": 0,
+    "gear_drive": 0
+  },
+  "doors": {
+    "front_left": 0,
+    "front_right": 0,
+    "trunk": 0,
+    "locked": 0
+  },
+  "seats": {
+    "front_left_occupied": 0,
+    "front_right_occupied": 0,
+    "front_left_seatbelt": 0,
+    "front_right_seatbelt": 0
+  },
+  "lights": {
+    "demi_light": 0,
+    "normal_light": 0
+  },
+  "proximity": {
+    "rear_left": 0,
+    "rear_right": 0
+  },
+  "controls": {
+    "brake_pressed": 0,
+    "accessory_power": 1,
+    "car_lock": 0,
+    "car_unlock": 0
+  },
+  "window_close_active": false,
+  "window_close_remaining_ms": 0,
+  "light_reminder_enabled": true,
+  "time": {
+    "synced": true,
+    "current_time": "2026-02-04 10:30:15",
+    "boot_time": "2026-02-04 08:00:00",
+    "is_night": false
+  }
 }
-```
-
-#### Available Commands
-
-**Lock/Unlock**
-```json
-{"command": "lock"}
-{"command": "unlock"}
-```
-
-**Accessory Power**
-```json
-{"command": "accessory-power", "action": "on"}
-{"command": "accessory-power", "action": "off"}
-{"command": "accessory-power", "action": "toggle"}
-```
-
-**Windows**
-```json
-{"command": "windows-close"}
-{"command": "windows-stop"}
-```
-
-**Buzzer**
-```json
-{"command": "buzzer", "action": "on"}
-{"command": "buzzer", "action": "off"}
-{"command": "buzzer", "action": "beep:500"}  // Duration in ms
-```
-
-**Turn Signals**
-```json
-{"command": "turn-signal-left", "action": "on"}
-{"command": "turn-signal-left", "action": "off"}
-{"command": "turn-signal-right", "action": "on"}
-{"command": "turn-signal-right", "action": "off"}
-{"command": "turn-signal-both-off"}
-```
-
-**Light Reminder**
-```json
-{"command": "light-reminder", "action": "on"}       // Enable light reminder
-{"command": "light-reminder", "action": "off"}      // Disable light reminder
-{"command": "light-reminder", "action": "enable"}   // Enable light reminder
-{"command": "light-reminder", "action": "disable"}  // Disable light reminder
-{"command": "light-reminder", "action": "toggle"}   // Toggle light reminder
-```
-
-**Request Status**
-```json
-{"command": "status"}
 ```
 
 ### JavaScript WebSocket Client Example
 
 ```javascript
-// Connect to WebSocket
+// Connect to WebSocket for real-time status monitoring
 const ws = new WebSocket('ws://192.168.4.1/ws');
 
 // Handle connection open
 ws.onopen = function() {
-  console.log('Connected to VF3 Smart');
-
-  // Request current status
-  ws.send(JSON.stringify({command: "status"}));
+  console.log('Connected to VF3 Smart - Monitoring status');
 };
 
-// Handle incoming messages (status updates)
+// Handle incoming status updates (received every 1 second)
 ws.onmessage = function(event) {
   const status = JSON.parse(event.data);
-  console.log('Car status:', status);
 
-  // Example: Check if car is locked
-  if (status.controls.car_lock === 1) {
-    console.log('Car is locked');
+  // Update your UI with real-time status
+  console.log('Speed:', status.sensors.vehicle_speed);
+  console.log('Car locked:', status.controls.car_lock === 1);
+  console.log('Lights on:', status.lights.normal_light === 1);
+
+  // Example: Display warnings
+  if (status.time && status.time.is_night && status.lights.normal_light === 0) {
+    console.warn('⚠️ Nighttime - headlights are off!');
   }
 
-  // Example: Check nighttime status
-  if (status.time && status.time.is_night) {
-    console.log('It is nighttime - headlights reminder active');
+  // Example: Monitor window closing
+  if (status.window_close_active) {
+    console.log(`Windows closing... ${status.window_close_remaining_ms}ms remaining`);
   }
 };
-
-// Send commands
-function lockCar() {
-  ws.send(JSON.stringify({command: "lock"}));
-}
-
-function unlockCar() {
-  ws.send(JSON.stringify({command: "unlock"}));
-}
-
-function toggleAccessoryPower() {
-  ws.send(JSON.stringify({
-    command: "accessory-power",
-    action: "toggle"
-  }));
-}
-
-function beep(duration = 500) {
-  ws.send(JSON.stringify({
-    command: "buzzer",
-    action: `beep:${duration}`
-  }));
-}
-
-function closeWindows() {
-  ws.send(JSON.stringify({command: "windows-close"}));
-}
 
 // Handle errors
 ws.onerror = function(error) {
@@ -685,7 +654,18 @@ ws.onerror = function(error) {
 ws.onclose = function() {
   console.log('Disconnected from VF3 Smart');
   // Optionally implement reconnection logic
+  setTimeout(() => location.reload(), 3000);
 };
+
+// To send commands, use HTTP API instead:
+async function lockCar() {
+  const response = await fetch('http://192.168.4.1/car/lock', {
+    method: 'POST',
+    headers: {'X-API-Key': 'YOUR_API_KEY'}
+  });
+  const result = await response.json();
+  console.log(result);
+}
 ```
 
 ### Python WebSocket Client Example
@@ -694,51 +674,64 @@ ws.onclose = function() {
 import asyncio
 import websockets
 import json
+import requests
 
-async def vf3_control():
+async def monitor_car():
+    """Monitor car status in real-time via WebSocket"""
     uri = "ws://192.168.4.1/ws"
 
     async with websockets.connect(uri) as websocket:
-        print("Connected to VF3 Smart")
+        print("Connected to VF3 Smart - Monitoring status")
 
-        # Receive initial status
-        status = await websocket.recv()
-        print(f"Initial status: {status}")
-
-        # Lock the car
-        await websocket.send(json.dumps({"command": "lock"}))
-        response = await websocket.recv()
-        print(f"Lock response: {response}")
-
-        # Wait 3 seconds
-        await asyncio.sleep(3)
-
-        # Unlock the car
-        await websocket.send(json.dumps({"command": "unlock"}))
-        response = await websocket.recv()
-        print(f"Unlock response: {response}")
-
-        # Listen for status updates
+        # Receive and process status updates (sent every 1 second)
         while True:
-            status = await websocket.recv()
-            data = json.loads(status)
-            print(f"Speed: {data['sensors']['vehicle_speed']}, " +
-                  f"Gear: {'D' if data['sensors']['gear_drive'] else 'Other'}")
+            try:
+                status_json = await websocket.recv()
+                status = json.loads(status_json)
 
-# Run the client
-asyncio.run(vf3_control())
+                # Process real-time status
+                speed = status['sensors']['vehicle_speed']
+                is_locked = status['controls']['car_lock'] == 1
+                gear_drive = status['sensors']['gear_drive'] == 1
+
+                print(f"Speed: {speed}, Locked: {is_locked}, Drive: {gear_drive}")
+
+                # Example: Check for alerts
+                if status['time']['is_night'] and status['lights']['normal_light'] == 0:
+                    print("⚠️ Warning: Nighttime but headlights are off!")
+
+            except websockets.exceptions.ConnectionClosed:
+                print("Connection closed, reconnecting...")
+                break
+
+# To send commands, use HTTP API with requests:
+def lock_car(api_key):
+    """Send lock command via HTTP API"""
+    response = requests.post(
+        'http://192.168.4.1/car/lock',
+        headers={'X-API-Key': api_key}
+    )
+    return response.json()
+
+# Run the monitor
+asyncio.run(monitor_car())
 ```
 
 ### WebSocket vs HTTP API
 
-**Use WebSocket when:**
-- Real-time status monitoring needed
-- Low latency control required
-- Building interactive dashboards
-- Implementing mobile apps with live updates
+**Use WebSocket for:**
+- ✅ Real-time status monitoring and dashboards
+- ✅ Live updates for mobile apps and web interfaces
+- ✅ Continuous data streaming (updated every 1 second)
+- ✅ Displaying real-time sensor data
 
-**Use HTTP API when:**
-- Simple one-off commands
-- Integration with existing HTTP-based systems
-- Testing with curl/Postman
-- No need for real-time updates
+**Use HTTP API for:**
+- ✅ Sending commands and controlling the car
+- ✅ Triggering actions (lock, unlock, windows, buzzer, etc.)
+- ✅ Authentication and authorization
+- ✅ One-off operations and testing with curl/Postman
+- ✅ Integration with automation systems
+
+**Architecture:**
+- **WebSocket** = Read-only, no authentication, real-time monitoring
+- **HTTP API** = Command/control, requires API key authentication
