@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VF3 Smart - Error</title>
+  <style>
+    body { font-family: Arial; max-width: 500px; margin: 50px auto; padding: 20px; text-align: center; }
+    h1 { color: #c62828; }
+    .error { background: #ffebee; color: #c62828; padding: 20px; border-radius: 5px; margin: 20px 0; }
+    a { color: #e71e2c; text-decoration: none; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Configuration Error</h1>
+  <div class="error" id="errorMessage">Invalid configuration. API Key must be at least 8 characters.</div>
+  <a href="#" id="backLink">Go Back</a>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const message = params.get('message') || 'Invalid configuration. API Key must be at least 8 characters.';
+    const backUrl = params.get('back') || '/configure';
+
+    document.getElementById('errorMessage').textContent = message;
+    document.getElementById('backLink').href = backUrl;
+  </script>
+</body>
+</html>

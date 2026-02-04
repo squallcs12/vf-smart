@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VF3 Smart - Success</title>
+  <style>
+    body { font-family: Arial; max-width: 500px; margin: 50px auto; padding: 20px; text-align: center; }
+    h1 { color: #4caf50; }
+    .success { background: #e8f5e9; color: #2e7d32; padding: 20px; border-radius: 5px; margin: 20px 0; }
+    .info { background: #fff3e0; color: #e65100; padding: 15px; margin: 20px 0; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <h1>✅ Configuration Updated!</h1>
+  <div class="success">
+    Your VF3 Smart device configuration has been updated successfully.<br><br>
+    <strong>SSID:</strong> <span id="ssid"></span><br>
+    <strong>API Key:</strong> <span id="apiKey"></span> (save this securely!)
+  </div>
+  <div class="info">The device will restart in <span id="countdown">3</span> seconds. Please reconnect to the WiFi network: <strong><span id="ssidInfo"></span></strong></div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const ssid = params.get('ssid') || '';
+    const apiKey = params.get('api_key') || '';
+
+    document.getElementById('ssid').textContent = ssid;
+    document.getElementById('apiKey').textContent = apiKey;
+    document.getElementById('ssidInfo').textContent = ssid;
+
+    let countdown = 3;
+    const countdownEl = document.getElementById('countdown');
+    const interval = setInterval(() => {
+      countdown--;
+      countdownEl.textContent = countdown;
+      if (countdown <= 0) {
+        clearInterval(interval);
+        window.location.href = '/restart';
+      }
+    }, 1000);
+  </script>
+</body>
+</html>
