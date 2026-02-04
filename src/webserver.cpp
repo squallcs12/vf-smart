@@ -63,6 +63,9 @@ void setupWebServer() {
     String output;
     serializeJson(doc, output);
     request->send(200, "application/json", output);
+
+    // Broadcast updated status immediately
+    broadcastStatus();
   });
 
   // POST /car/unlock - Unlock the car
@@ -86,6 +89,9 @@ void setupWebServer() {
     String output;
     serializeJson(doc, output);
     request->send(200, "application/json", output);
+
+    // Broadcast updated status immediately
+    broadcastStatus();
   });
 
   // POST /car/accessory-power - Toggle accessory power
@@ -128,6 +134,9 @@ void setupWebServer() {
     String output;
     serializeJson(doc, output);
     request->send(200, "application/json", output);
+
+    // Broadcast updated status immediately
+    broadcastStatus();
   });
 
   // POST /car/windows/close - Close windows (30 second timer)
@@ -150,6 +159,9 @@ void setupWebServer() {
     String output;
     serializeJson(doc, output);
     request->send(200, "application/json", output);
+
+    // Broadcast updated status immediately
+    broadcastStatus();
   });
 
   // POST /car/windows/stop - Stop window operation
@@ -171,6 +183,9 @@ void setupWebServer() {
     String output;
     serializeJson(doc, output);
     request->send(200, "application/json", output);
+
+    // Broadcast updated status immediately
+    broadcastStatus();
   });
 
   // POST /car/buzzer - Control buzzer
@@ -216,6 +231,9 @@ void setupWebServer() {
     String output;
     serializeJson(doc, output);
     request->send(200, "application/json", output);
+
+    // Broadcast updated status immediately
+    broadcastStatus();
   });
 
   // POST /car/windows/down - Control windows down
@@ -279,6 +297,9 @@ void setupWebServer() {
     String output;
     serializeJson(doc, output);
     request->send(200, "application/json", output);
+
+    // Broadcast updated status immediately
+    broadcastStatus();
   });
 
   // POST /car/light-reminder - Control light reminder
@@ -322,6 +343,9 @@ void setupWebServer() {
     String output;
     serializeJson(doc, output);
     request->send(200, "application/json", output);
+
+    // Broadcast updated status immediately
+    broadcastStatus();
   });
 
   // GET /configure - Reconfiguration page

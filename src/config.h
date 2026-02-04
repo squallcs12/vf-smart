@@ -24,7 +24,7 @@ extern bool time_synced;
 
 // ===== WEBSOCKET STATUS BROADCAST =====
 extern unsigned long lastStatusBroadcast;
-#define STATUS_BROADCAST_INTERVAL 1000  // Broadcast status every 1 second
+#define STATUS_BROADCAST_INTERVAL 5000  // Broadcast status every 5 seconds (fallback for sensor changes)
 
 // ===== LIGHT REMINDER CONFIGURATION =====
 extern unsigned long light_reminder_timer;
