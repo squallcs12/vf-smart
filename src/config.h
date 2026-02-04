@@ -22,10 +22,6 @@ extern const int daylight_offset_sec;
 extern struct tm boot_time;
 extern bool time_synced;
 
-// ===== WEBSOCKET STATUS BROADCAST =====
-extern unsigned long lastStatusBroadcast;
-#define STATUS_BROADCAST_INTERVAL 5000  // Broadcast status every 5 seconds (fallback for sensor changes)
-
 // ===== LIGHT REMINDER CONFIGURATION =====
 extern unsigned long light_reminder_timer;
 extern unsigned long last_light_reminder;

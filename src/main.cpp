@@ -104,13 +104,6 @@ void loop() {
   // Handle WebSocket
   ws.cleanupClients();
 
-  // Broadcast status periodically
-  unsigned long now = millis();
-  if (now - lastStatusBroadcast > STATUS_BROADCAST_INTERVAL) {
-    lastStatusBroadcast = now;
-    broadcastStatus();
-  }
-
   // Broadcast UDP discovery message
   handleDiscoveryBroadcast();
 

@@ -18,9 +18,6 @@ const int daylight_offset_sec = 0;        // No daylight saving in Vietnam
 struct tm boot_time;
 bool time_synced = false;
 
-// ===== WEBSOCKET STATUS BROADCAST =====
-unsigned long lastStatusBroadcast = 0;
-
 // ===== LIGHT REMINDER =====
 unsigned long light_reminder_timer = 0;
 unsigned long last_light_reminder = 0;
