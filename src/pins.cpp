@@ -25,9 +25,9 @@ int vf3_car_lock = LOW;
 int vf3_car_unlock = LOW;
 int self_accessory_power = HIGH;
 int self_inside_cameras = LOW;
-int self_dashcam = LOW;
-int self_odo_screen = LOW;
-int self_armrest = LOW;
+int self_dashcam = WRITE_ON;  // ON by default at boot
+int self_odo_screen = WRITE_ON;  // ON by default at boot
+int self_armrest = WRITE_ON;  // ON by default at boot
 int vf3_door_locked = LOW;
 
 void initializePins() {
@@ -63,14 +63,21 @@ void initializePins() {
   pcf8575.digitalWrite(VF3_WINDOW_RIGHT_UP, WRITE_OFF);
   pcf8575.digitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_OFF);
   pcf8575.digitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_OFF);
-  pcf8575.digitalWrite(SELF_DASHCAM, WRITE_OFF);
   pcf8575.digitalWrite(SELF_SIDE_MIRRORS_OPEN, WRITE_OFF);
   pcf8575.digitalWrite(SELF_SIDE_MIRRORS_CLOSE, WRITE_OFF);
-  pcf8575.digitalWrite(SELF_ODO_SCREEN, WRITE_OFF);
-  pcf8575.digitalWrite(SELF_ARMREST, WRITE_OFF);
   pcf8575.digitalWrite(VF3_CHARGER_UNLOCK, WRITE_OFF);
 
-  // Turn on accessory power and inside cameras on startup
+  // Turn on accessory power on startup
   pcf8575.digitalWrite(SELF_ACCESSORY_POWER, WRITE_ON);
+
+  // Turn on related accessories since accessory power is ON by default
+  pcf8575.digitalWrite(SELF_DASHCAM, WRITE_ON);
+  pcf8575.digitalWrite(SELF_ODO_SCREEN, WRITE_ON);
+  pcf8575.digitalWrite(SELF_ARMREST, WRITE_ON);
   pcf8575.digitalWrite(SELF_INSIDE_CARMERAS, WRITE_OFF);
+
+  // Open side mirrors on startup (1 second pulse - will be handled by accessory_power handler)
+  pcf8575.digitalWrite(SELF_SIDE_MIRRORS_OPEN, WRITE_ON);
+  delay(1000);
+  pcf8575.digitalWrite(SELF_SIDE_MIRRORS_OPEN, WRITE_OFF);
 }
