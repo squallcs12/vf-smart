@@ -27,7 +27,7 @@
 
 // ===== DIGITAL OUTPUTS (Controls & Indicators) - PCF8575 I2C I/O Expander =====
 // All outputs now controlled via PCF8575 at I2C address 0x20 (pins P0-P15)
-// Use pcfDigitalWrite() instead of digitalWrite() for these pins
+// Use pcf8575.digitalWrite() and pcf8575.digitalRead() for these pins
 #define VF3_CAR_LOCK PCF_P0              // P0 - ON for 1s then OFF to lock car
 #define VF3_CAR_UNLOCK PCF_P1            // P1 - ON for 1s then OFF to unlock car
 #define VF3_BUZZER PCF_P2                // P2 - ON/OFF buzzer

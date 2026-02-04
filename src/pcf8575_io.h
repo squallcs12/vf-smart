@@ -33,15 +33,7 @@
 // Initialize PCF8575
 bool initPCF8575();
 
-// Digital I/O functions
-void pcfDigitalWrite(uint8_t pin, uint8_t value);
-int pcfDigitalRead(uint8_t pin);
-
-// Batch operations for efficiency
-void pcfWriteAll(uint16_t value);
-uint16_t pcfReadAll();
-
-// Get PCF8575 instance (for advanced usage)
+// Global PCF8575 instance - use pcf8575.digitalWrite(), pcf8575.digitalRead(), etc.
 extern PCF8575 pcf8575;
 
 #endif // PCF8575_IO_H

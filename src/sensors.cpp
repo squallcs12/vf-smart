@@ -23,8 +23,8 @@ void readSensors() {
   vf3_proximity_rear_r = digitalRead(VF3_PROXIMITY_REAR_R);
 
   // Read output states from PCF8575 (for status reporting)
-  vf3_car_lock = pcfDigitalRead(VF3_CAR_LOCK);
-  vf3_car_unlock = pcfDigitalRead(VF3_CAR_UNLOCK);
-  self_accessory_power = pcfDigitalRead(SELF_ACCESSORY_POWER);
-  self_inside_cameras = pcfDigitalRead(SELF_INSIDE_CARMERAS);
+  vf3_car_lock = pcf8575.digitalRead(VF3_CAR_LOCK);
+  vf3_car_unlock = pcf8575.digitalRead(VF3_CAR_UNLOCK);
+  self_accessory_power = pcf8575.digitalRead(SELF_ACCESSORY_POWER);
+  self_inside_cameras = pcf8575.digitalRead(SELF_INSIDE_CARMERAS);
 }

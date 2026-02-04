@@ -51,6 +51,9 @@ String getCarStatusJSON() {
     doc["window_close_remaining_ms"] = 0;
   }
 
+  // Light reminder status
+  doc["light_reminder_enabled"] = light_reminder_enabled;
+
   // Time information
   JsonObject time_info = doc["time"].to<JsonObject>();
   time_info["synced"] = time_synced;

@@ -24,6 +24,7 @@ unsigned long lastStatusBroadcast = 0;
 // ===== LIGHT REMINDER =====
 unsigned long light_reminder_timer = 0;
 unsigned long last_light_reminder = 0;
+bool light_reminder_enabled = true;  // Enabled by default
 
 // ===== WINDOW CONTROL =====
 unsigned long window_close_timer = 0;

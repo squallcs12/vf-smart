@@ -297,7 +297,8 @@ Returns complete car status as JSON.
     "car_unlock": 0
   },
   "window_close_active": false,
-  "window_close_remaining_ms": 0
+  "window_close_remaining_ms": 0,
+  "light_reminder_enabled": true
 }
 ```
 
@@ -442,6 +443,43 @@ curl -X POST http://192.168.4.1/car/turn-signal \
 }
 ```
 
+##### POST /car/light-reminder
+Control the headlight reminder system. The light reminder beeps every 30 seconds when:
+- It's nighttime (6 PM - 6 AM)
+- The gear is in Drive (D)
+- Normal headlights are off
+- Light reminder is enabled
+
+**Parameters:**
+- `state` (required): `on`, `off`, `enable`, `disable`, or `toggle`
+
+**Example Requests:**
+```bash
+# Enable light reminder
+curl -X POST http://192.168.4.1/car/light-reminder \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d "state=on"
+
+# Disable light reminder
+curl -X POST http://192.168.4.1/car/light-reminder \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d "state=off"
+
+# Toggle light reminder
+curl -X POST http://192.168.4.1/car/light-reminder \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d "state=toggle"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Light reminder enabled",
+  "light_reminder_enabled": true
+}
+```
+
 ### Testing the API
 
 ```bash
@@ -482,6 +520,16 @@ curl -X POST http://192.168.4.1/car/buzzer \
 curl -X POST http://192.168.4.1/car/turn-signal \
   -H "X-API-Key: $API_KEY" \
   -d "side=left&state=on"
+
+# Disable light reminder (stops nighttime headlight reminders)
+curl -X POST http://192.168.4.1/car/light-reminder \
+  -H "X-API-Key: $API_KEY" \
+  -d "state=off"
+
+# Enable light reminder
+curl -X POST http://192.168.4.1/car/light-reminder \
+  -H "X-API-Key: $API_KEY" \
+  -d "state=on"
 
 # Alternative: Using query parameter for authentication
 curl -X POST "http://192.168.4.1/car/lock?api_key=$API_KEY"
@@ -555,6 +603,15 @@ Commands are sent as JSON objects with this format:
 {"command": "turn-signal-right", "action": "on"}
 {"command": "turn-signal-right", "action": "off"}
 {"command": "turn-signal-both-off"}
+```
+
+**Light Reminder**
+```json
+{"command": "light-reminder", "action": "on"}       // Enable light reminder
+{"command": "light-reminder", "action": "off"}      // Disable light reminder
+{"command": "light-reminder", "action": "enable"}   // Enable light reminder
+{"command": "light-reminder", "action": "disable"}  // Disable light reminder
+{"command": "light-reminder", "action": "toggle"}   // Toggle light reminder
 ```
 
 **Request Status**

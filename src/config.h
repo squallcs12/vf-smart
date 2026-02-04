@@ -29,6 +29,7 @@ extern unsigned long lastStatusBroadcast;
 // ===== LIGHT REMINDER CONFIGURATION =====
 extern unsigned long light_reminder_timer;
 extern unsigned long last_light_reminder;
+extern bool light_reminder_enabled;
 #define LIGHT_REMINDER_INTERVAL 30000          // Remind every 30 seconds
 #define LIGHT_REMINDER_BEEP_DURATION 200       // Beep duration in milliseconds
 #define NIGHT_START_HOUR 18                    // 6 PM

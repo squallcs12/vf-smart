@@ -1,12 +1,9 @@
 #ifndef CONTROLS_H
 #define CONTROLS_H
 
-#include "config.h"
-#include "pins.h"
-#include "time_sync.h"
-
-void handleWindowControl();
-void handleAccessoryPower();
-void handleLightReminder();
+// Aggregator header - includes all control modules
+#include "window_control.h"
+#include "accessory_power.h"
+#include "light_reminder.h"
 
 #endif // CONTROLS_H

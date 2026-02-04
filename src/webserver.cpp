@@ -51,8 +51,8 @@ void setupWebServer() {
 
     vf3_car_lock = HIGH;
     vf3_car_unlock = LOW;
-    pcfDigitalWrite(VF3_CAR_LOCK, WRITE_OFF);
-    pcfDigitalWrite(VF3_CAR_UNLOCK, WRITE_ON);
+    pcf8575.digitalWrite(VF3_CAR_LOCK, WRITE_OFF);
+    pcf8575.digitalWrite(VF3_CAR_UNLOCK, WRITE_ON);
 
     JsonDocument doc;
     doc["success"] = true;
@@ -74,8 +74,8 @@ void setupWebServer() {
 
     vf3_car_lock = LOW;
     vf3_car_unlock = HIGH;
-    pcfDigitalWrite(VF3_CAR_LOCK, WRITE_ON);
-    pcfDigitalWrite(VF3_CAR_UNLOCK, WRITE_OFF);
+    pcf8575.digitalWrite(VF3_CAR_LOCK, WRITE_ON);
+    pcf8575.digitalWrite(VF3_CAR_UNLOCK, WRITE_OFF);
 
     JsonDocument doc;
     doc["success"] = true;
@@ -102,13 +102,13 @@ void setupWebServer() {
 
     if (state == "on") {
       self_accessory_power = HIGH;
-      pcfDigitalWrite(SELF_ACCESSORY_POWER, WRITE_OFF);
+      pcf8575.digitalWrite(SELF_ACCESSORY_POWER, WRITE_OFF);
     } else if (state == "off") {
       self_accessory_power = LOW;
-      pcfDigitalWrite(SELF_ACCESSORY_POWER, WRITE_ON);
+      pcf8575.digitalWrite(SELF_ACCESSORY_POWER, WRITE_ON);
     } else if (state == "toggle") {
       self_accessory_power = !self_accessory_power;
-      pcfDigitalWrite(SELF_ACCESSORY_POWER, self_accessory_power);
+      pcf8575.digitalWrite(SELF_ACCESSORY_POWER, self_accessory_power);
     } else {
       JsonDocument doc;
       doc["success"] = false;
@@ -138,8 +138,8 @@ void setupWebServer() {
     }
 
     window_close_timer = millis();
-    pcfDigitalWrite(VF3_WINDOW_LEFT, WRITE_OFF);
-    pcfDigitalWrite(VF3_WINDOW_RIGHT, WRITE_OFF);
+    pcf8575.digitalWrite(VF3_WINDOW_LEFT, WRITE_OFF);
+    pcf8575.digitalWrite(VF3_WINDOW_RIGHT, WRITE_OFF);
 
     JsonDocument doc;
     doc["success"] = true;
@@ -160,8 +160,8 @@ void setupWebServer() {
     }
 
     window_close_timer = 0;
-    pcfDigitalWrite(VF3_WINDOW_LEFT, WRITE_ON);
-    pcfDigitalWrite(VF3_WINDOW_RIGHT, WRITE_ON);
+    pcf8575.digitalWrite(VF3_WINDOW_LEFT, WRITE_ON);
+    pcf8575.digitalWrite(VF3_WINDOW_RIGHT, WRITE_ON);
 
     JsonDocument doc;
     doc["success"] = true;
@@ -191,13 +191,13 @@ void setupWebServer() {
     }
 
     if (state == "on") {
-      pcfDigitalWrite(VF3_BUZZER, WRITE_OFF);
+      pcf8575.digitalWrite(VF3_BUZZER, WRITE_OFF);
     } else if (state == "off") {
-      pcfDigitalWrite(VF3_BUZZER, WRITE_ON);
+      pcf8575.digitalWrite(VF3_BUZZER, WRITE_ON);
     } else if (state == "beep" && duration > 0) {
-      pcfDigitalWrite(VF3_BUZZER, WRITE_OFF);
+      pcf8575.digitalWrite(VF3_BUZZER, WRITE_OFF);
       delay(duration);
-      pcfDigitalWrite(VF3_BUZZER, WRITE_ON);
+      pcf8575.digitalWrite(VF3_BUZZER, WRITE_ON);
     } else {
       JsonDocument doc;
       doc["success"] = false;
@@ -238,24 +238,24 @@ void setupWebServer() {
     bool validRequest = false;
 
     if (side == "left" && state == "on") {
-      pcfDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_OFF);
+      pcf8575.digitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_OFF);
       validRequest = true;
     } else if (side == "left" && state == "off") {
-      pcfDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_ON);
+      pcf8575.digitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_ON);
       validRequest = true;
     } else if (side == "right" && state == "on") {
-      pcfDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_OFF);
+      pcf8575.digitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_OFF);
       validRequest = true;
     } else if (side == "right" && state == "off") {
-      pcfDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_ON);
+      pcf8575.digitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_ON);
       validRequest = true;
     } else if (side == "both" && state == "on") {
-      pcfDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_OFF);
-      pcfDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_OFF);
+      pcf8575.digitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_OFF);
+      pcf8575.digitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_OFF);
       validRequest = true;
     } else if (side == "both" && state == "off") {
-      pcfDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_ON);
-      pcfDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_ON);
+      pcf8575.digitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_ON);
+      pcf8575.digitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_ON);
       validRequest = true;
     }
 
@@ -275,6 +275,49 @@ void setupWebServer() {
     doc["message"] = "Window down control updated";
     doc["side"] = side;
     doc["state"] = state;
+
+    String output;
+    serializeJson(doc, output);
+    request->send(200, "application/json", output);
+  });
+
+  // POST /car/light-reminder - Control light reminder
+  server.on("/car/light-reminder", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (!authenticateRequest(request)) {
+      sendUnauthorized(request);
+      return;
+    }
+
+    String state = "";
+    if (request->hasParam("state", true)) {
+      state = request->getParam("state", true)->value();
+    }
+
+    if (state == "on" || state == "enable") {
+      light_reminder_enabled = true;
+    } else if (state == "off" || state == "disable") {
+      light_reminder_enabled = false;
+      last_light_reminder = 0;  // Reset timer
+    } else if (state == "toggle") {
+      light_reminder_enabled = !light_reminder_enabled;
+      if (!light_reminder_enabled) {
+        last_light_reminder = 0;  // Reset timer when disabled
+      }
+    } else {
+      JsonDocument doc;
+      doc["success"] = false;
+      doc["message"] = "Invalid state. Use 'on', 'off', 'enable', 'disable', or 'toggle'";
+
+      String output;
+      serializeJson(doc, output);
+      request->send(400, "application/json", output);
+      return;
+    }
+
+    JsonDocument doc;
+    doc["success"] = true;
+    doc["message"] = light_reminder_enabled ? "Light reminder enabled" : "Light reminder disabled";
+    doc["light_reminder_enabled"] = light_reminder_enabled;
 
     String output;
     serializeJson(doc, output);
