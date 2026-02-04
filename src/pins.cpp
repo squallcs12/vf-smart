@@ -25,6 +25,9 @@ int vf3_car_lock = LOW;
 int vf3_car_unlock = LOW;
 int self_accessory_power = HIGH;
 int self_inside_cameras = LOW;
+int self_dashcam = LOW;
+int self_odo_screen = LOW;
+int self_armrest = LOW;
 int vf3_door_locked = LOW;
 
 void initializePins() {

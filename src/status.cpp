@@ -42,6 +42,9 @@ String getCarStatusJSON() {
   controls["accessory_power"] = self_accessory_power;
   controls["car_lock"] = vf3_car_lock;
   controls["car_unlock"] = vf3_car_unlock;
+  controls["dashcam"] = self_dashcam;
+  controls["odo_screen"] = self_odo_screen;
+  controls["armrest"] = self_armrest;
 
   // Window timer status
   doc["window_close_active"] = (window_close_timer != 0);

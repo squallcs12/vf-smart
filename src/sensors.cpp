@@ -22,6 +22,9 @@ static int prev_vf3_car_lock = -1;
 static int prev_vf3_car_unlock = -1;
 static int prev_self_accessory_power = -1;
 static int prev_self_inside_cameras = -1;
+static int prev_self_dashcam = -1;
+static int prev_self_odo_screen = -1;
+static int prev_self_armrest = -1;
 
 bool readSensors() {
   bool changed = false;
@@ -52,6 +55,9 @@ bool readSensors() {
   int new_car_unlock = pcf8575.digitalRead(VF3_CAR_UNLOCK);
   int new_accessory_power = pcf8575.digitalRead(SELF_ACCESSORY_POWER);
   int new_inside_cameras = pcf8575.digitalRead(SELF_INSIDE_CARMERAS);
+  int new_dashcam = pcf8575.digitalRead(SELF_DASHCAM);
+  int new_odo_screen = pcf8575.digitalRead(SELF_ODO_SCREEN);
+  int new_armrest = pcf8575.digitalRead(SELF_ARMREST);
 
   // Check for changes (using threshold for analog values to avoid noise)
   if (abs(new_accelerator - prev_vf3_accelerator) > 10) changed = true;
@@ -77,6 +83,9 @@ bool readSensors() {
   if (new_car_unlock != prev_vf3_car_unlock) changed = true;
   if (new_accessory_power != prev_self_accessory_power) changed = true;
   if (new_inside_cameras != prev_self_inside_cameras) changed = true;
+  if (new_dashcam != prev_self_dashcam) changed = true;
+  if (new_odo_screen != prev_self_odo_screen) changed = true;
+  if (new_armrest != prev_self_armrest) changed = true;
 
   // Update global variables
   vf3_accelerator = new_accelerator;
@@ -100,6 +109,9 @@ bool readSensors() {
   vf3_car_unlock = new_car_unlock;
   self_accessory_power = new_accessory_power;
   self_inside_cameras = new_inside_cameras;
+  self_dashcam = new_dashcam;
+  self_odo_screen = new_odo_screen;
+  self_armrest = new_armrest;
 
   // Update previous values
   prev_vf3_accelerator = new_accelerator;
@@ -123,6 +135,9 @@ bool readSensors() {
   prev_vf3_car_unlock = new_car_unlock;
   prev_self_accessory_power = new_accessory_power;
   prev_self_inside_cameras = new_inside_cameras;
+  prev_self_dashcam = new_dashcam;
+  prev_self_odo_screen = new_odo_screen;
+  prev_self_armrest = new_armrest;
 
   return changed;
 }

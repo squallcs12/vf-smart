@@ -78,6 +78,9 @@ extern int vf3_car_lock;
 extern int vf3_car_unlock;
 extern int self_accessory_power;
 extern int self_inside_cameras;
+extern int self_dashcam;
+extern int self_odo_screen;
+extern int self_armrest;
 extern int vf3_door_locked;
 
 void initializePins();
