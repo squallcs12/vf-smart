@@ -4,6 +4,8 @@
 static int prev_vf3_brake = -1;
 static int prev_vf3_steering_angle = -1;
 static int prev_vf3_gear_drive = -1;
+static int prev_vf3_window_left_state = -1;
+static int prev_vf3_window_right_state = -1;
 static int prev_vf3_door_fl = -1;
 static int prev_vf3_door_fr = -1;
 static int prev_vf3_door_trunk = -1;
@@ -34,6 +36,8 @@ bool readSensors() {
 
   // Read digital sensors (ESP32 GPIO)
   int new_gear_drive = digitalRead(VF3_GEAR_DRIVE);
+  int new_window_left_state = digitalRead(VF3_WINDOW_LEFT_STATE);
+  int new_window_right_state = digitalRead(VF3_WINDOW_RIGHT_STATE);
   int new_door_fl = digitalRead(VF3_DOOR_FL);
   int new_door_fr = digitalRead(VF3_DOOR_FR);
   int new_door_trunk = digitalRead(VF3_DOOR_TRUNK);
@@ -63,6 +67,8 @@ bool readSensors() {
 
   // Check digital sensors
   if (new_gear_drive != prev_vf3_gear_drive) changed = true;
+  if (new_window_left_state != prev_vf3_window_left_state) changed = true;
+  if (new_window_right_state != prev_vf3_window_right_state) changed = true;
   if (new_door_fl != prev_vf3_door_fl) changed = true;
   if (new_door_fr != prev_vf3_door_fr) changed = true;
   if (new_door_trunk != prev_vf3_door_trunk) changed = true;
@@ -88,6 +94,8 @@ bool readSensors() {
   vf3_brake = new_brake;
   vf3_steering_angle = new_steering_angle;
   vf3_gear_drive = new_gear_drive;
+  vf3_window_left_state = new_window_left_state;
+  vf3_window_right_state = new_window_right_state;
   vf3_door_fl = new_door_fl;
   vf3_door_fr = new_door_fr;
   vf3_door_trunk = new_door_trunk;
@@ -113,6 +121,8 @@ bool readSensors() {
   prev_vf3_brake = new_brake;
   prev_vf3_steering_angle = new_steering_angle;
   prev_vf3_gear_drive = new_gear_drive;
+  prev_vf3_window_left_state = new_window_left_state;
+  prev_vf3_window_right_state = new_window_right_state;
   prev_vf3_door_fl = new_door_fl;
   prev_vf3_door_fr = new_door_fr;
   prev_vf3_door_trunk = new_door_trunk;

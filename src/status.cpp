@@ -17,6 +17,11 @@ String getCarStatusJSON() {
   doors["trunk"] = vf3_door_trunk;
   doors["locked"] = vf3_door_locked;
 
+  // Window state
+  JsonObject windows = doc["windows"].to<JsonObject>();
+  windows["left_state"] = vf3_window_left_state;
+  windows["right_state"] = vf3_window_right_state;
+
   // Seat and seatbelt status
   JsonObject seats = doc["seats"].to<JsonObject>();
   seats["front_left_occupied"] = vf3_seat_fl;
