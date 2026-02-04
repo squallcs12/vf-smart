@@ -122,6 +122,7 @@ void loop() {
   }
 
   // Execute control logic
+  handleCarState();
   handleWindowControl();
   handleAccessoryPower();
   handleLightReminder();

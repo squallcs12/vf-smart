@@ -50,6 +50,9 @@ String getCarStatusJSON() {
   controls["odo_screen"] = self_odo_screen;
   controls["armrest"] = self_armrest;
 
+  // Car lock state
+  doc["car_lock_state"] = (car_lock_state == CAR_LOCKED) ? "locked" : "unlocked";
+
   // Window timer status
   doc["window_close_active"] = (window_close_timer != 0);
   if (window_close_timer != 0) {
