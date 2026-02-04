@@ -3,6 +3,7 @@
 
 #include "pins.h"
 
-void readSensors();
+// Returns true if any sensor value changed
+bool readSensors();
 
 #endif // SENSORS_H

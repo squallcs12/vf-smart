@@ -114,8 +114,11 @@ void loop() {
   // Broadcast UDP discovery message
   handleDiscoveryBroadcast();
 
-  // Read all sensors
-  readSensors();
+  // Read all sensors and broadcast if any changed
+  bool sensorsChanged = readSensors();
+  if (sensorsChanged) {
+    broadcastStatus();
+  }
 
   // Execute control logic
   handleWindowControl();
