@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <automotiveApp>
     <uses name="template"/>
+    <!-- IoT feature for car control -->
+    <uses name="iot"/>
 </automotiveApp>

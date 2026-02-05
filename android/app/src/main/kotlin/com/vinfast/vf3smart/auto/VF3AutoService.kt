@@ -9,8 +9,8 @@ import com.vinfast.vf3smart.BuildConfig
 /**
  * Android Auto CarAppService for VF3 Smart
  *
- * Provides read-only status monitoring in Android Auto projection mode.
- * Control features remain on phone due to Android Auto restrictions.
+ * Provides real-time status monitoring and car controls in Android Auto projection mode.
+ * Includes lock/unlock and window control actions for personal use.
  *
  * Note: Hilt injection not needed here. Dependencies injected in StatusScreen via manual lookup.
  */

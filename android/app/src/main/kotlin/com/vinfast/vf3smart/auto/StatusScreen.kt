@@ -19,10 +19,10 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 
 /**
- * Android Auto status screen - Read-only car monitoring
+ * Android Auto status and control screen
  *
- * Displays real-time car status using GridTemplate.
- * No control buttons due to Android Auto restrictions.
+ * Displays real-time car status using GridTemplate with control actions.
+ * Provides lock/unlock and window controls via ActionStrip buttons.
  *
  * Note: Cannot use @AndroidEntryPoint as Screen is not a supported Hilt entry point.
  * Uses EntryPointAccessors to manually retrieve repository from Application.
@@ -179,20 +179,49 @@ class StatusScreen(
             .setTitle("VF3 Smart Status")
             .setHeaderAction(Action.APP_ICON)
             .setSingleList(gridItemListBuilder.build())
-            .setActionStrip(
-                ActionStrip.Builder()
-                    .addAction(
-                        Action.Builder()
-                            .setTitle("Use phone for controls")
-                            .setOnClickListener {
-                                // Show toast or message
-                                carContext.getCarService(androidx.car.app.notification.CarNotificationManager::class.java)
-                            }
-                            .build()
-                    )
+            .setActionStrip(buildControlActions(status))
+            .build()
+    }
+
+    /**
+     * Build control actions for lock/unlock and windows
+     */
+    private fun buildControlActions(status: CarStatus): ActionStrip {
+        val builder = ActionStrip.Builder()
+
+        // Lock/Unlock button
+        val isLocked = status.carLockState == "locked"
+        builder.addAction(
+            Action.Builder()
+                .setTitle(if (isLocked) "Unlock" else "Lock")
+                .setOnClickListener {
+                    scope.launch {
+                        if (isLocked) {
+                            repository.unlockCar()
+                        } else {
+                            repository.lockCar()
+                        }
+                    }
+                }
+                .build()
+        )
+
+        // Close windows button (if windows open)
+        val windowsOpen = status.windows.leftState == 2 || status.windows.rightState == 2
+        if (windowsOpen) {
+            builder.addAction(
+                Action.Builder()
+                    .setTitle("Close Windows")
+                    .setOnClickListener {
+                        scope.launch {
+                            repository.closeWindows()
+                        }
+                    }
                     .build()
             )
-            .build()
+        }
+
+        return builder.build()
     }
 
     /**

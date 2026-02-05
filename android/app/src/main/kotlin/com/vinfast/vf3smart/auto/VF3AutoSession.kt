@@ -8,7 +8,7 @@ import androidx.car.app.Session
  * Android Auto session for VF3 Smart app
  *
  * Manages the lifecycle of the Android Auto connection.
- * Each session provides a read-only status screen.
+ * Each session provides status monitoring and control screen.
  *
  * Note: Cannot use @AndroidEntryPoint here as Session is not a supported Hilt entry point.
  * Dependencies are injected manually in StatusScreen via Application context.
