@@ -100,19 +100,25 @@ fun DebugScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-                    ControlButton(
-                        text = "Test Window Warning",
-                        onClick = { debugViewModel.testWindowWarning() },
-                        icon = {
-                            Icon(
-                                Icons.Default.VolumeUp,
-                                contentDescription = null
-                            )
-                        },
-                        description = "Cửa sổ đang mở (x2)"
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        ControlButton(
+                            text = "Test Window Warning",
+                            onClick = { debugViewModel.testWindowWarning() },
+                            icon = {
+                                Icon(
+                                    Icons.Default.VolumeUp,
+                                    contentDescription = null
+                                )
+                            }
+                        )
+                        Text(
+                            text = "Cửa sổ đang mở (x2)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
