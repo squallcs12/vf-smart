@@ -26,6 +26,7 @@ import com.vinfast.vf3smart.viewmodel.ControlViewModel
 @Composable
 fun HomeScreen(
     onNavigateToControls: () -> Unit,
+    onNavigateToDebug: () -> Unit = {},
     modifier: Modifier = Modifier,
     statusViewModel: CarStatusViewModel = hiltViewModel(),
     controlViewModel: ControlViewModel = hiltViewModel()
@@ -60,6 +61,14 @@ fun HomeScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ),
                 actions = {
+                    // Debug button
+                    IconButton(onClick = onNavigateToDebug) {
+                        Icon(
+                            Icons.Default.BugReport,
+                            contentDescription = "Debug Menu",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                     // Connection indicator
                     ConnectionIndicator(connectionState)
                 }

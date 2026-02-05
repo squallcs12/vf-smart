@@ -14,6 +14,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.vinfast.vf3smart.ui.screens.ControlScreen
+import com.vinfast.vf3smart.ui.screens.DebugScreen
 import com.vinfast.vf3smart.ui.screens.HomeScreen
 import com.vinfast.vf3smart.ui.screens.SetupScreen
 import com.vinfast.vf3smart.ui.theme.VF3SmartTheme
@@ -52,12 +53,23 @@ class MainActivity : ComponentActivity() {
                             HomeScreen(
                                 onNavigateToControls = {
                                     navController.navigate("controls")
+                                },
+                                onNavigateToDebug = {
+                                    navController.navigate("debug")
                                 }
                             )
                         }
 
                         composable("controls") {
                             ControlScreen(
+                                onNavigateBack = {
+                                    navController.popBackStack()
+                                }
+                            )
+                        }
+
+                        composable("debug") {
+                            DebugScreen(
                                 onNavigateBack = {
                                     navController.popBackStack()
                                 }
