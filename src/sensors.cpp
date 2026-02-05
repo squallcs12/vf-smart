@@ -62,33 +62,83 @@ bool readSensors() {
   int new_armrest = safeDigitalRead(SELF_ARMREST);
 
   // Check for changes (using threshold for analog values to avoid noise)
-  if (abs(new_brake - prev_vf3_brake) > 10) changed = true;
-  if (abs(new_steering_angle - prev_vf3_steering_angle) > 10) changed = true;
+  if (abs(new_brake - prev_vf3_brake) > 10) {
+    changed = true;
+  }
+  if (abs(new_steering_angle - prev_vf3_steering_angle) > 10) {
+    changed = true;
+  }
 
   // Check digital sensors
-  if (new_gear_drive != prev_vf3_gear_drive) changed = true;
-  if (new_window_left_state != prev_vf3_window_left_state) changed = true;
-  if (new_window_right_state != prev_vf3_window_right_state) changed = true;
-  if (new_door_fl != prev_vf3_door_fl) changed = true;
-  if (new_door_fr != prev_vf3_door_fr) changed = true;
-  if (new_door_trunk != prev_vf3_door_trunk) changed = true;
-  if (new_seat_fl != prev_vf3_seat_fl) changed = true;
-  if (new_seat_fr != prev_vf3_seat_fr) changed = true;
-  if (new_seatbelt_fl != prev_vf3_seatbelt_fl) changed = true;
-  if (new_seatbelt_fr != prev_vf3_seatbelt_fr) changed = true;
-  if (new_brake_pressed != prev_vf3_brake_pressed) changed = true;
-  if (new_demi_light != prev_vf3_demi_light) changed = true;
-  if (new_normal_light != prev_vf3_normal_light) changed = true;
-  if (new_proximity_rear_l != prev_vf3_proximity_rear_l) changed = true;
-  if (new_proximity_rear_r != prev_vf3_proximity_rear_r) changed = true;
-  if (new_charging_status != prev_vf3_charging_status) changed = true;
-  if (new_car_lock != prev_vf3_car_lock) changed = true;
-  if (new_car_unlock != prev_vf3_car_unlock) changed = true;
-  if (new_accessory_power != prev_self_accessory_power) changed = true;
-  if (new_inside_cameras != prev_self_inside_cameras) changed = true;
-  if (new_dashcam != prev_self_dashcam) changed = true;
-  if (new_odo_screen != prev_self_odo_screen) changed = true;
-  if (new_armrest != prev_self_armrest) changed = true;
+  if (new_gear_drive != prev_vf3_gear_drive) {
+    changed = true;
+  }
+  if (new_window_left_state != prev_vf3_window_left_state) {
+    changed = true;
+  }
+  if (new_window_right_state != prev_vf3_window_right_state) {
+    changed = true;
+  }
+  if (new_door_fl != prev_vf3_door_fl) {
+    changed = true;
+  }
+  if (new_door_fr != prev_vf3_door_fr) {
+    changed = true;
+  }
+  if (new_door_trunk != prev_vf3_door_trunk) {
+    changed = true;
+  }
+  if (new_seat_fl != prev_vf3_seat_fl) {
+    changed = true;
+  }
+  if (new_seat_fr != prev_vf3_seat_fr) {
+    changed = true;
+  }
+  if (new_seatbelt_fl != prev_vf3_seatbelt_fl) {
+    changed = true;
+  }
+  if (new_seatbelt_fr != prev_vf3_seatbelt_fr) {
+    changed = true;
+  }
+  if (new_brake_pressed != prev_vf3_brake_pressed) {
+    changed = true;
+  }
+  if (new_demi_light != prev_vf3_demi_light) {
+    changed = true;
+  }
+  if (new_normal_light != prev_vf3_normal_light) {
+    changed = true;
+  }
+  if (new_proximity_rear_l != prev_vf3_proximity_rear_l) {
+    changed = true;
+  }
+  if (new_proximity_rear_r != prev_vf3_proximity_rear_r) {
+    changed = true;
+  }
+  if (new_charging_status != prev_vf3_charging_status) {
+    changed = true;
+  }
+  if (new_car_lock != prev_vf3_car_lock) {
+    changed = true;
+  }
+  if (new_car_unlock != prev_vf3_car_unlock) {
+    changed = true;
+  }
+  if (new_accessory_power != prev_self_accessory_power) {
+    changed = true;
+  }
+  if (new_inside_cameras != prev_self_inside_cameras) {
+    changed = true;
+  }
+  if (new_dashcam != prev_self_dashcam) {
+    changed = true;
+  }
+  if (new_odo_screen != prev_self_odo_screen) {
+    changed = true;
+  }
+  if (new_armrest != prev_self_armrest) {
+    changed = true;
+  }
 
   // Update global variables
   vf3_brake = new_brake;
