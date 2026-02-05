@@ -30,8 +30,8 @@ void handleWebSocketMessage(AsyncWebSocketClient *client, uint8_t *data, size_t 
 
   Serial.printf("WebSocket message received from client #%u (ignored - use HTTP API for commands)\n", client->id());
 
-  // Optionally send current status as a courtesy response
-  client->text(getCarStatusJSON());
+  // Note: Status updates are sent automatically when sensors change (event-driven)
+  // Sending status on every message would waste bandwidth, especially with ping frames
 }
 
 void broadcastStatus() {
