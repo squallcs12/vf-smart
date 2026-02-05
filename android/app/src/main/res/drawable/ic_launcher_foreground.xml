@@ -1,0 +1,36 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Car body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M76,54 L72,42 C71.2,39.8 69.2,38 67,38 L41,38 C38.8,38 36.8,39.8 36,42 L32,54 L28,54 C26.9,54 26,54.9 26,56 L26,70 C26,71.1 26.9,72 28,72 L30,72 C30,75.3 32.7,78 36,78 C39.3,78 42,75.3 42,72 L66,72 C66,75.3 68.7,78 72,78 C75.3,78 78,75.3 78,72 L80,72 C81.1,72 82,71.1 82,70 L82,56 C82,54.9 81.1,54 80,54 L76,54 Z"/>
+
+    <!-- Left window -->
+    <path
+        android:fillColor="#2196F3"
+        android:pathData="M40,44 L48,44 L48,52 L38,52 L40,44 Z"/>
+
+    <!-- Right window -->
+    <path
+        android:fillColor="#2196F3"
+        android:pathData="M60,44 L68,44 L70,52 L60,52 L60,44 Z"/>
+
+    <!-- Left wheel -->
+    <path
+        android:fillColor="#424242"
+        android:pathData="M36,68 C37.7,68 39,66.7 39,65 C39,63.3 37.7,62 36,62 C34.3,62 33,63.3 33,65 C33,66.7 34.3,68 36,68 Z"/>
+
+    <!-- Right wheel -->
+    <path
+        android:fillColor="#424242"
+        android:pathData="M72,68 C73.7,68 75,66.7 75,65 C75,63.3 73.7,62 72,62 C70.3,62 69,63.3 69,65 C69,66.7 70.3,68 72,68 Z"/>
+
+    <!-- Lock symbol (small) -->
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M51,56 L51,54 C51,52.9 51.9,52 53,52 L55,52 C56.1,52 57,52.9 57,54 L57,56 L58,56 C58.6,56 59,56.4 59,57 L59,61 C59,61.6 58.6,62 58,62 L50,62 C49.4,62 49,61.6 49,61 L49,57 C49,56.4 49.4,56 50,56 L51,56 Z"/>
+</vector>
