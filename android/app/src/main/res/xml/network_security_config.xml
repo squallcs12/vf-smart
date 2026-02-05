@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!--
+        Allow cleartext (HTTP) traffic for local IoT device communication.
+        This is required because the ESP32 VF3-Smart device uses HTTP, not HTTPS.
+
+        Note: This allows HTTP for all domains. Since this app is designed for
+        local network IoT control only, this is acceptable. The ESP32 device
+        will typically be on a private IP address (192.168.x.x or 10.x.x.x).
+    -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

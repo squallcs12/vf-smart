@@ -14,8 +14,8 @@ void registerWindowEndpoints(AsyncWebServer& server) {
     }
 
     window_close_timer = millis();
-    pcf8575.digitalWrite(VF3_WINDOW_LEFT_UP, WRITE_OFF);
-    pcf8575.digitalWrite(VF3_WINDOW_RIGHT_UP, WRITE_OFF);
+    safeDigitalWrite(VF3_WINDOW_LEFT_UP, WRITE_OFF);
+    safeDigitalWrite(VF3_WINDOW_RIGHT_UP, WRITE_OFF);
 
     JsonDocument doc;
     doc["success"] = true;
@@ -39,8 +39,8 @@ void registerWindowEndpoints(AsyncWebServer& server) {
     }
 
     window_close_timer = 0;
-    pcf8575.digitalWrite(VF3_WINDOW_LEFT_UP, WRITE_ON);
-    pcf8575.digitalWrite(VF3_WINDOW_RIGHT_UP, WRITE_ON);
+    safeDigitalWrite(VF3_WINDOW_LEFT_UP, WRITE_ON);
+    safeDigitalWrite(VF3_WINDOW_RIGHT_UP, WRITE_ON);
 
     JsonDocument doc;
     doc["success"] = true;
@@ -75,24 +75,24 @@ void registerWindowEndpoints(AsyncWebServer& server) {
     bool validRequest = false;
 
     if (side == "left" && state == "on") {
-      pcf8575.digitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_OFF);
+      safeDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_OFF);
       validRequest = true;
     } else if (side == "left" && state == "off") {
-      pcf8575.digitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_ON);
+      safeDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_ON);
       validRequest = true;
     } else if (side == "right" && state == "on") {
-      pcf8575.digitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_OFF);
+      safeDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_OFF);
       validRequest = true;
     } else if (side == "right" && state == "off") {
-      pcf8575.digitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_ON);
+      safeDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_ON);
       validRequest = true;
     } else if (side == "both" && state == "on") {
-      pcf8575.digitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_OFF);
-      pcf8575.digitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_OFF);
+      safeDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_OFF);
+      safeDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_OFF);
       validRequest = true;
     } else if (side == "both" && state == "off") {
-      pcf8575.digitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_ON);
-      pcf8575.digitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_ON);
+      safeDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_ON);
+      safeDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_ON);
       validRequest = true;
     }
 

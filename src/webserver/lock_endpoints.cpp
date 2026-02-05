@@ -14,8 +14,8 @@ void registerLockEndpoints(AsyncWebServer& server) {
 
     vf3_car_lock = HIGH;
     vf3_car_unlock = LOW;
-    pcf8575.digitalWrite(VF3_CAR_LOCK, WRITE_OFF);
-    pcf8575.digitalWrite(VF3_CAR_UNLOCK, WRITE_ON);
+    safeDigitalWrite(VF3_CAR_LOCK, WRITE_OFF);
+    safeDigitalWrite(VF3_CAR_UNLOCK, WRITE_ON);
 
     JsonDocument doc;
     doc["success"] = true;
@@ -40,8 +40,8 @@ void registerLockEndpoints(AsyncWebServer& server) {
 
     vf3_car_lock = LOW;
     vf3_car_unlock = HIGH;
-    pcf8575.digitalWrite(VF3_CAR_LOCK, WRITE_ON);
-    pcf8575.digitalWrite(VF3_CAR_UNLOCK, WRITE_OFF);
+    safeDigitalWrite(VF3_CAR_LOCK, WRITE_ON);
+    safeDigitalWrite(VF3_CAR_UNLOCK, WRITE_OFF);
 
     JsonDocument doc;
     doc["success"] = true;

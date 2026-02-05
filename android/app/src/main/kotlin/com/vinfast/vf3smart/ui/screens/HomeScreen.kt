@@ -101,9 +101,15 @@ fun HomeScreen(
                 }
             }
 
+            // Disconnected banner
+            if (connectionState != WebSocketManager.ConnectionState.Connected) {
+                DisconnectedBanner(connectionState)
+            }
+
             // Quick actions
             QuickActions(
                 carStatus = carStatus,
+                connectionState = connectionState,
                 onLock = { controlViewModel.lockCar() },
                 onUnlock = { controlViewModel.unlockCar() },
                 onCloseWindows = { controlViewModel.closeWindows() },
@@ -155,6 +161,11 @@ private fun ConnectionIndicator(
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(20.dp)
                 )
+                Text(
+                    text = "Offline",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
             is WebSocketManager.ConnectionState.Error -> {
                 Icon(
@@ -162,6 +173,58 @@ private fun ConnectionIndicator(
                     contentDescription = "Error",
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(20.dp)
+                )
+                Text(
+                    text = "Error",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DisconnectedBanner(
+    connectionState: WebSocketManager.ConnectionState,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (connectionState is WebSocketManager.ConnectionState.Error) {
+                    Icons.Default.Error
+                } else {
+                    Icons.Default.CloudOff
+                },
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.size(24.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Device Disconnected",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Text(
+                    text = when (connectionState) {
+                        is WebSocketManager.ConnectionState.Error -> connectionState.message
+                        else -> "Controls are disabled. Reconnecting..."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
                 )
             }
         }
@@ -289,12 +352,15 @@ private fun StatusCardsGrid(
 @Composable
 private fun QuickActions(
     carStatus: CarStatus?,
+    connectionState: WebSocketManager.ConnectionState,
     onLock: () -> Unit,
     onUnlock: () -> Unit,
     onCloseWindows: () -> Unit,
     onBeep: () -> Unit,
     isLoading: Boolean
 ) {
+    val isConnected = connectionState == WebSocketManager.ConnectionState.Connected
+    val enabled = isConnected && !isLoading
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -321,7 +387,7 @@ private fun QuickActions(
                         text = "Unlock",
                         onClick = onUnlock,
                         modifier = Modifier.weight(1f),
-                        enabled = !isLoading,
+                        enabled = enabled,
                         icon = { Icon(Icons.Default.LockOpen, contentDescription = null) }
                     )
                 } else {
@@ -329,7 +395,7 @@ private fun QuickActions(
                         text = "Lock",
                         onClick = onLock,
                         modifier = Modifier.weight(1f),
-                        enabled = !isLoading,
+                        enabled = enabled,
                         icon = { Icon(Icons.Default.Lock, contentDescription = null) }
                     )
                 }
@@ -339,7 +405,7 @@ private fun QuickActions(
                     text = "Beep",
                     onClick = onBeep,
                     modifier = Modifier.weight(1f),
-                    enabled = !isLoading,
+                    enabled = enabled,
                     containerColor = MaterialTheme.colorScheme.secondary,
                     icon = { Icon(Icons.Default.Notifications, contentDescription = null) }
                 )
@@ -358,7 +424,7 @@ private fun QuickActions(
                         "Close Windows"
                     },
                     onClick = onCloseWindows,
-                    enabled = !isLoading,
+                    enabled = enabled,
                     containerColor = MaterialTheme.colorScheme.tertiary
                 )
             }

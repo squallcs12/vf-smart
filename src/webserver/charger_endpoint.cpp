@@ -13,9 +13,9 @@ void registerChargerEndpoint(AsyncWebServer& server) {
     }
 
     // Trigger charger unlock (1 second pulse)
-    pcf8575.digitalWrite(VF3_CHARGER_UNLOCK, WRITE_ON);
+    safeDigitalWrite(VF3_CHARGER_UNLOCK, WRITE_ON);
     delay(1000);
-    pcf8575.digitalWrite(VF3_CHARGER_UNLOCK, WRITE_OFF);
+    safeDigitalWrite(VF3_CHARGER_UNLOCK, WRITE_OFF);
 
     JsonDocument doc;
     doc["success"] = true;

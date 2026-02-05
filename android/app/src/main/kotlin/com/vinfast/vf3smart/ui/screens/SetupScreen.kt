@@ -46,6 +46,13 @@ fun SetupScreen(
         }
     }
 
+    // Auto-start device discovery when screen loads
+    LaunchedEffect(Unit) {
+        if (discoveryState is SetupViewModel.DiscoveryState.Idle) {
+            viewModel.discoverDevice()
+        }
+    }
+
     Scaffold(
         topBar = {
             @OptIn(ExperimentalMaterial3Api::class)
@@ -99,20 +106,7 @@ fun SetupScreen(
                     )
 
                     when (val state = discoveryState) {
-                        is SetupViewModel.DiscoveryState.Idle -> {
-                            Text(
-                                text = "Tap the button below to automatically discover your device on the network (30 second scan).",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            )
-
-                            ControlButton(
-                                text = "Discover Device",
-                                onClick = { viewModel.discoverDevice() },
-                                icon = { Icon(Icons.Default.Search, contentDescription = null) }
-                            )
-                        }
-
+                        is SetupViewModel.DiscoveryState.Idle,
                         is SetupViewModel.DiscoveryState.Discovering -> {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -121,8 +115,13 @@ fun SetupScreen(
                                 CircularProgressIndicator()
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "Scanning network...",
+                                    text = "Searching for your VF3-Smart device...",
                                     style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = "This may take up to 30 seconds",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                 )
                             }
                         }

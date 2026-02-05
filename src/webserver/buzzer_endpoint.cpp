@@ -23,13 +23,13 @@ void registerBuzzerEndpoint(AsyncWebServer& server) {
     }
 
     if (state == "on") {
-      pcf8575.digitalWrite(VF3_BUZZER, WRITE_OFF);
+      safeDigitalWrite(VF3_BUZZER, WRITE_OFF);
     } else if (state == "off") {
-      pcf8575.digitalWrite(VF3_BUZZER, WRITE_ON);
+      safeDigitalWrite(VF3_BUZZER, WRITE_ON);
     } else if (state == "beep" && duration > 0) {
-      pcf8575.digitalWrite(VF3_BUZZER, WRITE_OFF);
+      safeDigitalWrite(VF3_BUZZER, WRITE_OFF);
       delay(duration);
-      pcf8575.digitalWrite(VF3_BUZZER, WRITE_ON);
+      safeDigitalWrite(VF3_BUZZER, WRITE_ON);
     } else {
       JsonDocument doc;
       doc["success"] = false;

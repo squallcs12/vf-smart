@@ -53,13 +53,13 @@ bool readSensors() {
   int new_charging_status = digitalRead(VF3_CHARGING_STATUS);
 
   // Read output states from PCF8575 (for status reporting)
-  int new_car_lock = pcf8575.digitalRead(VF3_CAR_LOCK);
-  int new_car_unlock = pcf8575.digitalRead(VF3_CAR_UNLOCK);
-  int new_accessory_power = pcf8575.digitalRead(SELF_ACCESSORY_POWER);
-  int new_inside_cameras = pcf8575.digitalRead(SELF_INSIDE_CARMERAS);
-  int new_dashcam = pcf8575.digitalRead(SELF_DASHCAM);
-  int new_odo_screen = pcf8575.digitalRead(SELF_ODO_SCREEN);
-  int new_armrest = pcf8575.digitalRead(SELF_ARMREST);
+  int new_car_lock = safeDigitalRead(VF3_CAR_LOCK);
+  int new_car_unlock = safeDigitalRead(VF3_CAR_UNLOCK);
+  int new_accessory_power = safeDigitalRead(SELF_ACCESSORY_POWER);
+  int new_inside_cameras = safeDigitalRead(SELF_INSIDE_CARMERAS);
+  int new_dashcam = safeDigitalRead(SELF_DASHCAM);
+  int new_odo_screen = safeDigitalRead(SELF_ODO_SCREEN);
+  int new_armrest = safeDigitalRead(SELF_ARMREST);
 
   // Check for changes (using threshold for analog values to avoid noise)
   if (abs(new_brake - prev_vf3_brake) > 10) changed = true;

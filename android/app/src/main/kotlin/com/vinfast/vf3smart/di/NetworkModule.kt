@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import com.vinfast.vf3smart.BuildConfig
 import com.vinfast.vf3smart.data.local.SecurePreferences
 import com.vinfast.vf3smart.data.network.AuthInterceptor
+import com.vinfast.vf3smart.data.network.DynamicBaseUrlInterceptor
 import com.vinfast.vf3smart.data.network.UdpDiscoveryService
 import com.vinfast.vf3smart.data.network.VF3ApiService
 import com.vinfast.vf3smart.data.network.WebSocketManager
@@ -27,6 +28,14 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    fun provideDynamicBaseUrlInterceptor(
+        securePreferences: SecurePreferences
+    ): DynamicBaseUrlInterceptor {
+        return DynamicBaseUrlInterceptor(securePreferences)
+    }
+
+    @Provides
+    @Singleton
     fun provideAuthInterceptor(
         securePreferences: SecurePreferences
     ): AuthInterceptor {
@@ -36,10 +45,12 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(
+        dynamicBaseUrlInterceptor: DynamicBaseUrlInterceptor,
         authInterceptor: AuthInterceptor
     ): OkHttpClient {
         return OkHttpClient.Builder()
-            .addInterceptor(authInterceptor)
+            .addInterceptor(dynamicBaseUrlInterceptor)  // First: change host dynamically
+            .addInterceptor(authInterceptor)            // Second: add API key
             .addInterceptor(
                 HttpLoggingInterceptor().apply {
                     level = if (BuildConfig.DEBUG) {
@@ -59,15 +70,12 @@ object NetworkModule {
     @Singleton
     fun provideRetrofit(
         okHttpClient: OkHttpClient,
-        gson: Gson,
-        securePreferences: SecurePreferences
+        gson: Gson
     ): Retrofit {
-        // Use configured device IP or default
-        val baseUrl = securePreferences.getDeviceIp()?.let { "http://$it/" }
-            ?: "http://192.168.4.1/"
-
+        // Note: The actual URL is set dynamically by DynamicBaseUrlInterceptor
+        // This base URL is just a placeholder required by Retrofit
         return Retrofit.Builder()
-            .baseUrl(baseUrl)
+            .baseUrl("http://192.168.4.1/")  // Placeholder, overridden by interceptor
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()

@@ -74,11 +74,23 @@ void handleDiscoveryBroadcast() {
   serializeJson(doc, message);
 
   // Broadcast UDP message
-  IPAddress broadcastIP(255, 255, 255, 255);
+  // Calculate broadcast address: (IP & subnet) | (~subnet)
+  IPAddress localIP = WiFi.localIP();
+  IPAddress subnet = WiFi.subnetMask();
+  IPAddress broadcastIP(
+    (localIP[0] & subnet[0]) | (~subnet[0] & 0xFF),
+    (localIP[1] & subnet[1]) | (~subnet[1] & 0xFF),
+    (localIP[2] & subnet[2]) | (~subnet[2] & 0xFF),
+    (localIP[3] & subnet[3]) | (~subnet[3] & 0xFF)
+  );
+
   udp.beginPacket(broadcastIP, UDP_BROADCAST_PORT);
   udp.print(message);
   udp.endPacket();
 
   Serial.print("UDP Broadcast: ");
   Serial.println(message);
+  Serial.printf("Broadcasting to: %s (subnet: %s)\n",
+    broadcastIP.toString().c_str(),
+    subnet.toString().c_str());
 }

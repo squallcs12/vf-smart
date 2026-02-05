@@ -33,6 +33,13 @@
 // Initialize PCF8575
 bool initPCF8575();
 
+// Check if PCF8575 is initialized and ready
+bool isPCF8575Ready();
+
+// Safe PCF8575 operations (check initialization before accessing)
+void safeDigitalWrite(uint8_t pin, uint8_t value);
+uint8_t safeDigitalRead(uint8_t pin);
+
 // Global PCF8575 instance - use pcf8575.digitalWrite(), pcf8575.digitalRead(), etc.
 extern PCF8575 pcf8575;
 

@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vinfast.vf3smart.data.model.CarStatus
+import com.vinfast.vf3smart.data.network.WebSocketManager
 import com.vinfast.vf3smart.ui.components.ControlButton
 import com.vinfast.vf3smart.ui.components.OutlinedControlButton
 import com.vinfast.vf3smart.ui.components.ToggleControlButton
@@ -30,7 +31,10 @@ fun ControlScreen(
     controlViewModel: ControlViewModel = hiltViewModel()
 ) {
     val carStatus by statusViewModel.carStatus.collectAsStateWithLifecycle()
+    val connectionState by statusViewModel.connectionState.collectAsStateWithLifecycle()
     val operationState by controlViewModel.operationState.collectAsStateWithLifecycle()
+
+    val isConnected = connectionState == WebSocketManager.ConnectionState.Connected
 
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(operationState) {
@@ -60,7 +64,11 @@ fun ControlScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                ),
+                actions = {
+                    // Connection indicator
+                    ConnectionStatusIndicator(connectionState)
+                }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -74,6 +82,12 @@ fun ControlScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             val isLoading = operationState is ControlViewModel.OperationState.Loading
+            val enabled = isConnected && !isLoading
+
+            // Disconnected banner
+            if (!isConnected) {
+                DisconnectedWarningBanner(connectionState)
+            }
 
             // Security section
             ControlSection(
@@ -88,7 +102,7 @@ fun ControlScreen(
                         text = "Lock",
                         onClick = { controlViewModel.lockCar() },
                         modifier = Modifier.weight(1f),
-                        enabled = !isLoading,
+                        enabled = enabled,
                         icon = { Icon(Icons.Default.Lock, contentDescription = null) }
                     )
 
@@ -96,7 +110,7 @@ fun ControlScreen(
                         text = "Unlock",
                         onClick = { controlViewModel.unlockCar() },
                         modifier = Modifier.weight(1f),
-                        enabled = !isLoading,
+                        enabled = enabled,
                         icon = { Icon(Icons.Default.LockOpen, contentDescription = null) }
                     )
                 }
@@ -123,14 +137,14 @@ fun ControlScreen(
                         "Close Windows (30s)"
                     },
                     onClick = { controlViewModel.closeWindows() },
-                    enabled = !isLoading && carStatus?.windowCloseActive != true
+                    enabled = enabled && carStatus?.windowCloseActive != true
                 )
 
                 if (carStatus?.windowCloseActive == true) {
                     OutlinedControlButton(
                         text = "Stop",
                         onClick = { controlViewModel.stopWindows() },
-                        enabled = !isLoading,
+                        enabled = enabled,
                         icon = { Icon(Icons.Default.Stop, contentDescription = null) }
                     )
                 }
@@ -158,7 +172,7 @@ fun ControlScreen(
                             controlViewModel.controlWindowDown("left", leftWindowDown)
                         },
                         modifier = Modifier.weight(1f),
-                        enabled = !isLoading
+                        enabled = enabled
                     )
 
                     ToggleControlButton(
@@ -169,7 +183,7 @@ fun ControlScreen(
                             controlViewModel.controlWindowDown("right", rightWindowDown)
                         },
                         modifier = Modifier.weight(1f),
-                        enabled = !isLoading
+                        enabled = enabled
                     )
                 }
 
@@ -180,7 +194,7 @@ fun ControlScreen(
                         rightWindowDown = true
                         controlViewModel.controlWindowDown("both", true)
                     },
-                    enabled = !isLoading && !leftWindowDown && !rightWindowDown,
+                    enabled = enabled && !leftWindowDown && !rightWindowDown,
                     containerColor = MaterialTheme.colorScheme.secondary
                 )
 
@@ -215,7 +229,7 @@ fun ControlScreen(
                     text = "Accessory Power",
                     isOn = accessoryPowerOn,
                     onToggle = { controlViewModel.toggleAccessoryPower() },
-                    enabled = !isLoading
+                    enabled = enabled
                 )
 
                 val camerasOn = carStatus?.controls?.insideCameras == 1
@@ -223,7 +237,7 @@ fun ControlScreen(
                     text = "Inside Cameras",
                     isOn = camerasOn,
                     onToggle = { controlViewModel.toggleInsideCameras() },
-                    enabled = !isLoading
+                    enabled = enabled
                 )
             }
 
@@ -251,7 +265,7 @@ fun ControlScreen(
                 ControlButton(
                     text = "Beep Horn",
                     onClick = { controlViewModel.beepHorn(buzzerDuration) },
-                    enabled = !isLoading,
+                    enabled = enabled,
                     icon = { Icon(Icons.Default.VolumeUp, contentDescription = null) }
                 )
             }
@@ -264,7 +278,7 @@ fun ControlScreen(
                 ControlButton(
                     text = "Unlock Charger Port",
                     onClick = { controlViewModel.unlockCharger() },
-                    enabled = !isLoading,
+                    enabled = enabled,
                     icon = { Icon(Icons.Default.Lock, contentDescription = null) }
                 )
 
@@ -292,7 +306,7 @@ fun ControlScreen(
                     text = "Light Reminder",
                     isOn = lightReminderEnabled,
                     onToggle = { controlViewModel.toggleLightReminder() },
-                    enabled = !isLoading
+                    enabled = enabled
                 )
 
                 Text(
@@ -351,4 +365,90 @@ private fun getWindowStateText(state: Int): String = when (state) {
     1 -> "Closed"
     2 -> "Open"
     else -> "Unknown"
+}
+
+@Composable
+private fun ConnectionStatusIndicator(
+    connectionState: WebSocketManager.ConnectionState,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.padding(end = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        when (connectionState) {
+            WebSocketManager.ConnectionState.Connected -> {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = "Connected",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            WebSocketManager.ConnectionState.Disconnected -> {
+                Icon(
+                    Icons.Default.Cancel,
+                    contentDescription = "Disconnected",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            is WebSocketManager.ConnectionState.Error -> {
+                Icon(
+                    Icons.Default.Error,
+                    contentDescription = "Error",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DisconnectedWarningBanner(
+    connectionState: WebSocketManager.ConnectionState,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (connectionState is WebSocketManager.ConnectionState.Error) {
+                    Icons.Default.Error
+                } else {
+                    Icons.Default.CloudOff
+                },
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.size(24.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Device Disconnected",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Text(
+                    text = when (connectionState) {
+                        is WebSocketManager.ConnectionState.Error -> connectionState.message
+                        else -> "All controls are disabled. Reconnecting..."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                )
+            }
+        }
+    }
 }

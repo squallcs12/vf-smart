@@ -19,13 +19,13 @@ void registerAccessoryEndpoints(AsyncWebServer& server) {
 
     if (state == "on") {
       self_accessory_power = HIGH;
-      pcf8575.digitalWrite(SELF_ACCESSORY_POWER, WRITE_OFF);
+      safeDigitalWrite(SELF_ACCESSORY_POWER, WRITE_OFF);
     } else if (state == "off") {
       self_accessory_power = LOW;
-      pcf8575.digitalWrite(SELF_ACCESSORY_POWER, WRITE_ON);
+      safeDigitalWrite(SELF_ACCESSORY_POWER, WRITE_ON);
     } else if (state == "toggle") {
       self_accessory_power = !self_accessory_power;
-      pcf8575.digitalWrite(SELF_ACCESSORY_POWER, self_accessory_power);
+      safeDigitalWrite(SELF_ACCESSORY_POWER, self_accessory_power);
     } else {
       JsonDocument doc;
       doc["success"] = false;
@@ -63,14 +63,14 @@ void registerAccessoryEndpoints(AsyncWebServer& server) {
     }
 
     if (state == "on") {
-      pcf8575.digitalWrite(SELF_INSIDE_CARMERAS, WRITE_ON);
+      safeDigitalWrite(SELF_INSIDE_CARMERAS, WRITE_ON);
       self_inside_cameras = WRITE_ON;
     } else if (state == "off") {
-      pcf8575.digitalWrite(SELF_INSIDE_CARMERAS, WRITE_OFF);
+      safeDigitalWrite(SELF_INSIDE_CARMERAS, WRITE_OFF);
       self_inside_cameras = WRITE_OFF;
     } else if (state == "toggle") {
       self_inside_cameras = (self_inside_cameras == WRITE_ON) ? WRITE_OFF : WRITE_ON;
-      pcf8575.digitalWrite(SELF_INSIDE_CARMERAS, self_inside_cameras);
+      safeDigitalWrite(SELF_INSIDE_CARMERAS, self_inside_cameras);
     } else {
       JsonDocument doc;
       doc["success"] = false;
