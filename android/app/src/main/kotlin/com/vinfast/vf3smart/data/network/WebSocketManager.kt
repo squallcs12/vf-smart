@@ -61,7 +61,12 @@ class WebSocketManager @Inject constructor(
 
         Log.d(TAG, "Connecting to WebSocket: ws://$deviceIp/ws")
 
-        webSocket = okHttpClient.newWebSocket(request, object : WebSocketListener() {
+        // Create WebSocket client with ping/pong enabled
+        val wsClient = okHttpClient.newBuilder()
+            .pingInterval(2, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+
+        webSocket = wsClient.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 Log.d(TAG, "WebSocket connected")
                 _connectionState.value = ConnectionState.Connected
