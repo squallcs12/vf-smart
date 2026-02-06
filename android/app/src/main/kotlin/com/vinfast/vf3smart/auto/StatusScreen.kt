@@ -8,6 +8,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.vinfast.vf3smart.R
 import com.vinfast.vf3smart.data.model.CarStatus
+import com.vinfast.vf3smart.data.network.WebSocketManager
 import com.vinfast.vf3smart.data.repository.VF3Repository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +29,7 @@ class StatusScreen(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var currentStatus: CarStatus? = null
+    private var connectionState: WebSocketManager.ConnectionState = WebSocketManager.ConnectionState.Disconnected
 
     init {
         // Observe lifecycle and connect/disconnect WebSocket
@@ -40,7 +42,15 @@ class StatusScreen(
                 scope.launch {
                     repository.carStatus.collectLatest { status ->
                         currentStatus = status
-                        invalidate() // Refresh UI
+                        invalidate()
+                    }
+                }
+
+                // Collect connection state and invalidate screen
+                scope.launch {
+                    repository.connectionState.collectLatest { state ->
+                        connectionState = state
+                        invalidate()
                     }
                 }
             }
@@ -55,16 +65,16 @@ class StatusScreen(
 
     override fun onGetTemplate(): Template {
         val status = currentStatus
-
-        return if (status != null) {
-            buildControlsTemplate(status)
-        } else {
+        return if (status == null) {
             buildLoadingTemplate()
+        } else {
+            buildControlsTemplate(status)
         }
     }
 
     private fun buildControlsTemplate(status: CarStatus): Template {
         val gridItemListBuilder = ItemList.Builder()
+        val isConnected = connectionState == WebSocketManager.ConnectionState.Connected
 
         val accessoryPowerOn = status.controls.accessoryPower == 1
         val odoScreenOn = status.controls.odoScreen == 1
@@ -82,11 +92,13 @@ class StatusScreen(
                             carContext,
                             R.drawable.ic_camera
                         )
-                    ).setTint(CarColor.YELLOW).build()
+                    ).setTint(if (isConnected) CarColor.YELLOW else CarColor.DEFAULT).build()
                 )
                 .setOnClickListener {
-                    scope.launch {
-                        repository.setInsideCameras(true)
+                    if (isConnected) {
+                        scope.launch {
+                            repository.setInsideCameras(true)
+                        }
                     }
                 }
                 .build()
@@ -103,11 +115,13 @@ class StatusScreen(
                             carContext,
                             R.drawable.ic_power
                         )
-                    ).setTint(if (accessoryPowerOn) CarColor.GREEN else CarColor.DEFAULT).build()
+                    ).setTint(if (isConnected) (if (accessoryPowerOn) CarColor.GREEN else CarColor.DEFAULT) else CarColor.DEFAULT).build()
                 )
                 .setOnClickListener {
-                    scope.launch {
-                        // repository.toggleAccessoryPower()
+                    if (isConnected) {
+                        scope.launch {
+                            repository.toggleAccessoryPower()
+                        }
                     }
                 }
                 .build()
@@ -124,11 +138,13 @@ class StatusScreen(
                             carContext,
                             R.drawable.ic_odo_screen
                         )
-                    ).setTint(if (odoScreenOn) CarColor.GREEN else CarColor.DEFAULT).build()
+                    ).setTint(if (isConnected) (if (odoScreenOn) CarColor.GREEN else CarColor.DEFAULT) else CarColor.DEFAULT).build()
                 )
                 .setOnClickListener {
-                    scope.launch {
-                        // repository.toggleOdoScreen()
+                    if (isConnected) {
+                        scope.launch {
+                            repository.toggleOdoScreen()
+                        }
                     }
                 }
                 .build()
@@ -145,11 +161,13 @@ class StatusScreen(
                             carContext,
                             R.drawable.ic_armrest
                         )
-                    ).setTint(if (armrestOn) CarColor.GREEN else CarColor.DEFAULT).build()
+                    ).setTint(if (isConnected) (if (armrestOn) CarColor.GREEN else CarColor.DEFAULT) else CarColor.DEFAULT).build()
                 )
                 .setOnClickListener {
-                    scope.launch {
-                        // repository.toggleArmrest()
+                    if (isConnected) {
+                        scope.launch {
+                            repository.toggleArmrest()
+                        }
                     }
                 }
                 .build()
@@ -166,25 +184,39 @@ class StatusScreen(
                             carContext,
                             R.drawable.ic_dashcam
                         )
-                    ).setTint(if (dashcamOn) CarColor.GREEN else CarColor.DEFAULT).build()
+                    ).setTint(if (isConnected) (if (dashcamOn) CarColor.GREEN else CarColor.DEFAULT) else CarColor.DEFAULT).build()
                 )
                 .setOnClickListener {
-                    scope.launch {
-                        // repository.toggleDashcam()
+                    if (isConnected) {
+                        scope.launch {
+                            repository.toggleDashcam()
+                        }
                     }
                 }
                 .build()
         )
 
+        val connectionText = when (connectionState) {
+            is WebSocketManager.ConnectionState.Connected -> "Connected"
+            is WebSocketManager.ConnectionState.Disconnected -> "Disconnected"
+            is WebSocketManager.ConnectionState.Error -> "Error"
+        }
+
         return GridTemplate.Builder()
-            .setTitle("VF3 Smart Controls")
             .setHeaderAction(Action.APP_ICON)
             .setSingleList(gridItemListBuilder.build())
+            .setTitle(connectionText)
             .build()
     }
 
     private fun buildLoadingTemplate(): Template {
-        return MessageTemplate.Builder("Connecting to device...")
+        val connectionText = when (connectionState) {
+            is WebSocketManager.ConnectionState.Connected -> "Connected"
+            is WebSocketManager.ConnectionState.Disconnected -> "Disconnected. Connecting..."
+            is WebSocketManager.ConnectionState.Error -> "Error. Retrying..."
+        }
+
+        return MessageTemplate.Builder(connectionText)
             .setTitle("VF3 Smart")
             .setHeaderAction(Action.APP_ICON)
             .setLoading(true)
