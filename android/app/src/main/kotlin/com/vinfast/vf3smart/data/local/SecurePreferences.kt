@@ -5,8 +5,6 @@ import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.vinfast.vf3smart.data.model.DeviceConfig
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
@@ -14,9 +12,7 @@ import javax.inject.Singleton
  * Stores: Device IP, API key, Device name, MAC address
  */
 @Singleton
-class SecurePreferences @Inject constructor(
-    @ApplicationContext private val context: Context
-) {
+class SecurePreferences private constructor(context: Context) {
     private val masterKey: MasterKey by lazy {
         MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -40,6 +36,15 @@ class SecurePreferences @Inject constructor(
         private const val KEY_DEVICE_NAME = "device_name"
         private const val KEY_MAC_ADDRESS = "mac_address"
         private const val KEY_IS_CONFIGURED = "is_configured"
+
+        @Volatile
+        private var INSTANCE: SecurePreferences? = null
+
+        fun getInstance(context: Context): SecurePreferences {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: SecurePreferences(context.applicationContext).also { INSTANCE = it }
+            }
+        }
     }
 
     /**

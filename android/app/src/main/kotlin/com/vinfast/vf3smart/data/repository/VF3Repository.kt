@@ -7,7 +7,6 @@ import com.vinfast.vf3smart.data.network.UdpDiscoveryService
 import com.vinfast.vf3smart.data.network.VF3ApiService
 import com.vinfast.vf3smart.data.network.WebSocketManager
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
@@ -25,7 +24,7 @@ class VF3Repository @Inject constructor(
     private val webSocketManager: WebSocketManager,
     private val udpDiscoveryService: UdpDiscoveryService,
     private val securePreferences: SecurePreferences,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val ioDispatcher: CoroutineDispatcher
 ) {
     companion object {
         private const val TAG = "VF3Repository"

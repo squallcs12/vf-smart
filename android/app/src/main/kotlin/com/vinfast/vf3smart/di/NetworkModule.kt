@@ -1,6 +1,7 @@
 package com.vinfast.vf3smart.di
 
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.vinfast.vf3smart.BuildConfig
 import com.vinfast.vf3smart.data.local.SecurePreferences
 import com.vinfast.vf3smart.data.network.AuthInterceptor
@@ -12,6 +13,8 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -25,6 +28,17 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
+
+    @Provides
+    @Singleton
+    fun provideGson(): Gson {
+        return GsonBuilder().create()
+    }
+
+    @Provides
+    fun provideIoDispatcher(): CoroutineDispatcher {
+        return Dispatchers.IO
+    }
 
     @Provides
     @Singleton
