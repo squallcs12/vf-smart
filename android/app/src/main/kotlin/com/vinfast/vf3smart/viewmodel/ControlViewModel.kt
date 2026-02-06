@@ -115,6 +115,30 @@ class ControlViewModel @Inject constructor(
         }
     }
 
+    fun openLeftWindow() {
+        executeOperation("Opening left window...") {
+            repository.controlWindowDown("left", true)
+        }
+    }
+
+    fun closeLeftWindow() {
+        executeOperation("Closing left window...") {
+            repository.controlWindowDown("left", false)
+        }
+    }
+
+    fun openRightWindow() {
+        executeOperation("Opening right window...") {
+            repository.controlWindowDown("right", true)
+        }
+    }
+
+    fun closeRightWindow() {
+        executeOperation("Closing right window...") {
+            repository.controlWindowDown("right", false)
+        }
+    }
+
     /**
      * Reset operation state
      */

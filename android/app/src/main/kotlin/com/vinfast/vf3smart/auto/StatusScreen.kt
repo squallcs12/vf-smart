@@ -81,7 +81,30 @@ class StatusScreen(
         val armrestOn = status.controls.armrest == 1
         val dashcamOn = status.controls.dashcam == 1
 
-        // Turn On Inside Camera
+        // 1. Close Left Window
+        gridItemListBuilder.addItem(
+            GridItem.Builder()
+                .setTitle("Close Left")
+                .setText("Close Left Window")
+                .setImage(
+                    CarIcon.Builder(
+                        IconCompat.createWithResource(
+                            carContext,
+                            R.drawable.ic_window_left_up
+                        )
+                    ).setTint(if (isConnected) CarColor.BLUE else CarColor.DEFAULT).build()
+                )
+                .setOnClickListener {
+                    if (isConnected) {
+                        scope.launch {
+                            repository.controlWindowUp("left", true)
+                        }
+                    }
+                }
+                .build()
+        )
+
+        // 2. Turn On Inside Camera
         gridItemListBuilder.addItem(
             GridItem.Builder()
                 .setTitle("Camera")
@@ -104,7 +127,7 @@ class StatusScreen(
                 .build()
         )
 
-        // Accessory Power Control
+        // 3. Accessory Power Control
         gridItemListBuilder.addItem(
             GridItem.Builder()
                 .setTitle(if (accessoryPowerOn) "Power Off" else "Power On")
@@ -127,7 +150,53 @@ class StatusScreen(
                 .build()
         )
 
-        // ODO Screen
+        // 4. Close Right Window
+        gridItemListBuilder.addItem(
+            GridItem.Builder()
+                .setTitle("Close Right")
+                .setText("Close Right Window")
+                .setImage(
+                    CarIcon.Builder(
+                        IconCompat.createWithResource(
+                            carContext,
+                            R.drawable.ic_window_right_up
+                        )
+                    ).setTint(if (isConnected) CarColor.BLUE else CarColor.DEFAULT).build()
+                )
+                .setOnClickListener {
+                    if (isConnected) {
+                        scope.launch {
+                            repository.controlWindowUp("right", true)
+                        }
+                    }
+                }
+                .build()
+        )
+
+        // 5. Open Left Window
+        gridItemListBuilder.addItem(
+            GridItem.Builder()
+                .setTitle("Open Left")
+                .setText("Open Left Window")
+                .setImage(
+                    CarIcon.Builder(
+                        IconCompat.createWithResource(
+                            carContext,
+                            R.drawable.ic_window_left_down
+                        )
+                    ).setTint(if (isConnected) CarColor.YELLOW else CarColor.DEFAULT).build()
+                )
+                .setOnClickListener {
+                    if (isConnected) {
+                        scope.launch {
+                            repository.controlWindowDown("left", true)
+                        }
+                    }
+                }
+                .build()
+        )
+
+        // 6. ODO Screen
         gridItemListBuilder.addItem(
             GridItem.Builder()
                 .setTitle(if (odoScreenOn) "ODO Off" else "ODO On")
@@ -150,7 +219,7 @@ class StatusScreen(
                 .build()
         )
 
-        // Armrest
+        // 7. Armrest
         gridItemListBuilder.addItem(
             GridItem.Builder()
                 .setTitle(if (armrestOn) "Armrest Off" else "Armrest On")
@@ -173,7 +242,30 @@ class StatusScreen(
                 .build()
         )
 
-        // Dashcam
+        // 8. Open Right Window
+        gridItemListBuilder.addItem(
+            GridItem.Builder()
+                .setTitle("Open Right")
+                .setText("Open Right Window")
+                .setImage(
+                    CarIcon.Builder(
+                        IconCompat.createWithResource(
+                            carContext,
+                            R.drawable.ic_window_right_down
+                        )
+                    ).setTint(if (isConnected) CarColor.YELLOW else CarColor.DEFAULT).build()
+                )
+                .setOnClickListener {
+                    if (isConnected) {
+                        scope.launch {
+                            repository.controlWindowDown("right", true)
+                        }
+                    }
+                }
+                .build()
+        )
+
+        // 9. Dashcam
         gridItemListBuilder.addItem(
             GridItem.Builder()
                 .setTitle(if (dashcamOn) "Dashcam Off" else "Dashcam On")

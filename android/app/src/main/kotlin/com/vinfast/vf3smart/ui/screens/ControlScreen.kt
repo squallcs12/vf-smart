@@ -9,9 +9,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.vinfast.vf3smart.R
 import com.vinfast.vf3smart.data.model.CarStatus
 import com.vinfast.vf3smart.data.network.WebSocketManager
 import com.vinfast.vf3smart.ui.components.ControlButton
@@ -130,73 +132,46 @@ fun ControlScreen(
                 title = "Windows",
                 icon = Icons.Default.Window
             ) {
-                ControlButton(
-                    text = if (carStatus?.windowCloseActive == true) {
-                        "Closing... (${carStatus!!.windowCloseRemainingMs / 1000}s remaining)"
-                    } else {
-                        "Close Windows (30s)"
-                    },
-                    onClick = { controlViewModel.closeWindows() },
-                    enabled = enabled && carStatus?.windowCloseActive != true
-                )
-
-                if (carStatus?.windowCloseActive == true) {
-                    OutlinedControlButton(
-                        text = "Stop",
-                        onClick = { controlViewModel.stopWindows() },
-                        enabled = enabled,
-                        icon = { Icon(Icons.Default.Stop, contentDescription = null) }
-                    )
-                }
-
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-
-                Text(
-                    text = "Manual Window Control",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                var leftWindowDown by remember { mutableStateOf(false) }
-                var rightWindowDown by remember { mutableStateOf(false) }
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    ToggleControlButton(
-                        text = "Left Down",
-                        isOn = leftWindowDown,
-                        onToggle = {
-                            leftWindowDown = !leftWindowDown
-                            controlViewModel.controlWindowDown("left", leftWindowDown)
-                        },
+                    ControlButton(
+                        text = "Open Left",
+                        onClick = { controlViewModel.openLeftWindow() },
                         modifier = Modifier.weight(1f),
-                        enabled = enabled
+                        enabled = enabled,
+                        icon = { Icon(painterResource(id = R.drawable.ic_window_left_down), contentDescription = null) }
                     )
 
-                    ToggleControlButton(
-                        text = "Right Down",
-                        isOn = rightWindowDown,
-                        onToggle = {
-                            rightWindowDown = !rightWindowDown
-                            controlViewModel.controlWindowDown("right", rightWindowDown)
-                        },
+                    ControlButton(
+                        text = "Close Left",
+                        onClick = { controlViewModel.closeLeftWindow() },
                         modifier = Modifier.weight(1f),
-                        enabled = enabled
+                        enabled = enabled,
+                        icon = { Icon(painterResource(id = R.drawable.ic_window_left_up), contentDescription = null) }
                     )
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ControlButton(
+                        text = "Open Right",
+                        onClick = { controlViewModel.openRightWindow() },
+                        modifier = Modifier.weight(1f),
+                        enabled = enabled,
+                        icon = { Icon(painterResource(id = R.drawable.ic_window_right_down), contentDescription = null) }
+                    )
 
-                ControlButton(
-                    text = "Both Windows Down",
-                    onClick = {
-                        leftWindowDown = true
-                        rightWindowDown = true
-                        controlViewModel.controlWindowDown("both", true)
-                    },
-                    enabled = enabled && !leftWindowDown && !rightWindowDown,
-                    containerColor = MaterialTheme.colorScheme.secondary
-                )
+                    ControlButton(
+                        text = "Close Right",
+                        onClick = { controlViewModel.closeRightWindow() },
+                        modifier = Modifier.weight(1f),
+                        enabled = enabled,
+                        icon = { Icon(painterResource(id = R.drawable.ic_window_right_up), contentDescription = null) }
+                    )
+                }
 
                 if (carStatus != null) {
                     Row(

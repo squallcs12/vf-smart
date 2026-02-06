@@ -1,0 +1,32 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <!-- Right door (dimmed) -->
+  <path
+      android:fillColor="@android:color/white"
+      android:fillAlpha="0.2"
+      android:pathData="M14,4h7c0.5,0 1,0.5 1,1v14c0,0.5 -0.5,1 -1,1h-7c-1,0 -1,0 -1,-1V5c0,-1 0,-1 1,-1z"
+      android:strokeWidth="1"
+      android:strokeColor="@android:color/white"
+      android:strokeAlpha="0.3"/>
+
+  <!-- Left car door frame -->
+  <path
+      android:fillColor="@android:color/white"
+      android:pathData="M3,4h7c0.5,0 1,0.5 1,1v14c0,0.5 -0.5,1 -1,1H3c-1,0 -1,0 -1,-1V5c0,-1 0,-1 1,-1z"
+      android:strokeWidth="1.5"
+      android:strokeColor="@android:color/white"/>
+
+  <!-- Window glass (closed/up position) -->
+  <path
+      android:fillColor="@android:color/white"
+      android:fillAlpha="0.7"
+      android:pathData="M4,5h5v8h-5z"/>
+
+  <!-- Down arrow on left side (large and prominent) -->
+  <path
+      android:fillColor="@android:color/white"
+      android:pathData="M6.5,14 l3,3 h-2 v3 h-2 v-3 h-2 z"/>
+</vector>

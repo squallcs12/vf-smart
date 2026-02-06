@@ -79,6 +79,18 @@ interface VF3ApiService {
     ): WindowResponse
 
     /**
+     * Control window up operation (requires API key)
+     * @param side: "left", "right", or "both"
+     * @param state: "on" or "off"
+     */
+    @FormUrlEncoded
+    @POST("/car/windows/up")
+    suspend fun controlWindowsUp(
+        @Field("side") side: String,
+        @Field("state") state: String
+    ): WindowResponse
+
+    /**
      * Control buzzer/horn (requires API key)
      * @param state: "on", "off", or "beep"
      * @param duration: Duration in milliseconds (optional, for "beep" mode)

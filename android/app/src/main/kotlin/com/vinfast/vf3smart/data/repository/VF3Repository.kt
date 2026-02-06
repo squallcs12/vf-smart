@@ -137,6 +137,15 @@ class VF3Repository @Inject constructor(
     }
 
     /**
+     * Control window up operation
+     * @param side "left", "right", or "both"
+     * @param on true to roll up, false to stop
+     */
+    suspend fun controlWindowUp(side: String, on: Boolean): Result<WindowResponse> = safeApiCall {
+        apiService.controlWindowsUp(side, if (on) "on" else "off")
+    }
+
+    /**
      * Beep horn/buzzer
      * @param durationMs Duration in milliseconds (default: 500ms)
      */

@@ -1,0 +1,39 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <!-- Left door (dimmed) -->
+  <path
+      android:fillColor="@android:color/white"
+      android:fillAlpha="0.2"
+      android:pathData="M3,4h7c0.5,0 1,0.5 1,1v14c0,0.5 -0.5,1 -1,1H3c-1,0 -1,0 -1,-1V5c0,-1 0,-1 1,-1z"
+      android:strokeWidth="1"
+      android:strokeColor="@android:color/white"
+      android:strokeAlpha="0.3"/>
+
+  <!-- Right car door frame -->
+  <path
+      android:fillColor="@android:color/white"
+      android:pathData="M14,4h7c0.5,0 1,0.5 1,1v14c0,0.5 -0.5,1 -1,1h-7c-1,0 -1,0 -1,-1V5c0,-1 0,-1 1,-1z"
+      android:strokeWidth="1.5"
+      android:strokeColor="@android:color/white"/>
+
+  <!-- Window glass (down/open position - only small part visible at top) -->
+  <path
+      android:fillColor="@android:color/white"
+      android:fillAlpha="0.7"
+      android:pathData="M15,5h5v3h-5z"/>
+
+  <!-- Empty space showing open window -->
+  <path
+      android:fillColor="@android:color/white"
+      android:fillAlpha="0.15"
+      android:pathData="M15,8h5v5h-5z"/>
+
+  <!-- Large DOWN arrow in open window area -->
+  <path
+      android:fillColor="@android:color/black"
+      android:fillAlpha="0.9"
+      android:pathData="M17.5,13l3,-4h-2v-3h-2v3h-2z"/>
+</vector>
