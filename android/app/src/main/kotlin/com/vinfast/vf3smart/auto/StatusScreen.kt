@@ -305,7 +305,7 @@ class StatusScreen(
         val connectionText = when (connectionState) {
             is WebSocketManager.ConnectionState.Connected -> "Connected"
             is WebSocketManager.ConnectionState.Disconnected -> "Disconnected. Connecting..."
-            is WebSocketManager.ConnectionState.Error -> "Error. Retrying..."
+            is WebSocketManager.ConnectionState.Error -> "Waiting for ESP32..."
         }
 
         return MessageTemplate.Builder(connectionText)
