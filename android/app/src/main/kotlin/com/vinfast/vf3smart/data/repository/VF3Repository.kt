@@ -175,6 +175,65 @@ class VF3Repository @Inject constructor(
     }
 
     /**
+     * Open side mirrors
+     */
+    suspend fun openSideMirrors(): Result<ControlResponse> = safeApiCall {
+        apiService.controlSideMirrors("open")
+    }
+
+    /**
+     * Close side mirrors
+     */
+    suspend fun closeSideMirrors(): Result<ControlResponse> = safeApiCall {
+        apiService.controlSideMirrors("close")
+    }
+
+    /**
+     * Toggle ODO screen
+     */
+    suspend fun toggleOdoScreen(): Result<ControlResponse> = safeApiCall {
+        apiService.controlOdoScreen("toggle")
+    }
+
+    /**
+     * Set ODO screen
+     * @param on true to turn on, false to turn off
+     */
+    suspend fun setOdoScreen(on: Boolean): Result<ControlResponse> = safeApiCall {
+        apiService.controlOdoScreen(if (on) "on" else "off")
+    }
+
+    /**
+     * Toggle armrest
+     */
+    suspend fun toggleArmrest(): Result<ControlResponse> = safeApiCall {
+        apiService.controlArmrest("toggle")
+    }
+
+    /**
+     * Set armrest
+     * @param on true to turn on, false to turn off
+     */
+    suspend fun setArmrest(on: Boolean): Result<ControlResponse> = safeApiCall {
+        apiService.controlArmrest(if (on) "on" else "off")
+    }
+
+    /**
+     * Toggle dashcam
+     */
+    suspend fun toggleDashcam(): Result<ControlResponse> = safeApiCall {
+        apiService.controlDashcam("toggle")
+    }
+
+    /**
+     * Set dashcam
+     * @param on true to turn on, false to turn off
+     */
+    suspend fun setDashcam(on: Boolean): Result<ControlResponse> = safeApiCall {
+        apiService.controlDashcam(if (on) "on" else "off")
+    }
+
+    /**
      * Test connection to device
      * @return true if connection successful, false otherwise
      */

@@ -506,6 +506,133 @@ curl -X POST http://192.168.4.1/car/charger-unlock \
 }
 ```
 
+##### POST /car/side-mirrors
+Control side mirrors opening and closing.
+
+**Parameters:**
+- `action` (required): `open` or `close`
+
+**Example Requests:**
+```bash
+# Open side mirrors
+curl -X POST http://192.168.4.1/car/side-mirrors \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d "action=open"
+
+# Close side mirrors
+curl -X POST http://192.168.4.1/car/side-mirrors \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d "action=close"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Side mirrors opening",
+  "action": "open"
+}
+```
+
+##### POST /car/odo-screen
+Control the odometer screen display.
+
+**Parameters:**
+- `state` (required): `on`, `off`, or `toggle`
+
+**Example Requests:**
+```bash
+# Turn on ODO screen
+curl -X POST http://192.168.4.1/car/odo-screen \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d "state=on"
+
+# Turn off ODO screen
+curl -X POST http://192.168.4.1/car/odo-screen \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d "state=off"
+
+# Toggle ODO screen
+curl -X POST http://192.168.4.1/car/odo-screen \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d "state=toggle"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "ODO screen updated",
+  "odo_screen": "on"
+}
+```
+
+##### POST /car/armrest
+Control the armrest.
+
+**Parameters:**
+- `state` (required): `on`, `off`, or `toggle`
+
+**Example Requests:**
+```bash
+# Turn on armrest
+curl -X POST http://192.168.4.1/car/armrest \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d "state=on"
+
+# Turn off armrest
+curl -X POST http://192.168.4.1/car/armrest \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d "state=off"
+
+# Toggle armrest
+curl -X POST http://192.168.4.1/car/armrest \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d "state=toggle"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Armrest updated",
+  "armrest": "on"
+}
+```
+
+##### POST /car/dashcam
+Control the dashcam.
+
+**Parameters:**
+- `state` (required): `on`, `off`, or `toggle`
+
+**Example Requests:**
+```bash
+# Turn on dashcam
+curl -X POST http://192.168.4.1/car/dashcam \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d "state=on"
+
+# Turn off dashcam
+curl -X POST http://192.168.4.1/car/dashcam \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d "state=off"
+
+# Toggle dashcam
+curl -X POST http://192.168.4.1/car/dashcam \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d "state=toggle"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Dashcam updated",
+  "dashcam": "on"
+}
+```
+
 ### Testing the API
 
 ```bash
@@ -560,6 +687,31 @@ curl -X POST http://192.168.4.1/car/light-reminder \
 # Unlock charger port
 curl -X POST http://192.168.4.1/car/charger-unlock \
   -H "X-API-Key: $API_KEY"
+
+# Open side mirrors
+curl -X POST http://192.168.4.1/car/side-mirrors \
+  -H "X-API-Key: $API_KEY" \
+  -d "action=open"
+
+# Close side mirrors
+curl -X POST http://192.168.4.1/car/side-mirrors \
+  -H "X-API-Key: $API_KEY" \
+  -d "action=close"
+
+# Turn on ODO screen
+curl -X POST http://192.168.4.1/car/odo-screen \
+  -H "X-API-Key: $API_KEY" \
+  -d "state=on"
+
+# Turn off armrest
+curl -X POST http://192.168.4.1/car/armrest \
+  -H "X-API-Key: $API_KEY" \
+  -d "state=off"
+
+# Toggle dashcam
+curl -X POST http://192.168.4.1/car/dashcam \
+  -H "X-API-Key: $API_KEY" \
+  -d "state=toggle"
 
 # Alternative: Using query parameter for authentication
 curl -X POST "http://192.168.4.1/car/lock?api_key=$API_KEY"

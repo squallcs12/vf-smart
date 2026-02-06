@@ -106,4 +106,44 @@ interface VF3ApiService {
      */
     @POST("/car/charger-unlock")
     suspend fun unlockCharger(): ChargerResponse
+
+    /**
+     * Control side mirrors (requires API key)
+     * @param action: "open" or "close"
+     */
+    @FormUrlEncoded
+    @POST("/car/side-mirrors")
+    suspend fun controlSideMirrors(
+        @Field("action") action: String
+    ): ControlResponse
+
+    /**
+     * Control ODO screen (requires API key)
+     * @param state: "on", "off", or "toggle"
+     */
+    @FormUrlEncoded
+    @POST("/car/odo-screen")
+    suspend fun controlOdoScreen(
+        @Field("state") state: String
+    ): ControlResponse
+
+    /**
+     * Control armrest (requires API key)
+     * @param state: "on", "off", or "toggle"
+     */
+    @FormUrlEncoded
+    @POST("/car/armrest")
+    suspend fun controlArmrest(
+        @Field("state") state: String
+    ): ControlResponse
+
+    /**
+     * Control dashcam (requires API key)
+     * @param state: "on", "off", or "toggle"
+     */
+    @FormUrlEncoded
+    @POST("/car/dashcam")
+    suspend fun controlDashcam(
+        @Field("state") state: String
+    ): ControlResponse
 }

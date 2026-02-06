@@ -11,6 +11,7 @@
 #include "webserver/configure_endpoints.h"
 #include "webserver/dashboard_endpoint.h"
 #include "webserver/onboarding_endpoints.h"
+#include "webserver/vehicle_accessories_endpoints.h"
 
 AsyncWebServer server(80);
 
@@ -29,6 +30,7 @@ void setupWebServer() {
   registerLightReminderEndpoint(server);
   registerConfigureEndpoints(server);
   registerDashboardEndpoint(server);
+  registerVehicleAccessoriesEndpoints(server);
 
   // Handle 404
   server.onNotFound([](AsyncWebServerRequest *request){

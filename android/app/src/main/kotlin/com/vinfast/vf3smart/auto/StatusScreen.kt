@@ -66,55 +66,7 @@ class StatusScreen(
     private fun buildControlsTemplate(status: CarStatus): Template {
         val gridItemListBuilder = ItemList.Builder()
 
-        val isLocked = status.carLockState == "locked"
-        val windowsOpen = status.windows.leftState == 2 || status.windows.rightState == 2
         val accessoryPowerOn = status.controls.accessoryPower == 1
-
-        // Lock/Unlock Control
-        gridItemListBuilder.addItem(
-            GridItem.Builder()
-                .setTitle(if (isLocked) "Unlock" else "Lock")
-                .setText(if (isLocked) "Car Locked" else "Car Unlocked")
-                .setImage(
-                    CarIcon.Builder(
-                        IconCompat.createWithResource(
-                            carContext,
-                            if (isLocked) R.drawable.ic_lock_open else R.drawable.ic_lock
-                        )
-                    ).setTint(if (isLocked) CarColor.GREEN else CarColor.RED).build()
-                )
-                .setOnClickListener {
-                    scope.launch {
-                        if (isLocked) {
-                            repository.unlockCar()
-                        } else {
-                            repository.lockCar()
-                        }
-                    }
-                }
-                .build()
-        )
-
-        // Close Windows Control
-        gridItemListBuilder.addItem(
-            GridItem.Builder()
-                .setTitle("Windows")
-                .setText(if (windowsOpen) "Close Windows" else "Windows Closed")
-                .setImage(
-                    CarIcon.Builder(
-                        IconCompat.createWithResource(
-                            carContext,
-                            R.drawable.ic_windows
-                        )
-                    ).setTint(CarColor.BLUE).build()
-                )
-                .setOnClickListener {
-                    scope.launch {
-                        repository.closeWindows()
-                    }
-                }
-                .build()
-        )
 
         // Turn On Inside Camera
         gridItemListBuilder.addItem(
@@ -153,6 +105,86 @@ class StatusScreen(
                 .setOnClickListener {
                     scope.launch {
                         repository.toggleAccessoryPower()
+                    }
+                }
+                .build()
+        )
+
+        // Side Mirrors Open
+        gridItemListBuilder.addItem(
+            GridItem.Builder()
+                .setTitle("Mirrors Open")
+                .setText("Open Side Mirrors")
+                .setImage(
+                    CarIcon.Builder(CarIcon.APP_ICON).build()
+                )
+                .setOnClickListener {
+                    scope.launch {
+                        repository.openSideMirrors()
+                    }
+                }
+                .build()
+        )
+
+        // Side Mirrors Close
+        gridItemListBuilder.addItem(
+            GridItem.Builder()
+                .setTitle("Mirrors Close")
+                .setText("Close Side Mirrors")
+                .setImage(
+                    CarIcon.Builder(CarIcon.APP_ICON).build()
+                )
+                .setOnClickListener {
+                    scope.launch {
+                        repository.closeSideMirrors()
+                    }
+                }
+                .build()
+        )
+
+        // ODO Screen
+        gridItemListBuilder.addItem(
+            GridItem.Builder()
+                .setTitle("ODO Screen")
+                .setText("Toggle ODO Screen")
+                .setImage(
+                    CarIcon.Builder(CarIcon.APP_ICON).build()
+                )
+                .setOnClickListener {
+                    scope.launch {
+                        repository.toggleOdoScreen()
+                    }
+                }
+                .build()
+        )
+
+        // Armrest
+        gridItemListBuilder.addItem(
+            GridItem.Builder()
+                .setTitle("Armrest")
+                .setText("Toggle Armrest")
+                .setImage(
+                    CarIcon.Builder(CarIcon.APP_ICON).build()
+                )
+                .setOnClickListener {
+                    scope.launch {
+                        repository.toggleArmrest()
+                    }
+                }
+                .build()
+        )
+
+        // Dashcam
+        gridItemListBuilder.addItem(
+            GridItem.Builder()
+                .setTitle("Dashcam")
+                .setText("Toggle Dashcam")
+                .setImage(
+                    CarIcon.Builder(CarIcon.APP_ICON).build()
+                )
+                .setOnClickListener {
+                    scope.launch {
+                        repository.toggleDashcam()
                     }
                 }
                 .build()
