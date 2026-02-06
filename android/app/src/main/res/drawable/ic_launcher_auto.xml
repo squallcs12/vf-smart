@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- A solid, opaque background -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#3D5AFE"/>
+        </shape>
+    </item>
+    <!-- The original car icon, placed on top -->
+    <item
+        android:drawable="@drawable/ic_launcher_foreground"
+        android:width="72dp"
+        android:height="72dp"
+        android:gravity="center" />
+</layer-list>
