@@ -67,6 +67,9 @@ class StatusScreen(
         val gridItemListBuilder = ItemList.Builder()
 
         val accessoryPowerOn = status.controls.accessoryPower == 1
+        val odoScreenOn = status.controls.odoScreen == 1
+        val armrestOn = status.controls.armrest == 1
+        val dashcamOn = status.controls.dashcam == 1
 
         // Turn On Inside Camera
         gridItemListBuilder.addItem(
@@ -100,43 +103,11 @@ class StatusScreen(
                             carContext,
                             R.drawable.ic_power
                         )
-                    ).setTint(if (accessoryPowerOn) CarColor.GREEN else CarColor.RED).build()
+                    ).setTint(if (accessoryPowerOn) CarColor.GREEN else CarColor.DEFAULT).build()
                 )
                 .setOnClickListener {
                     scope.launch {
-                        repository.toggleAccessoryPower()
-                    }
-                }
-                .build()
-        )
-
-        // Side Mirrors Open
-        gridItemListBuilder.addItem(
-            GridItem.Builder()
-                .setTitle("Mirrors Open")
-                .setText("Open Side Mirrors")
-                .setImage(
-                    CarIcon.Builder(CarIcon.APP_ICON).build()
-                )
-                .setOnClickListener {
-                    scope.launch {
-                        repository.openSideMirrors()
-                    }
-                }
-                .build()
-        )
-
-        // Side Mirrors Close
-        gridItemListBuilder.addItem(
-            GridItem.Builder()
-                .setTitle("Mirrors Close")
-                .setText("Close Side Mirrors")
-                .setImage(
-                    CarIcon.Builder(CarIcon.APP_ICON).build()
-                )
-                .setOnClickListener {
-                    scope.launch {
-                        repository.closeSideMirrors()
+                        // repository.toggleAccessoryPower()
                     }
                 }
                 .build()
@@ -145,14 +116,19 @@ class StatusScreen(
         // ODO Screen
         gridItemListBuilder.addItem(
             GridItem.Builder()
-                .setTitle("ODO Screen")
-                .setText("Toggle ODO Screen")
+                .setTitle(if (odoScreenOn) "ODO Off" else "ODO On")
+                .setText(if (odoScreenOn) "ODO Screen On" else "ODO Screen Off")
                 .setImage(
-                    CarIcon.Builder(CarIcon.APP_ICON).build()
+                    CarIcon.Builder(
+                        IconCompat.createWithResource(
+                            carContext,
+                            R.drawable.ic_odo_screen
+                        )
+                    ).setTint(if (odoScreenOn) CarColor.GREEN else CarColor.DEFAULT).build()
                 )
                 .setOnClickListener {
                     scope.launch {
-                        repository.toggleOdoScreen()
+                        // repository.toggleOdoScreen()
                     }
                 }
                 .build()
@@ -161,14 +137,19 @@ class StatusScreen(
         // Armrest
         gridItemListBuilder.addItem(
             GridItem.Builder()
-                .setTitle("Armrest")
-                .setText("Toggle Armrest")
+                .setTitle(if (armrestOn) "Armrest Off" else "Armrest On")
+                .setText(if (armrestOn) "Armrest On" else "Armrest Off")
                 .setImage(
-                    CarIcon.Builder(CarIcon.APP_ICON).build()
+                    CarIcon.Builder(
+                        IconCompat.createWithResource(
+                            carContext,
+                            R.drawable.ic_armrest
+                        )
+                    ).setTint(if (armrestOn) CarColor.GREEN else CarColor.DEFAULT).build()
                 )
                 .setOnClickListener {
                     scope.launch {
-                        repository.toggleArmrest()
+                        // repository.toggleArmrest()
                     }
                 }
                 .build()
@@ -177,14 +158,19 @@ class StatusScreen(
         // Dashcam
         gridItemListBuilder.addItem(
             GridItem.Builder()
-                .setTitle("Dashcam")
-                .setText("Toggle Dashcam")
+                .setTitle(if (dashcamOn) "Dashcam Off" else "Dashcam On")
+                .setText(if (dashcamOn) "Dashcam On" else "Dashcam Off")
                 .setImage(
-                    CarIcon.Builder(CarIcon.APP_ICON).build()
+                    CarIcon.Builder(
+                        IconCompat.createWithResource(
+                            carContext,
+                            R.drawable.ic_dashcam
+                        )
+                    ).setTint(if (dashcamOn) CarColor.GREEN else CarColor.DEFAULT).build()
                 )
                 .setOnClickListener {
                     scope.launch {
-                        repository.toggleDashcam()
+                        // repository.toggleDashcam()
                     }
                 }
                 .build()
