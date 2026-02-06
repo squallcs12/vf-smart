@@ -3,8 +3,10 @@ package com.vinfast.vf3smart.auto
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.*
+import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import com.vinfast.vf3smart.R
 import com.vinfast.vf3smart.data.model.CarStatus
 import com.vinfast.vf3smart.data.repository.VF3Repository
 import kotlinx.coroutines.CoroutineScope
@@ -66,6 +68,7 @@ class StatusScreen(
 
         val isLocked = status.carLockState == "locked"
         val windowsOpen = status.windows.leftState == 2 || status.windows.rightState == 2
+        val accessoryPowerOn = status.controls.accessoryPower == 1
 
         // Lock/Unlock Control
         gridItemListBuilder.addItem(
@@ -73,7 +76,12 @@ class StatusScreen(
                 .setTitle(if (isLocked) "Unlock" else "Lock")
                 .setText(if (isLocked) "Car Locked" else "Car Unlocked")
                 .setImage(
-                    CarIcon.Builder(CarIcon.APP_ICON).build()
+                    CarIcon.Builder(
+                        IconCompat.createWithResource(
+                            carContext,
+                            if (isLocked) R.drawable.ic_lock_open else R.drawable.ic_lock
+                        )
+                    ).setTint(if (isLocked) CarColor.GREEN else CarColor.RED).build()
                 )
                 .setOnClickListener {
                     scope.launch {
@@ -93,7 +101,12 @@ class StatusScreen(
                 .setTitle("Windows")
                 .setText(if (windowsOpen) "Close Windows" else "Windows Closed")
                 .setImage(
-                    CarIcon.Builder(CarIcon.APP_ICON).build()
+                    CarIcon.Builder(
+                        IconCompat.createWithResource(
+                            carContext,
+                            R.drawable.ic_windows
+                        )
+                    ).setTint(CarColor.BLUE).build()
                 )
                 .setOnClickListener {
                     scope.launch {
@@ -109,11 +122,37 @@ class StatusScreen(
                 .setTitle("Camera")
                 .setText("Turn On Camera")
                 .setImage(
-                    CarIcon.Builder(CarIcon.APP_ICON).build()
+                    CarIcon.Builder(
+                        IconCompat.createWithResource(
+                            carContext,
+                            R.drawable.ic_camera
+                        )
+                    ).setTint(CarColor.YELLOW).build()
                 )
                 .setOnClickListener {
                     scope.launch {
                         repository.setInsideCameras(true)
+                    }
+                }
+                .build()
+        )
+
+        // Accessory Power Control
+        gridItemListBuilder.addItem(
+            GridItem.Builder()
+                .setTitle(if (accessoryPowerOn) "Power Off" else "Power On")
+                .setText(if (accessoryPowerOn) "Accessory Power On" else "Accessory Power Off")
+                .setImage(
+                    CarIcon.Builder(
+                        IconCompat.createWithResource(
+                            carContext,
+                            R.drawable.ic_power
+                        )
+                    ).setTint(if (accessoryPowerOn) CarColor.GREEN else CarColor.RED).build()
+                )
+                .setOnClickListener {
+                    scope.launch {
+                        repository.toggleAccessoryPower()
                     }
                 }
                 .build()
