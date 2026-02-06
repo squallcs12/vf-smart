@@ -41,7 +41,7 @@ void setup() {
 
     // Wait up to 3 minutes for connection
     unsigned long start_time = millis();
-    unsigned long timeout = 180000; // 3 minutes
+    unsigned long timeout = 60000; // 1 minutes
 
     while (WiFi.status() != WL_CONNECTED && (millis() - start_time) < timeout) {
       delay(500);
