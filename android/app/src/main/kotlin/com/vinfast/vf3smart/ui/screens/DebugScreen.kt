@@ -119,6 +119,24 @@ fun DebugScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        ControlButton(
+                            text = "Test Light Reminder",
+                            onClick = { debugViewModel.testLightReminder() },
+                            icon = {
+                                Icon(
+                                    Icons.Default.VolumeUp,
+                                    contentDescription = null
+                                )
+                            }
+                        )
+                        Text(
+                            text = "Bạn chưa bật đèn (x2)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 

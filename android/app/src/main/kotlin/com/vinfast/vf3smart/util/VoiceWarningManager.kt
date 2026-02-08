@@ -103,6 +103,13 @@ class VoiceWarningManager @Inject constructor(
     }
 
     /**
+     * Warn that headlights are not turned on (nighttime driving)
+     */
+    fun warnLightsOff() {
+        speak("Bạn chưa bật đèn", repeatCount = 2)
+    }
+
+    /**
      * Stop any ongoing speech
      */
     fun stop() {

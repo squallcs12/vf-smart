@@ -270,11 +270,11 @@ fun SetupScreen(
                 }
             }
 
-            // Connection test & save
+            // Save and continue
             when (val state = configurationState) {
                 is SetupViewModel.ConfigurationState.Idle -> {
                     ControlButton(
-                        text = "Test Connection & Save",
+                        text = "Save and Continue",
                         onClick = {
                             viewModel.saveConfiguration(manualIp, apiKey)
                         },
@@ -297,6 +297,7 @@ fun SetupScreen(
                 }
 
                 is SetupViewModel.ConfigurationState.Testing -> {
+                    // This state is now skipped in ViewModel but kept here for completeness
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.fillMaxWidth()
@@ -304,7 +305,7 @@ fun SetupScreen(
                         CircularProgressIndicator()
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Testing connection...",
+                            text = "Connecting...",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -342,7 +343,7 @@ fun SetupScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "✓ Connection successful! Redirecting...",
+                            text = "✓ Configuration saved! Redirecting...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.padding(12.dp)

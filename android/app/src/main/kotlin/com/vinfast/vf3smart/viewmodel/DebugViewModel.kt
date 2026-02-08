@@ -26,6 +26,14 @@ class DebugViewModel @Inject constructor(
         voiceWarningManager.warnWindowsOpen()
     }
 
+    /**
+     * Test the light reminder voice
+     */
+    fun testLightReminder() {
+        Log.d(TAG, "Testing light reminder voice")
+        voiceWarningManager.warnLightsOff()
+    }
+
     override fun onCleared() {
         super.onCleared()
         voiceWarningManager.shutdown()

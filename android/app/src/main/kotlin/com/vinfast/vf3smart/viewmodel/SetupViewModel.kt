@@ -71,15 +71,8 @@ class SetupViewModel @Inject constructor(
             )
             securePreferences.saveDeviceConfig(config)
 
-            // Test connection
-            _configurationState.value = ConfigurationState.Testing
-            val testResult = repository.testConnection()
-
-            if (testResult) {
-                _configurationState.value = ConfigurationState.Success
-            } else {
-                _configurationState.value = ConfigurationState.Error("Failed to connect to device. Check IP and API key.")
-            }
+            // Jump to success immediately as per request, skipping connection test
+            _configurationState.value = ConfigurationState.Success
         }
     }
 
