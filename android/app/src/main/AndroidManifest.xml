@@ -48,11 +48,11 @@
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
                 <category android:name="androidx.car.app.category.IOT" />
-                <category android:name="androidx.car.app.category.COMMUNICATION" />
             </intent-filter>
         </service>
 
         <!-- Android Auto metadata -->
+        <!-- IOT requires at least API level 2 -->
         <meta-data
             android:name="androidx.car.app.minCarApiLevel"
             android:value="2" />
@@ -61,6 +61,9 @@
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
 
+        <meta-data
+            android:name="com.google.android.gms.car.distractionOptimized"
+            android:value="true" />
     </application>
 
 </manifest>
