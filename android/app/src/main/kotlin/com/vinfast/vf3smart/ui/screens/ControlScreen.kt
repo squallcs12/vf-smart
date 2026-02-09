@@ -137,31 +137,11 @@ fun ControlScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     ControlButton(
-                        text = "Open Left",
-                        onClick = { controlViewModel.openLeftWindow() },
-                        modifier = Modifier.weight(1f),
-                        enabled = enabled,
-                        icon = { Icon(painterResource(id = R.drawable.ic_window_left_down), contentDescription = null) }
-                    )
-
-                    ControlButton(
                         text = "Close Left",
                         onClick = { controlViewModel.closeLeftWindow() },
                         modifier = Modifier.weight(1f),
                         enabled = enabled,
                         icon = { Icon(painterResource(id = R.drawable.ic_window_left_up), contentDescription = null) }
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    ControlButton(
-                        text = "Open Right",
-                        onClick = { controlViewModel.openRightWindow() },
-                        modifier = Modifier.weight(1f),
-                        enabled = enabled,
-                        icon = { Icon(painterResource(id = R.drawable.ic_window_right_down), contentDescription = null) }
                     )
 
                     ControlButton(
@@ -170,6 +150,26 @@ fun ControlScreen(
                         modifier = Modifier.weight(1f),
                         enabled = enabled,
                         icon = { Icon(painterResource(id = R.drawable.ic_window_right_up), contentDescription = null) }
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ControlButton(
+                        text = "Open Left",
+                        onClick = { controlViewModel.openLeftWindow() },
+                        modifier = Modifier.weight(1f),
+                        enabled = enabled,
+                        icon = { Icon(painterResource(id = R.drawable.ic_window_left_down), contentDescription = null) }
+                    )
+
+                    ControlButton(
+                        text = "Open Right",
+                        onClick = { controlViewModel.openRightWindow() },
+                        modifier = Modifier.weight(1f),
+                        enabled = enabled,
+                        icon = { Icon(painterResource(id = R.drawable.ic_window_right_down), contentDescription = null) }
                     )
                 }
 
