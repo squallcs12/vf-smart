@@ -10,6 +10,7 @@
 #include "websocket.h"
 #include "webserver.h"
 #include "discovery.h"
+#include "ota.h"
 
 void setup() {
   // Initialize Serial Communication
@@ -64,6 +65,9 @@ void setup() {
       // Initialize UDP discovery broadcasting
       initDiscovery();
 
+      // Initialize OTA update service
+      initOTA();
+
       Serial.println("VinFast VF3 MCU System Ready!");
     } else {
       // Connection failed - start AP mode for reconfiguration
@@ -109,6 +113,9 @@ void setup() {
 }
 
 void loop() {
+  // Handle OTA updates
+  handleOTA();
+
   // Handle WebSocket
   ws.cleanupClients();
 

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Entity names for vehicle objects -->
+    <string name="entity_windows">windows</string>
+    <string name="entity_mirrors">mirrors</string>
+    <string name="entity_side_mirrors">side mirrors</string>
+
+    <!-- Entity synonyms for windows -->
+    <string-array name="entity_windows_synonyms">
+        <item>window</item>
+        <item>car windows</item>
+        <item>vehicle windows</item>
+        <item>all windows</item>
+    </string-array>
+
+    <!-- Entity synonyms for mirrors -->
+    <string-array name="entity_mirrors_synonyms">
+        <item>mirror</item>
+        <item>car mirrors</item>
+        <item>vehicle mirrors</item>
+        <item>rearview mirrors</item>
+    </string-array>
+
+    <!-- Entity synonyms for side mirrors -->
+    <string-array name="entity_side_mirrors_synonyms">
+        <item>side mirror</item>
+        <item>wing mirrors</item>
+        <item>door mirrors</item>
+    </string-array>
+
+    <!-- Entity names for power states -->
+    <string name="entity_power_on">on</string>
+    <string name="entity_power_off">off</string>
+    <string name="entity_power_toggle">toggle</string>
+
+    <!-- Entity synonyms for power on -->
+    <string-array name="entity_power_on_synonyms">
+        <item>turn on</item>
+        <item>enable</item>
+        <item>activate</item>
+        <item>start</item>
+    </string-array>
+
+    <!-- Entity synonyms for power off -->
+    <string-array name="entity_power_off_synonyms">
+        <item>turn off</item>
+        <item>disable</item>
+        <item>deactivate</item>
+        <item>stop</item>
+    </string-array>
+
+    <!-- Entity synonyms for toggle -->
+    <string-array name="entity_power_toggle_synonyms">
+        <item>switch</item>
+        <item>flip</item>
+        <item>change</item>
+    </string-array>
+</resources>

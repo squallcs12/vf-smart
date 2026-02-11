@@ -39,6 +39,23 @@
             </intent-filter>
         </activity>
 
+        <!-- Voice Assistant Activity (handles Google Assistant commands) -->
+        <activity
+            android:name=".ui.VoiceAssistantActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="vf3smart"
+                    android:host="command" />
+            </intent-filter>
+        </activity>
+
         <!-- Android Auto Car App Service -->
         <service
             android:name=".auto.VF3AutoService"
@@ -64,6 +81,16 @@
         <meta-data
             android:name="com.google.android.gms.car.distractionOptimized"
             android:value="true" />
+
+        <!-- Google App Actions metadata -->
+        <meta-data
+            android:name="com.google.android.actions"
+            android:resource="@xml/actions" />
+
+        <!-- Google Assistant entity sets -->
+        <meta-data
+            android:name="com.google.android.actions.APP_ACTION_CAPABILITY"
+            android:resource="@xml/entities" />
     </application>
 
 </manifest>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Entity sets for Google App Actions parameters -->
+<entity-sets>
+    <!-- Vehicle objects that can be opened/closed -->
+    <entity-set entitySetId="VehicleObjectEntitySet">
+        <entity
+            identifier="windows"
+            name="@string/entity_windows"
+            alternateName="@array/entity_windows_synonyms"/>
+        <entity
+            identifier="mirrors"
+            name="@string/entity_mirrors"
+            alternateName="@array/entity_mirrors_synonyms"/>
+        <entity
+            identifier="side_mirrors"
+            name="@string/entity_side_mirrors"
+            alternateName="@array/entity_side_mirrors_synonyms"/>
+    </entity-set>
+
+    <!-- Power states for accessory power control -->
+    <entity-set entitySetId="PowerStateEntitySet">
+        <entity
+            identifier="on"
+            name="@string/entity_power_on"
+            alternateName="@array/entity_power_on_synonyms"/>
+        <entity
+            identifier="off"
+            name="@string/entity_power_off"
+            alternateName="@array/entity_power_off_synonyms"/>
+        <entity
+            identifier="toggle"
+            name="@string/entity_power_toggle"
+            alternateName="@array/entity_power_toggle_synonyms"/>
+    </entity-set>
+</entity-sets>

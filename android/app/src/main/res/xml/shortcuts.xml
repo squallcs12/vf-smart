@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App Shortcuts for VF3 Smart - Shows suggested voice commands to users -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Lock car shortcut -->
+    <shortcut
+        android:shortcutId="lock_car"
+        android:enabled="true"
+        android:icon="@drawable/ic_lock"
+        android:shortcutShortLabel="@string/shortcut_lock_short"
+        android:shortcutLongLabel="@string/shortcut_lock_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="vf3smart://command/lock" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <!-- Unlock car shortcut -->
+    <shortcut
+        android:shortcutId="unlock_car"
+        android:enabled="true"
+        android:icon="@drawable/ic_unlock"
+        android:shortcutShortLabel="@string/shortcut_unlock_short"
+        android:shortcutLongLabel="@string/shortcut_unlock_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="vf3smart://command/unlock" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <!-- Close windows shortcut -->
+    <shortcut
+        android:shortcutId="close_windows"
+        android:enabled="true"
+        android:icon="@drawable/ic_window"
+        android:shortcutShortLabel="@string/shortcut_close_windows_short"
+        android:shortcutLongLabel="@string/shortcut_close_windows_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="vf3smart://command/close?object=windows" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <!-- Honk horn shortcut -->
+    <shortcut
+        android:shortcutId="honk_horn"
+        android:enabled="true"
+        android:icon="@drawable/ic_horn"
+        android:shortcutShortLabel="@string/shortcut_honk_short"
+        android:shortcutLongLabel="@string/shortcut_honk_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="vf3smart://command/honk" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <!-- Open mirrors shortcut -->
+    <shortcut
+        android:shortcutId="open_mirrors"
+        android:enabled="true"
+        android:icon="@drawable/ic_mirror"
+        android:shortcutShortLabel="@string/shortcut_open_mirrors_short"
+        android:shortcutLongLabel="@string/shortcut_open_mirrors_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="vf3smart://command/open?object=mirrors" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <!-- Unlock charger shortcut -->
+    <shortcut
+        android:shortcutId="unlock_charger"
+        android:enabled="true"
+        android:icon="@drawable/ic_charger"
+        android:shortcutShortLabel="@string/shortcut_unlock_charger_short"
+        android:shortcutLongLabel="@string/shortcut_unlock_charger_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="vf3smart://command/charger/unlock" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+</shortcuts>

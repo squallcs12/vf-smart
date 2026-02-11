@@ -633,6 +633,80 @@ curl -X POST http://192.168.4.1/car/dashcam \
 }
 ```
 
+#### OTA (Over-The-Air) Update Endpoints
+
+##### GET /ota/status
+Get the current OTA update status.
+
+**Response:**
+```json
+{
+  "ota_enabled": true,
+  "in_progress": false,
+  "progress_percent": 0,
+  "error": ""
+}
+```
+
+##### POST /ota/update
+Upload firmware or filesystem image via HTTP. Requires API key authentication.
+
+**Parameters:**
+- Upload a `.bin` file (firmware) or `.littlefs.bin` / `.spiffs.bin` file (filesystem)
+
+**Example Request (using curl):**
+```bash
+# Upload firmware
+curl -X POST http://192.168.4.1/ota/update \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -F "file=@firmware.bin"
+
+# Upload filesystem
+curl -X POST http://192.168.4.1/ota/update \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -F "file=@littlefs.bin"
+```
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "message": "Firmware update successful - Rebooting in 3 seconds"
+}
+```
+
+**Response (Error):**
+```json
+{
+  "success": false,
+  "message": "Firmware update failed",
+  "error": "Error description"
+}
+```
+
+**Note**: After a successful firmware update, the device will automatically reboot in 3 seconds.
+
+##### ArduinoOTA Support
+The system also supports ArduinoOTA for updates via Arduino IDE or PlatformIO:
+
+- **Hostname**: `VF3-Smart`
+- **Port**: 3232 (default)
+- **Authentication**: None (use API key on HTTP endpoints)
+
+**Using PlatformIO:**
+```bash
+# Upload firmware via OTA
+pio run --target upload --upload-port VF3-Smart.local
+
+# Or specify IP address
+pio run --target upload --upload-port 192.168.4.1
+```
+
+**Using Arduino IDE:**
+1. Go to Tools > Port
+2. Select "VF3-Smart at 192.168.4.1" (Network Port)
+3. Click Upload
+
 ### Testing the API
 
 ```bash
@@ -712,6 +786,14 @@ curl -X POST http://192.168.4.1/car/armrest \
 curl -X POST http://192.168.4.1/car/dashcam \
   -H "X-API-Key: $API_KEY" \
   -d "state=toggle"
+
+# Check OTA update status
+curl http://192.168.4.1/ota/status
+
+# Upload firmware update
+curl -X POST http://192.168.4.1/ota/update \
+  -H "X-API-Key: $API_KEY" \
+  -F "file=@.pio/build/esp32dev/firmware.bin"
 
 # Alternative: Using query parameter for authentication
 curl -X POST "http://192.168.4.1/car/lock?api_key=$API_KEY"
@@ -917,3 +999,381 @@ asyncio.run(monitor_car())
 **Architecture:**
 - **WebSocket** = Read-only, no authentication, real-time monitoring
 - **HTTP API** = Command/control, requires API key authentication
+
+## Google Assistant Integration (Android Auto)
+
+The VF3 Smart system supports Google Assistant voice control through the Android Auto mobile app. The integration architecture is:
+
+**Voice Command → Android App → ESP32 HTTP API → Car Action**
+
+### Integration Architecture
+
+```
+┌─────────────────┐      ┌──────────────────┐      ┌──────────────┐
+│  Google         │      │  Android Auto    │      │  ESP32       │
+│  Assistant      │─────▶│  App             │─────▶│  VF3 Smart   │
+│  (Voice)        │      │  (HTTP Client)   │      │  (REST API)  │
+└─────────────────┘      └──────────────────┘      └──────────────┘
+```
+
+1. **User speaks command** to Google Assistant (in car or on phone)
+2. **Android Auto app intercepts** the voice command
+3. **App translates command** to appropriate HTTP API endpoint
+4. **ESP32 executes action** and returns response
+5. **App provides voice feedback** to user
+
+### Implementation Approaches
+
+#### Option 1: Google App Actions (Recommended)
+
+Use [Google App Actions](https://developers.google.com/assistant/app/overview) to define custom voice commands in your Android Auto app.
+
+**Example actions.xml:**
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<actions>
+  <!-- Lock car -->
+  <action intentName="actions.intent.LOCK">
+    <fulfillment urlTemplate="vf3smart://lock" />
+  </action>
+
+  <!-- Unlock car -->
+  <action intentName="actions.intent.UNLOCK">
+    <fulfillment urlTemplate="vf3smart://unlock" />
+  </action>
+
+  <!-- Control windows -->
+  <action intentName="actions.intent.OPEN">
+    <parameter name="object">
+      <entity-set-reference entitySetId="WindowEntitySet"/>
+    </parameter>
+    <fulfillment urlTemplate="vf3smart://windows/open" />
+  </action>
+
+  <action intentName="actions.intent.CLOSE">
+    <parameter name="object">
+      <entity-set-reference entitySetId="WindowEntitySet"/>
+    </parameter>
+    <fulfillment urlTemplate="vf3smart://windows/close" />
+  </action>
+
+  <!-- Control lights -->
+  <action intentName="com.vf3smart.TOGGLE_LIGHTS">
+    <fulfillment urlTemplate="vf3smart://lights/toggle" />
+  </action>
+</actions>
+```
+
+**Android App Handler (Kotlin Example):**
+```kotlin
+class VF3SmartActivity : AppCompatActivity() {
+    private val apiClient = VF3ApiClient("http://192.168.4.1", "YOUR_API_KEY")
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        handleIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        intent?.let { handleIntent(it) }
+    }
+
+    private fun handleIntent(intent: Intent) {
+        when (intent.action) {
+            Intent.ACTION_VIEW -> {
+                val deepLink = intent.data?.toString() ?: return
+                handleDeepLink(deepLink)
+            }
+        }
+    }
+
+    private fun handleDeepLink(deepLink: String) {
+        lifecycleScope.launch {
+            try {
+                when {
+                    deepLink.contains("lock") -> {
+                        apiClient.lockCar()
+                        speak("Car locked")
+                    }
+                    deepLink.contains("unlock") -> {
+                        apiClient.unlockCar()
+                        speak("Car unlocked")
+                    }
+                    deepLink.contains("windows/close") -> {
+                        apiClient.closeWindows()
+                        speak("Closing windows")
+                    }
+                    deepLink.contains("lights/toggle") -> {
+                        apiClient.toggleLights()
+                        speak("Toggling lights")
+                    }
+                }
+            } catch (e: Exception) {
+                speak("Error: ${e.message}")
+            }
+        }
+    }
+
+    private fun speak(text: String) {
+        val tts = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+            }
+        }
+    }
+}
+```
+
+**API Client Example:**
+```kotlin
+class VF3ApiClient(private val baseUrl: String, private val apiKey: String) {
+    private val client = OkHttpClient()
+
+    suspend fun lockCar(): Response = withContext(Dispatchers.IO) {
+        post("/car/lock")
+    }
+
+    suspend fun unlockCar(): Response = withContext(Dispatchers.IO) {
+        post("/car/unlock")
+    }
+
+    suspend fun closeWindows(): Response = withContext(Dispatchers.IO) {
+        post("/car/windows/close")
+    }
+
+    suspend fun toggleLights(): Response = withContext(Dispatchers.IO) {
+        post("/car/accessory-power", "state=toggle")
+    }
+
+    private fun post(endpoint: String, body: String = ""): Response {
+        val requestBody = body.toRequestBody("application/x-www-form-urlencoded".toMediaType())
+        val request = Request.Builder()
+            .url("$baseUrl$endpoint")
+            .addHeader("X-API-Key", apiKey)
+            .post(requestBody)
+            .build()
+        return client.newCall(request).execute()
+    }
+}
+```
+
+#### Option 2: Custom Assistant Commands
+
+Handle custom voice commands directly in your Android Auto app using speech recognition.
+
+**Example with Speech Recognizer:**
+```kotlin
+class VoiceCommandHandler(private val context: Context) {
+    private val speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+    private val apiClient = VF3ApiClient("http://192.168.4.1", "YOUR_API_KEY")
+
+    init {
+        speechRecognizer.setRecognitionListener(object : RecognitionListener {
+            override fun onResults(results: Bundle?) {
+                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                matches?.firstOrNull()?.let { processCommand(it) }
+            }
+            // ... other callbacks
+        })
+    }
+
+    private fun processCommand(command: String) {
+        lifecycleScope.launch {
+            when {
+                command.contains("lock", ignoreCase = true) -> apiClient.lockCar()
+                command.contains("unlock", ignoreCase = true) -> apiClient.unlockCar()
+                command.contains("close window", ignoreCase = true) -> apiClient.closeWindows()
+                command.contains("open mirror", ignoreCase = true) -> apiClient.openMirrors()
+                command.contains("honk", ignoreCase = true) -> apiClient.beepHorn()
+                // Add more patterns
+            }
+        }
+    }
+}
+```
+
+### Supported Voice Commands
+
+Map Google Assistant voice commands to VF3 Smart API endpoints:
+
+| Voice Command | API Endpoint | Action |
+|--------------|--------------|--------|
+| "Lock my car" | `POST /car/lock` | Lock the car |
+| "Unlock my car" | `POST /car/unlock` | Unlock the car |
+| "Close the windows" | `POST /car/windows/close` | Close all windows (30s) |
+| "Stop the windows" | `POST /car/windows/stop` | Stop window operation |
+| "Open the mirrors" | `POST /car/side-mirrors` (action=open) | Open side mirrors |
+| "Close the mirrors" | `POST /car/side-mirrors` (action=close) | Close side mirrors |
+| "Honk the horn" | `POST /car/buzzer` (state=beep) | Beep buzzer |
+| "Turn on accessory power" | `POST /car/accessory-power` (state=on) | Enable accessories |
+| "Turn off accessory power" | `POST /car/accessory-power` (state=off) | Disable accessories |
+| "Unlock the charger" | `POST /car/charger-unlock` | Unlock charging port |
+| "Turn on ODO screen" | `POST /car/odo-screen` (state=on) | Turn on ODO display |
+| "Turn on dashcam" | `POST /car/dashcam` (state=on) | Enable dashcam |
+
+### Real-Time Status Feedback
+
+Combine Google Assistant commands with WebSocket for instant feedback:
+
+```kotlin
+class VF3StatusMonitor(private val wsUrl: String) {
+    private val webSocket: WebSocket by lazy {
+        OkHttpClient().newWebSocket(
+            Request.Builder().url(wsUrl).build(),
+            object : WebSocketListener() {
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    handleStatusUpdate(text)
+                }
+            }
+        )
+    }
+
+    private fun handleStatusUpdate(jsonStatus: String) {
+        val status = JSONObject(jsonStatus)
+
+        // Provide voice feedback for important events
+        if (status.getJSONObject("controls").getInt("car_lock") == 1) {
+            speak("Car is now locked")
+        }
+
+        if (status.getBoolean("window_close_active")) {
+            val remaining = status.getInt("window_close_remaining_ms") / 1000
+            speak("Windows closing, $remaining seconds remaining")
+        }
+    }
+}
+```
+
+### Android Auto Considerations
+
+**1. Network Discovery**
+
+Use UDP discovery to automatically find the VF3 Smart device on the network:
+
+```kotlin
+class DeviceDiscovery {
+    suspend fun discoverDevice(): String? = withContext(Dispatchers.IO) {
+        val socket = DatagramSocket(8888)
+        socket.broadcast = true
+        socket.soTimeout = 10000 // 10 second timeout
+
+        val buffer = ByteArray(1024)
+        val packet = DatagramPacket(buffer, buffer.size)
+
+        try {
+            socket.receive(packet)
+            val json = JSONObject(String(packet.data, 0, packet.length))
+            if (json.getString("device") == "VF3-Smart") {
+                val deviceIp = json.getString("ip")
+                // Send confirmation to stop broadcasting
+                val confirm = """{"command":"confirm"}""".toByteArray()
+                val confirmPacket = DatagramPacket(
+                    confirm, confirm.size,
+                    InetAddress.getByName(deviceIp), 8888
+                )
+                socket.send(confirmPacket)
+                return@withContext deviceIp
+            }
+        } catch (e: Exception) {
+            Log.e("Discovery", "Failed to discover device", e)
+        } finally {
+            socket.close()
+        }
+        null
+    }
+}
+```
+
+**2. Car Mode Detection**
+
+Only enable voice commands when Android Auto is active:
+
+```kotlin
+class CarModeDetector(context: Context) {
+    fun isInCarMode(): Boolean {
+        val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
+        return uiModeManager.currentModeType == Configuration.UI_MODE_TYPE_CAR
+    }
+}
+```
+
+**3. Error Handling**
+
+Provide clear voice feedback for errors:
+
+```kotlin
+suspend fun executeSafeCommand(command: suspend () -> Unit, description: String) {
+    try {
+        command()
+        speak("$description completed successfully")
+    } catch (e: Exception) {
+        when (e) {
+            is SocketTimeoutException -> speak("Cannot reach the car, check WiFi connection")
+            is HttpException -> {
+                if (e.code() == 401) {
+                    speak("Authentication failed, check API key")
+                } else {
+                    speak("Command failed: ${e.message}")
+                }
+            }
+            else -> speak("Error: ${e.message}")
+        }
+    }
+}
+```
+
+### Best Practices
+
+1. **Cache Device IP**: Store the discovered device IP to avoid repeated UDP discovery
+2. **Background Monitoring**: Keep WebSocket connection alive for real-time status
+3. **Command Confirmation**: Always provide voice feedback after command execution
+4. **Offline Handling**: Gracefully handle when car WiFi is out of range
+5. **Security**: Store API key securely using Android KeyStore
+6. **Battery Optimization**: Use WorkManager for periodic status checks instead of continuous WebSocket
+7. **User Permissions**: Request microphone and network permissions explicitly
+
+### Testing Voice Commands
+
+**Using ADB for Testing:**
+```bash
+# Simulate voice command deep link
+adb shell am start -a android.intent.action.VIEW -d "vf3smart://lock"
+
+# Test with Google Assistant
+adb shell am start -a android.intent.action.ASSIST
+```
+
+**Manual Testing in App:**
+```kotlin
+// Debug menu for testing commands
+class DebugCommandActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        findViewById<Button>(R.id.btnLock).setOnClickListener {
+            simulateCommand("lock")
+        }
+
+        findViewById<Button>(R.id.btnUnlock).setOnClickListener {
+            simulateCommand("unlock")
+        }
+    }
+
+    private fun simulateCommand(action: String) {
+        val deepLink = Uri.parse("vf3smart://$action")
+        val intent = Intent(Intent.ACTION_VIEW, deepLink)
+        startActivity(intent)
+    }
+}
+```
+
+### Example Full Implementation
+
+See the complete implementation example in the Android Auto app repository, which demonstrates:
+- UDP device discovery with caching
+- Google Assistant App Actions integration
+- WebSocket real-time status monitoring
+- Voice feedback with TextToSpeech
+- Secure API key storage with KeyStore
+- Car mode detection and lifecycle management

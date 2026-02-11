@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Google App Actions for VF3 Smart Car Control -->
+<actions>
+    <!-- Built-in BII (Built-in Intent) for locking -->
+    <action intentName="actions.intent.LOCK">
+        <fulfillment urlTemplate="vf3smart://command/lock" />
+    </action>
+
+    <!-- Built-in BII for unlocking -->
+    <action intentName="actions.intent.UNLOCK">
+        <fulfillment urlTemplate="vf3smart://command/unlock" />
+    </action>
+
+    <!-- Built-in BII for opening things -->
+    <action intentName="actions.intent.OPEN">
+        <parameter name="object">
+            <entity-set-reference entitySetId="VehicleObjectEntitySet"/>
+        </parameter>
+        <fulfillment urlTemplate="vf3smart://command/open{?object}">
+            <parameter-mapping
+                intentParameter="object"
+                urlParameter="object"/>
+        </fulfillment>
+    </action>
+
+    <!-- Built-in BII for closing things -->
+    <action intentName="actions.intent.CLOSE">
+        <parameter name="object">
+            <entity-set-reference entitySetId="VehicleObjectEntitySet"/>
+        </parameter>
+        <fulfillment urlTemplate="vf3smart://command/close{?object}">
+            <parameter-mapping
+                intentParameter="object"
+                urlParameter="object"/>
+        </fulfillment>
+    </action>
+
+    <!-- Custom action for honking horn -->
+    <action intentName="com.vinfast.vf3smart.HONK">
+        <fulfillment urlTemplate="vf3smart://command/honk" />
+    </action>
+
+    <!-- Custom action for accessory power -->
+    <action intentName="com.vinfast.vf3smart.ACCESSORY_POWER">
+        <parameter name="state" required="true">
+            <entity-set-reference entitySetId="PowerStateEntitySet"/>
+        </parameter>
+        <fulfillment urlTemplate="vf3smart://command/accessory{?state}">
+            <parameter-mapping
+                intentParameter="state"
+                urlParameter="state"/>
+        </fulfillment>
+    </action>
+
+    <!-- Custom action for charger -->
+    <action intentName="com.vinfast.vf3smart.CHARGER">
+        <fulfillment urlTemplate="vf3smart://command/charger/unlock" />
+    </action>
+</actions>

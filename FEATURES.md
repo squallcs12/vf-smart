@@ -45,7 +45,7 @@
 - [x] Persistent API key (minimum 8 characters)
 - [x] Web-based reconfiguration
 - [x] Automatic AP fallback on connection failure
-- [ ] OTA (Over-The-Air) firmware updates
+- [x] OTA (Over-The-Air) firmware updates
 - [ ] Factory reset option
 
 ## Monitoring
@@ -57,7 +57,8 @@
 - [ ] Battery voltage monitoring
 
 ## Integration
-- [ ] Mobile app (iOS/Android)
+- [x] Mobile app (iOS/Android)
+- [x] Voice assistant (Google Assistant via Android Auto)
 - [ ] Voice assistant (Alexa/Google Home)
 - [ ] Home automation integration
 - [ ] Smartwatch notifications
