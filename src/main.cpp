@@ -129,6 +129,7 @@ void loop() {
   }
 
   // Execute control logic
+  handleFactoryResetButton();  // Check hardware factory reset button (hold 10s)
   handleCarState();
   handleWindowControl();
   handleAccessoryPower();

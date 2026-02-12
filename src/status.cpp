@@ -8,6 +8,7 @@ String getCarStatusJSON() {
   JsonObject sensors = doc["sensors"].to<JsonObject>();
   sensors["brake"] = vf3_brake;
   sensors["steering_angle"] = vf3_steering_angle;
+  sensors["battery_voltage"] = serialized(String(vf3_battery_voltage, 2));  // 2 decimal places
   sensors["gear_drive"] = vf3_gear_drive;
 
   // Door status

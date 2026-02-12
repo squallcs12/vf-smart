@@ -3,6 +3,7 @@
 // Previous sensor values for change detection
 static int prev_vf3_brake = -1;
 static int prev_vf3_steering_angle = -1;
+static float prev_vf3_battery_voltage = -1.0;
 static int prev_vf3_gear_drive = -1;
 static int prev_vf3_window_left_state = -1;
 static int prev_vf3_window_right_state = -1;
@@ -33,6 +34,11 @@ bool readSensors() {
   // Read analog sensors (ESP32 ADC)
   int new_brake = analogRead(VF3_BRAKE_PEDAL);
   int new_steering_angle = analogRead(VF3_STEERING_ANGLE);
+
+  // Read battery voltage via 4:1 voltage divider (0-16V -> 0-4V -> 0-3.3V safe range)
+  // Formula: V_battery = (ADC / 4095) * 3.3V * 4.0 (divider ratio)
+  int battery_adc = analogRead(VF3_BATTERY_VOLTAGE);
+  float new_battery_voltage = (battery_adc / 4095.0) * 3.3 * 4.0;
 
   // Read digital sensors (ESP32 GPIO)
   int new_gear_drive = digitalRead(VF3_GEAR_DRIVE);
@@ -66,6 +72,9 @@ bool readSensors() {
     changed = true;
   }
   if (abs(new_steering_angle - prev_vf3_steering_angle) > 10) {
+    changed = true;
+  }
+  if (abs(new_battery_voltage - prev_vf3_battery_voltage) > 0.1) {  // 0.1V threshold
     changed = true;
   }
 
@@ -143,6 +152,7 @@ bool readSensors() {
   // Update global variables
   vf3_brake = new_brake;
   vf3_steering_angle = new_steering_angle;
+  vf3_battery_voltage = new_battery_voltage;
   vf3_gear_drive = new_gear_drive;
   vf3_window_left_state = new_window_left_state;
   vf3_window_right_state = new_window_right_state;
@@ -170,6 +180,7 @@ bool readSensors() {
   // Update previous values
   prev_vf3_brake = new_brake;
   prev_vf3_steering_angle = new_steering_angle;
+  prev_vf3_battery_voltage = new_battery_voltage;
   prev_vf3_gear_drive = new_gear_drive;
   prev_vf3_window_left_state = new_window_left_state;
   prev_vf3_window_right_state = new_window_right_state;

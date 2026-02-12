@@ -32,3 +32,26 @@ void saveConfiguration(String ssid, String password, String api_key) {
 
   Serial.println("Configuration saved to flash");
 }
+
+void factoryReset() {
+  Serial.println("===========================================");
+  Serial.println("FACTORY RESET - Clearing all configuration");
+  Serial.println("===========================================");
+
+  preferences.begin("vf3-config", false);
+
+  // Clear all stored values
+  preferences.clear();
+
+  preferences.end();
+
+  Serial.println("All configuration cleared from NVS storage");
+  Serial.println("Device will restart in onboarding mode");
+  Serial.println("===========================================");
+
+  // Wait a moment to ensure serial output is flushed
+  delay(1000);
+
+  // Restart the ESP32
+  ESP.restart();
+}

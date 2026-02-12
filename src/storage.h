@@ -6,5 +6,6 @@
 
 void loadConfiguration();
 void saveConfiguration(String ssid, String password, String api_key);
+void factoryReset();
 
 #endif // STORAGE_H

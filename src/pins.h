@@ -7,6 +7,7 @@
 // ===== ANALOG INPUTS (Sensors) - Use input-only pins =====
 #define VF3_BRAKE_PEDAL 39             // GPIO 39 - Brake pedal sensor (input only)
 #define VF3_STEERING_ANGLE 36          // GPIO 36 - Steering angle sensor (input only)
+#define VF3_BATTERY_VOLTAGE 38         // GPIO 38 - Battery voltage sensor via 4:1 voltage divider (input only)
 
 // ===== DIGITAL INPUTS (Sensors & Switches) - ESP32 GPIO Pins =====
 #define VF3_GEAR_DRIVE 37              // GPIO 37 - Gear in Drive position (1=D, 0=other) (input only)
@@ -25,6 +26,7 @@
 #define VF3_PROXIMITY_REAR_L 33        // GPIO 33 - Rear left proximity/parking detection
 #define VF3_PROXIMITY_REAR_R 32        // GPIO 32 - Rear right proximity/parking detection
 #define VF3_CHARGING_STATUS 13         // GPIO 13 - Charging status (1=charging, 0=not charging)
+#define VF3_FACTORY_RESET_BTN 0        // GPIO 0 - Factory reset button (BOOT button, active LOW, hold 10s to reset)
 
 // ===== DIGITAL OUTPUTS (Controls & Indicators) - PCF8575 I2C I/O Expander =====
 // All outputs now controlled via PCF8575 at I2C address 0x20 (pins P0-P15)
@@ -53,6 +55,7 @@
 // ===== INPUT VARIABLES =====
 extern int vf3_brake;
 extern int vf3_steering_angle;
+extern float vf3_battery_voltage;
 extern int vf3_gear_drive;
 extern int vf3_window_left_state;
 extern int vf3_window_right_state;

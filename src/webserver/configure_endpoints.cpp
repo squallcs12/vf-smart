@@ -72,6 +72,25 @@ void registerConfigureEndpoints(AsyncWebServer& server) {
     request->redirect(redirectUrl);
   });
 
+  // POST /factory-reset - Reset device to factory defaults
+  server.on("/factory-reset", HTTP_POST, [](AsyncWebServerRequest *request){
+    // Require API key authentication for factory reset (security)
+    if (!authenticateRequest(request)) {
+      sendUnauthorized(request);
+      return;
+    }
+
+    // Send response before resetting
+    request->send(200, "application/json",
+      "{\"success\":true,\"message\":\"Factory reset initiated - Device will restart in onboarding mode\"}");
+
+    // Wait a moment to ensure response is sent
+    delay(500);
+
+    // Perform factory reset (clears NVS and restarts)
+    factoryReset();
+  });
+
   // GET /restart - Restart the device
   server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(LittleFS, "/restart.html", "text/html");

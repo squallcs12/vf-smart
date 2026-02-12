@@ -5,7 +5,8 @@
       "Bash(pio run:*)",
       "Bash(~/.platformio/penv/Scripts/pio run:*)",
       "Bash(python -m platformio run:*)",
-      "Bash(cmd.exe /c \"pio run\")"
+      "Bash(cmd.exe /c \"pio run\")",
+      "Bash(~/.platformio/penv/bin/pio run:*)"
     ]
   }
 }

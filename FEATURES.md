@@ -3,7 +3,7 @@
 ## Hardware
 - [x] ESP32 microcontroller
 - [x] PCF8575 I2C I/O expander (16-pin digital outputs)
-- [x] 3 analog sensors (accelerator, brake, steering)
+- [x] 4 analog sensors (brake, steering, battery voltage, accelerator)
 - [x] 15 digital input sensors (doors, seats, seatbelts, lights, proximity, speed, gear, charging status)
 - [x] 16 digital output controls via PCF8575 (lock, unlock, windows, signals, buzzer, mirrors, charger, accessories)
 
@@ -18,7 +18,6 @@
 - [x] WebSocket real-time updates (event-driven, state changes only)
 - [x] Web dashboard with controls
 - [x] API key authentication (header or query parameter)
-- [ ] Mobile responsive UI improvements
 
 ## Control Features
 - [x] Auto-close windows when locked (30 seconds)
@@ -46,7 +45,7 @@
 - [x] Web-based reconfiguration
 - [x] Automatic AP fallback on connection failure
 - [x] OTA (Over-The-Air) firmware updates
-- [ ] Factory reset option
+- [x] Factory reset option (HTTP endpoint with API key auth)
 
 ## Monitoring
 - [x] Real-time sensor data via HTTP/WebSocket
@@ -54,17 +53,12 @@
 - [x] Charging status monitoring (real-time charging detection)
 - [x] Time tracking (boot time, current time, night mode)
 - [x] Event-driven WebSocket broadcasts (state changes only)
-- [ ] Battery voltage monitoring
+- [x] Battery voltage monitoring (12V battery via voltage divider)
 
 ## Integration
 - [x] Mobile app (iOS/Android)
 - [x] Voice assistant (Google Assistant via Android Auto)
-- [ ] Voice assistant (Alexa/Google Home)
-- [ ] Home automation integration
-- [ ] Smartwatch notifications
 
 ## Advanced Features
 - [x] Charging status monitoring with auto-unlock
 - [ ] Tire pressure monitoring
-- [ ] Remote start/stop engine
-- [ ] GPS tracking and geofencing

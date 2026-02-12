@@ -4,6 +4,7 @@
 // ===== INPUT VARIABLES =====
 int vf3_brake = 0;
 int vf3_steering_angle = 0;
+float vf3_battery_voltage = 0.0;
 int vf3_gear_drive = LOW;
 int vf3_window_left_state = LOW;
 int vf3_window_right_state = LOW;
@@ -49,6 +50,10 @@ void initializePins() {
   pinMode(VF3_PROXIMITY_REAR_L, INPUT);
   pinMode(VF3_PROXIMITY_REAR_R, INPUT);
   pinMode(VF3_CHARGING_STATUS, INPUT);
+
+  // Initialize Factory Reset Button (GPIO 0 - BOOT button)
+  // INPUT_PULLUP: button not pressed = HIGH, button pressed = LOW
+  pinMode(VF3_FACTORY_RESET_BTN, INPUT_PULLUP);
 
   // Initialize PCF8575 I2C I/O Expander for all digital outputs
   if (!initPCF8575()) {

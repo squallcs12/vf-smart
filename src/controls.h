@@ -7,5 +7,6 @@
 #include "controls/accessory_power.h"
 #include "controls/light_reminder.h"
 #include "controls/charging_control.h"
+#include "controls/factory_reset.h"
 
 #endif // CONTROLS_H

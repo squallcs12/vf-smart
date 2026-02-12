@@ -48,7 +48,7 @@ pio run --target upload && pio device monitor
 The system is organized into three categories:
 
 1. **Analog Inputs (ADC1 pins)**: Sensors requiring analog-to-digital conversion
-   - Motor temperature, accelerator pedal, brake pedal, steering angle
+   - Brake pedal, steering angle, battery voltage (via 4:1 voltage divider)
 
 2. **Digital Inputs**: Binary state sensors and switches
    - Door sensors, seat occupancy, seatbelt sensors, light switches, proximity sensors
@@ -106,6 +106,73 @@ State is managed through global variables that mirror physical sensor/actuator s
 - Input sensors: `vf3_<sensor_name>` (e.g., `vf3_door_fl`)
 - Output controls: `vf3_<control_name>` (e.g., `vf3_car_lock`)
 - Timer variables: `<feature>_timer` (e.g., `window_close_timer`)
+
+## Battery Voltage Monitoring
+
+The system monitors the 12V car battery voltage using an analog input with a voltage divider circuit.
+
+### Hardware Configuration
+
+- **Pin**: GPIO 38 (ADC1_CH2, input-only)
+- **Voltage Divider**: 4:1 ratio (R1=30kΩ, R2=10kΩ)
+  - Scales 0-16V battery range to 0-4V
+  - ESP32 ADC safe range: 0-3.3V
+  - Typical battery voltage: 11-14.5V
+- **ADC Resolution**: 12-bit (0-4095)
+
+### Voltage Calculation
+
+```cpp
+battery_voltage = (adc_value / 4095.0) * 3.3V * 4.0
+```
+
+**Example readings:**
+- 12.0V battery → ADC ~3724 → 12.0V reading
+- 13.5V battery (charging) → ADC ~4195 → 13.5V reading
+- 11.5V battery (low) → ADC ~3569 → 11.5V reading
+
+### Change Detection
+
+The system uses a 0.1V threshold to filter noise:
+- Only broadcasts WebSocket update if voltage changes by ±0.1V
+- Prevents excessive updates from ADC noise
+- Updates occur every 50ms control loop cycle when threshold exceeded
+
+### Monitoring Battery Health
+
+**Voltage Ranges:**
+- **14.0-14.5V**: Charging (alternator active)
+- **12.6-13.0V**: Fully charged (engine off)
+- **12.0-12.5V**: Partially discharged
+- **<12.0V**: Low battery, needs charging
+- **<11.5V**: Critical, battery may be failing
+
+**API Access:**
+```bash
+# Get current battery voltage
+curl http://192.168.4.1/car/status | jq '.sensors.battery_voltage'
+
+# WebSocket real-time monitoring
+ws://192.168.4.1/ws
+# Returns: {"sensors": {"battery_voltage": "12.65", ...}}
+```
+
+### Troubleshooting
+
+**Voltage reads 0.0V:**
+- Check voltage divider connections
+- Verify GPIO 38 is not damaged
+- Test with multimeter at voltage divider output (should be <3.3V)
+
+**Voltage reads incorrectly:**
+- Verify voltage divider resistor values (R1=30k, R2=10k)
+- Check for loose connections
+- Calibrate using known voltage and adjust divider ratio in code if needed
+
+**Voltage fluctuates excessively:**
+- Add capacitor (e.g., 10μF) across R2 to stabilize readings
+- Check for electrical noise sources
+- Increase change threshold from 0.1V to 0.2V in sensors.cpp
 
 ## Web Server API
 
@@ -272,11 +339,10 @@ Returns complete car status as JSON.
 ```json
 {
   "sensors": {
-    "motor_temp": 0,
-    "accelerator": 0,
     "brake": 0,
     "steering_angle": 0,
-    "vehicle_speed": 0
+    "battery_voltage": "12.65",
+    "gear_drive": 0
   },
   "doors": {
     "front_left": 0,
@@ -707,6 +773,113 @@ pio run --target upload --upload-port 192.168.4.1
 2. Select "VF3-Smart at 192.168.4.1" (Network Port)
 3. Click Upload
 
+#### Configuration Endpoints
+
+##### POST /factory-reset
+Reset the device to factory defaults and return to onboarding mode.
+
+**⚠️ WARNING:** This endpoint permanently deletes all stored configuration (WiFi credentials and API key). The device will restart in onboarding mode (AP: VF3-SETUP / setup123).
+
+**Authentication:** Requires API key (header or query parameter)
+
+**Example Request:**
+```bash
+curl -X POST http://192.168.4.1/factory-reset \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Factory reset initiated - Device will restart in onboarding mode"
+}
+```
+
+**What Happens:**
+1. All NVS (Non-Volatile Storage) data is cleared:
+   - WiFi SSID and password
+   - API key
+   - Configuration status
+2. Device automatically restarts
+3. Device enters onboarding mode:
+   - Creates AP: `VF3-SETUP` (password: `setup123`)
+   - IP: `192.168.4.1`
+   - Web interface available for reconfiguration
+
+**Use Cases:**
+- Selling or transferring the device to someone else
+- Changing WiFi network completely
+- Resetting after forgotten API key
+- Starting fresh after configuration errors
+
+**Recovery:**
+If you accidentally factory reset the device:
+1. Connect to WiFi: `VF3-SETUP` (password: `setup123`)
+2. Visit `http://192.168.4.1`
+3. Reconfigure WiFi credentials and API key
+4. Device will restart and connect to your WiFi
+
+##### Hardware Factory Reset (Physical Button)
+
+In addition to the HTTP endpoint, the device supports **hardware factory reset** via a physical button.
+
+**Hardware Configuration:**
+- **Pin:** GPIO 0 (BOOT button on ESP32 Dev Module)
+- **Trigger:** Hold button for 10 seconds
+- **Button State:** Active LOW (button pressed = pin LOW)
+- **Pull-up:** Internal pull-up enabled (INPUT_PULLUP)
+
+**How to Trigger:**
+1. Press and hold the BOOT button on the ESP32 dev board
+2. Keep holding for 10 seconds
+3. Serial monitor will show countdown:
+   ```
+   Factory reset button pressed - hold for 10 seconds to reset
+   Factory reset in 9 seconds... (release to cancel)
+   Factory reset in 8 seconds... (release to cancel)
+   ...
+   Factory reset in 1 seconds... (release to cancel)
+
+   ===========================================
+   FACTORY RESET TRIGGERED VIA HARDWARE BUTTON
+   ===========================================
+   ```
+4. Device will clear all configuration and restart in onboarding mode
+
+**Cancel Factory Reset:**
+- Release the button before 10 seconds elapse
+- Serial monitor will show: `Factory reset cancelled (button released after X seconds)`
+
+**Why Hardware Reset?**
+- **No API key needed:** Works even if you forgot the API key
+- **No network needed:** Works when WiFi is not configured or unreachable
+- **Physical access required:** Prevents remote unauthorized resets
+- **Fail-safe recovery:** Always available as last resort
+
+**Use Cases:**
+- Forgot API key and can't access HTTP endpoint
+- WiFi not connecting and can't reconfigure
+- Device in unknown state - need to start fresh
+- Physical security: person with device access can reset it
+
+**Wiring (if not using dev board BOOT button):**
+```
+┌─────────────┐
+│   ESP32     │
+│             │
+│   GPIO 0 ───┼─────┬───── GND
+│             │     │
+│             │   [Button]
+│             │     │
+│   (3.3V) ───┼─────┘
+└─────────────┘
+  (Internal
+   pull-up)
+```
+
+**Note:** GPIO 0 is the BOOT button on most ESP32 development boards. On custom PCB designs, connect a momentary push button between GPIO 0 and GND.
+
 ### Testing the API
 
 ```bash
@@ -795,6 +968,10 @@ curl -X POST http://192.168.4.1/ota/update \
   -H "X-API-Key: $API_KEY" \
   -F "file=@.pio/build/esp32dev/firmware.bin"
 
+# Factory reset (⚠️ Clears all configuration and restarts in onboarding mode)
+curl -X POST http://192.168.4.1/factory-reset \
+  -H "X-API-Key: $API_KEY"
+
 # Alternative: Using query parameter for authentication
 curl -X POST "http://192.168.4.1/car/lock?api_key=$API_KEY"
 
@@ -834,10 +1011,9 @@ The WebSocket sends car status updates as JSON with the same structure as `GET /
 ```json
 {
   "sensors": {
-    "accelerator": 0,
     "brake": 0,
     "steering_angle": 0,
-    "vehicle_speed": 0,
+    "battery_voltage": "12.65",
     "gear_drive": 0
   },
   "doors": {
