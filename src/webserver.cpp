@@ -7,6 +7,7 @@
 #include "webserver/window_endpoints.h"
 #include "webserver/buzzer_endpoint.h"
 #include "webserver/charger_endpoint.h"
+#include "webserver/frunk_endpoint.h"
 #include "webserver/light_reminder_endpoint.h"
 #include "webserver/configure_endpoints.h"
 #include "webserver/dashboard_endpoint.h"
@@ -28,6 +29,7 @@ void setupWebServer() {
   registerWindowEndpoints(server);
   registerBuzzerEndpoint(server);
   registerChargerEndpoint(server);
+  registerFrunkEndpoint(server);
   registerLightReminderEndpoint(server);
   registerConfigureEndpoints(server);
   registerDashboardEndpoint(server);

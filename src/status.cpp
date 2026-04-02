@@ -47,12 +47,10 @@ String getCarStatusJSON() {
   JsonObject controls = doc["controls"].to<JsonObject>();
   controls["brake_pressed"] = vf3_brake_pressed;
   controls["accessory_power"] = self_accessory_power;
-  controls["inside_cameras"] = self_inside_cameras;
   controls["car_lock"] = vf3_car_lock;
   controls["car_unlock"] = vf3_car_unlock;
-  controls["dashcam"] = self_dashcam;
-  controls["odo_screen"] = self_odo_screen;
-  controls["armrest"] = self_armrest;
+  controls["inside_cameras"] = self_inside_cameras;
+  controls["front_trunk_unlock"] = vf3_front_trunk_unlock;
 
   // Car lock state
   doc["car_lock_state"] = (car_lock_state == CAR_LOCKED) ? "locked" : "unlocked";

@@ -572,6 +572,43 @@ curl -X POST http://192.168.4.1/car/charger-unlock \
 }
 ```
 
+##### POST /car/frunk/open
+Unlock and open the front trunk (frunk).
+
+**Safety:** This endpoint is disabled when the vehicle is in Drive (D) gear.
+
+**Rate Limiting:** 2-second cooldown between operations to prevent relay damage.
+
+**Example Request:**
+```bash
+# Open front trunk
+curl -X POST http://192.168.4.1/car/frunk/open \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Front trunk unlocked"
+}
+```
+
+**Error Responses:**
+```json
+// Vehicle in Drive
+{
+  "success": false,
+  "message": "Cannot open front trunk while vehicle is in Drive"
+}
+
+// Too many requests
+{
+  "success": false,
+  "message": "Too many requests - wait 2 seconds between operations"
+}
+```
+
 ##### POST /car/side-mirrors
 Control side mirrors opening and closing.
 
@@ -597,72 +634,6 @@ curl -X POST http://192.168.4.1/car/side-mirrors \
   "success": true,
   "message": "Side mirrors opening",
   "action": "open"
-}
-```
-
-##### POST /car/odo-screen
-Control the odometer screen display.
-
-**Parameters:**
-- `state` (required): `on`, `off`, or `toggle`
-
-**Example Requests:**
-```bash
-# Turn on ODO screen
-curl -X POST http://192.168.4.1/car/odo-screen \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "state=on"
-
-# Turn off ODO screen
-curl -X POST http://192.168.4.1/car/odo-screen \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "state=off"
-
-# Toggle ODO screen
-curl -X POST http://192.168.4.1/car/odo-screen \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "state=toggle"
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "ODO screen updated",
-  "odo_screen": "on"
-}
-```
-
-##### POST /car/armrest
-Control the armrest.
-
-**Parameters:**
-- `state` (required): `on`, `off`, or `toggle`
-
-**Example Requests:**
-```bash
-# Turn on armrest
-curl -X POST http://192.168.4.1/car/armrest \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "state=on"
-
-# Turn off armrest
-curl -X POST http://192.168.4.1/car/armrest \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "state=off"
-
-# Toggle armrest
-curl -X POST http://192.168.4.1/car/armrest \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "state=toggle"
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Armrest updated",
-  "armrest": "on"
 }
 ```
 
@@ -935,6 +906,10 @@ curl -X POST http://192.168.4.1/car/light-reminder \
 curl -X POST http://192.168.4.1/car/charger-unlock \
   -H "X-API-Key: $API_KEY"
 
+# Open front trunk (frunk)
+curl -X POST http://192.168.4.1/car/frunk/open \
+  -H "X-API-Key: $API_KEY"
+
 # Open side mirrors
 curl -X POST http://192.168.4.1/car/side-mirrors \
   -H "X-API-Key: $API_KEY" \
@@ -944,16 +919,6 @@ curl -X POST http://192.168.4.1/car/side-mirrors \
 curl -X POST http://192.168.4.1/car/side-mirrors \
   -H "X-API-Key: $API_KEY" \
   -d "action=close"
-
-# Turn on ODO screen
-curl -X POST http://192.168.4.1/car/odo-screen \
-  -H "X-API-Key: $API_KEY" \
-  -d "state=on"
-
-# Turn off armrest
-curl -X POST http://192.168.4.1/car/armrest \
-  -H "X-API-Key: $API_KEY" \
-  -d "state=off"
 
 # Toggle dashcam
 curl -X POST http://192.168.4.1/car/dashcam \
@@ -1385,7 +1350,7 @@ Map Google Assistant voice commands to VF3 Smart API endpoints:
 | "Turn on accessory power" | `POST /car/accessory-power` (state=on) | Enable accessories |
 | "Turn off accessory power" | `POST /car/accessory-power` (state=off) | Disable accessories |
 | "Unlock the charger" | `POST /car/charger-unlock` | Unlock charging port |
-| "Turn on ODO screen" | `POST /car/odo-screen` (state=on) | Turn on ODO display |
+| "Open the frunk" | `POST /car/frunk/open` | Unlock and open front trunk |
 | "Turn on dashcam" | `POST /car/dashcam` (state=on) | Enable dashcam |
 
 ### Real-Time Status Feedback

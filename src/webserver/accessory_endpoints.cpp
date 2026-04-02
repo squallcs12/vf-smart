@@ -85,7 +85,7 @@ void registerAccessoryEndpoints(AsyncWebServer& server) {
     JsonDocument doc;
     doc["success"] = true;
     doc["message"] = "Inside cameras updated";
-    doc["inside_cameras"] = self_inside_cameras;
+    doc["inside_cameras"] = (self_inside_cameras == WRITE_ON) ? "on" : "off";
 
     String output;
     serializeJson(doc, output);

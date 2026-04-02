@@ -22,45 +22,29 @@ void handleAccessoryPower() {
       // Accessory power turned ON - enable related accessories
       Serial.println("Accessory power ON - enabling accessories");
 
-      // Turn on dashcam
-      pcf8575.digitalWrite(SELF_DASHCAM, WRITE_ON);
-      self_dashcam = WRITE_ON;
-
-      // Turn on ODO screen
-      pcf8575.digitalWrite(SELF_ODO_SCREEN, WRITE_ON);
-      self_odo_screen = WRITE_ON;
-
-      // Turn on armrest
-      pcf8575.digitalWrite(SELF_ARMREST, WRITE_ON);
-      self_armrest = WRITE_ON;
+      // Turn on inside cameras
+      pcf8575.digitalWrite(SELF_INSIDE_CARMERAS, WRITE_ON);
+      self_inside_cameras = WRITE_ON;
 
       // Start opening side mirrors (1 second pulse)
       pcf8575.digitalWrite(SELF_SIDE_MIRRORS_OPEN, WRITE_ON);
       mirror_timer = millis();
 
-      Serial.println("Dashcam, ODO screen, armrest ON - Opening mirrors");
+      Serial.println("Inside cameras ON - Opening mirrors");
 
     } else {
       // Accessory power turned OFF - disable related accessories
       Serial.println("Accessory power OFF - disabling accessories");
 
-      // Turn off dashcam
-      pcf8575.digitalWrite(SELF_DASHCAM, WRITE_OFF);
-      self_dashcam = WRITE_OFF;
-
-      // Turn off ODO screen
-      pcf8575.digitalWrite(SELF_ODO_SCREEN, WRITE_OFF);
-      self_odo_screen = WRITE_OFF;
-
-      // Turn off armrest
-      pcf8575.digitalWrite(SELF_ARMREST, WRITE_OFF);
-      self_armrest = WRITE_OFF;
+      // Turn off inside cameras
+      pcf8575.digitalWrite(SELF_INSIDE_CARMERAS, WRITE_OFF);
+      self_inside_cameras = WRITE_OFF;
 
       // Start closing side mirrors (1 second pulse)
       pcf8575.digitalWrite(SELF_SIDE_MIRRORS_CLOSE, WRITE_ON);
       mirror_timer = millis();
 
-      Serial.println("Dashcam, ODO screen, armrest OFF - Closing mirrors");
+      Serial.println("Inside cameras OFF - Closing mirrors");
     }
 
     prev_accessory_power = self_accessory_power;

@@ -38,12 +38,12 @@
 #define VF3_WINDOW_RIGHT_UP PCF_P4       // P4 - Window right UP control
 #define VF3_DOOR_LOCK PCF_P5             // P5 - ON for 1s then OFF to lock doors
 #define SELF_ACCESSORY_POWER PCF_P6      // P6 - ON/OFF accessory power
-#define SELF_INSIDE_CARMERAS PCF_P7      // P7 - ON/OFF inside cameras
-#define SELF_DASHCAM PCF_P8              // P8 - ON/OFF dashcam
+#define VF3_FRONT_TRUNK_UNLOCK PCF_P7    // P7 - ON for 1s then OFF to unlock front trunk
+#define SELF_INSIDE_CARMERAS PCF_P8      // P8 - ON/OFF inside cameras
 #define SELF_SIDE_MIRRORS_OPEN PCF_P9    // P9 - ON 1s then OFF to open mirrors
 #define SELF_SIDE_MIRRORS_CLOSE PCF_P10  // P10 - ON 1s then OFF to close mirrors
-#define SELF_ODO_SCREEN PCF_P11          // P11 - ON/OFF odometer screen
-#define SELF_ARMREST PCF_P12             // P12 - ON/OFF armrest
+// P11 - Reserved for future use
+// P12 - Reserved for future use
 #define VF3_CHARGER_UNLOCK PCF_P13       // P13 - ON for 1s then OFF to unlock charger port
 #define VF3_WINDOW_LEFT_DOWN PCF_P14     // P14 - Window left DOWN control
 #define VF3_WINDOW_RIGHT_DOWN PCF_P15    // P15 - Window right DOWN control
@@ -78,9 +78,7 @@ extern int vf3_car_lock;
 extern int vf3_car_unlock;
 extern int self_accessory_power;
 extern int self_inside_cameras;
-extern int self_dashcam;
-extern int self_odo_screen;
-extern int self_armrest;
+extern int vf3_front_trunk_unlock;
 extern int vf3_door_locked;
 
 void initializePins();
