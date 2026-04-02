@@ -26,6 +26,8 @@
 #define VF3_PROXIMITY_REAR_L 33        // GPIO 33 - Rear left proximity/parking detection
 #define VF3_PROXIMITY_REAR_R 32        // GPIO 32 - Rear right proximity/parking detection
 #define VF3_CHARGING_STATUS 13         // GPIO 13 - Charging status (1=charging, 0=not charging)
+#define VF3_REMOTE_LOCK_PRESS 18       // GPIO 18 - Car remote lock button press detection (1=pressed, 0=not pressed)
+#define VF3_REMOTE_UNLOCK_PRESS 19     // GPIO 19 - Car remote unlock button press detection (1=pressed, 0=not pressed)
 #define VF3_FACTORY_RESET_BTN 0        // GPIO 0 - Factory reset button (BOOT button, active LOW, hold 10s to reset)
 
 // ===== DIGITAL OUTPUTS (Controls & Indicators) - PCF8575 I2C I/O Expander =====
@@ -38,7 +40,7 @@
 #define VF3_WINDOW_RIGHT_UP PCF_P4       // P4 - Window right UP control
 #define VF3_DOOR_LOCK PCF_P5             // P5 - ON for 1s then OFF to lock doors
 #define SELF_ACCESSORY_POWER PCF_P6      // P6 - ON/OFF accessory power
-#define VF3_FRONT_TRUNK_UNLOCK PCF_P7    // P7 - ON for 1s then OFF to unlock front trunk
+#define VF3_FRONT_TRUNK_UNLOCK PCF_P7    // P7 - ON for 8s then OFF to unlock front trunk
 #define SELF_INSIDE_CARMERAS PCF_P8      // P8 - ON/OFF inside cameras
 #define SELF_SIDE_MIRRORS_OPEN PCF_P9    // P9 - ON 1s then OFF to open mirrors
 #define SELF_SIDE_MIRRORS_CLOSE PCF_P10  // P10 - ON 1s then OFF to close mirrors
@@ -72,6 +74,8 @@ extern int vf3_proximity_rear_r;
 extern int vf3_demi_light;
 extern int vf3_normal_light;
 extern int vf3_charging_status;
+extern int vf3_remote_lock_press;
+extern int vf3_remote_unlock_press;
 
 // ===== OUTPUT VARIABLES =====
 extern int vf3_car_lock;

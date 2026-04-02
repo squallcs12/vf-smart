@@ -49,6 +49,8 @@ String getCarStatusJSON() {
   controls["accessory_power"] = self_accessory_power;
   controls["car_lock"] = vf3_car_lock;
   controls["car_unlock"] = vf3_car_unlock;
+  controls["remote_lock_press"] = vf3_remote_lock_press;
+  controls["remote_unlock_press"] = vf3_remote_unlock_press;
   controls["inside_cameras"] = self_inside_cameras;
   controls["front_trunk_unlock"] = vf3_front_trunk_unlock;
 

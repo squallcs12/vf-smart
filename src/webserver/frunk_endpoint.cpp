@@ -41,9 +41,9 @@ void registerFrunkEndpoint(AsyncWebServer& server) {
       return;
     }
 
-    // Trigger front trunk unlock (1 second pulse)
+    // Trigger front trunk unlock (8 second pulse)
     safeDigitalWrite(VF3_FRONT_TRUNK_UNLOCK, WRITE_ON);
-    delay(1000);
+    delay(8000);
     safeDigitalWrite(VF3_FRONT_TRUNK_UNLOCK, WRITE_OFF);
 
     last_frunk_unlock = millis();

@@ -21,6 +21,8 @@ int vf3_proximity_rear_r = LOW;
 int vf3_demi_light = LOW;
 int vf3_normal_light = LOW;
 int vf3_charging_status = LOW;
+int vf3_remote_lock_press = LOW;
+int vf3_remote_unlock_press = LOW;
 
 // ===== OUTPUT VARIABLES =====
 int vf3_car_lock = LOW;
@@ -48,6 +50,8 @@ void initializePins() {
   pinMode(VF3_PROXIMITY_REAR_L, INPUT);
   pinMode(VF3_PROXIMITY_REAR_R, INPUT);
   pinMode(VF3_CHARGING_STATUS, INPUT);
+  pinMode(VF3_REMOTE_LOCK_PRESS, INPUT);
+  pinMode(VF3_REMOTE_UNLOCK_PRESS, INPUT);
 
   // Initialize Factory Reset Button (GPIO 0 - BOOT button)
   // INPUT_PULLUP: button not pressed = HIGH, button pressed = LOW

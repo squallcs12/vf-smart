@@ -8,5 +8,6 @@
 #include "controls/light_reminder.h"
 #include "controls/charging_control.h"
 #include "controls/factory_reset.h"
+#include "controls/remote_frunk_control.h"
 
 #endif // CONTROLS_H

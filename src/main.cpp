@@ -135,6 +135,7 @@ void loop() {
   handleAccessoryPower();
   handleLightReminder();
   handleChargingControl();
+  handleRemoteFrunkControl();  // Open front trunk when remote unlock held for 1s
 
   // 50ms control loop cycle
   delay(50);

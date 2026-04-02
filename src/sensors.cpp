@@ -20,6 +20,8 @@ static int prev_vf3_normal_light = -1;
 static int prev_vf3_proximity_rear_l = -1;
 static int prev_vf3_proximity_rear_r = -1;
 static int prev_vf3_charging_status = -1;
+static int prev_vf3_remote_lock_press = -1;
+static int prev_vf3_remote_unlock_press = -1;
 static int prev_vf3_car_lock = -1;
 static int prev_vf3_car_unlock = -1;
 static int prev_self_accessory_power = -1;
@@ -54,6 +56,8 @@ bool readSensors() {
   int new_proximity_rear_l = digitalRead(VF3_PROXIMITY_REAR_L);
   int new_proximity_rear_r = digitalRead(VF3_PROXIMITY_REAR_R);
   int new_charging_status = digitalRead(VF3_CHARGING_STATUS);
+  int new_remote_lock_press = digitalRead(VF3_REMOTE_LOCK_PRESS);
+  int new_remote_unlock_press = digitalRead(VF3_REMOTE_UNLOCK_PRESS);
 
   // Read output states from PCF8575 (for status reporting)
   int new_car_lock = safeDigitalRead(VF3_CAR_LOCK);
@@ -121,6 +125,12 @@ bool readSensors() {
   if (new_charging_status != prev_vf3_charging_status) {
     changed = true;
   }
+  if (new_remote_lock_press != prev_vf3_remote_lock_press) {
+    changed = true;
+  }
+  if (new_remote_unlock_press != prev_vf3_remote_unlock_press) {
+    changed = true;
+  }
   if (new_car_lock != prev_vf3_car_lock) {
     changed = true;
   }
@@ -154,6 +164,8 @@ bool readSensors() {
   vf3_proximity_rear_l = new_proximity_rear_l;
   vf3_proximity_rear_r = new_proximity_rear_r;
   vf3_charging_status = new_charging_status;
+  vf3_remote_lock_press = new_remote_lock_press;
+  vf3_remote_unlock_press = new_remote_unlock_press;
   vf3_car_lock = new_car_lock;
   vf3_car_unlock = new_car_unlock;
   self_accessory_power = new_accessory_power;
@@ -179,6 +191,8 @@ bool readSensors() {
   prev_vf3_proximity_rear_l = new_proximity_rear_l;
   prev_vf3_proximity_rear_r = new_proximity_rear_r;
   prev_vf3_charging_status = new_charging_status;
+  prev_vf3_remote_lock_press = new_remote_lock_press;
+  prev_vf3_remote_unlock_press = new_remote_unlock_press;
   prev_vf3_car_lock = new_car_lock;
   prev_vf3_car_unlock = new_car_unlock;
   prev_self_accessory_power = new_accessory_power;
