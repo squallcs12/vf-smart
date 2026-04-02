@@ -9,5 +9,6 @@
 #include "controls/charging_control.h"
 #include "controls/factory_reset.h"
 #include "controls/remote_frunk_control.h"
+#include "controls/remote_mirror_control.h"
 
 #endif // CONTROLS_H

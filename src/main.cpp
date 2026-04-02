@@ -136,6 +136,7 @@ void loop() {
   handleLightReminder();
   handleChargingControl();
   handleRemoteFrunkControl();  // Open front trunk when remote unlock held for 1s
+  handleRemoteMirrorControl();  // Control mirrors via remote button double-press
 
   // 50ms control loop cycle
   delay(50);
