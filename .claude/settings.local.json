@@ -6,7 +6,11 @@
       "Bash(~/.platformio/penv/Scripts/pio run:*)",
       "Bash(python -m platformio run:*)",
       "Bash(cmd.exe /c \"pio run\")",
-      "Bash(~/.platformio/penv/bin/pio run:*)"
+      "Bash(~/.platformio/penv/bin/pio run:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd remote button detection and automatic front trunk opening\n\n- Add GPIO pins for car remote lock/unlock button press detection \\(GPIO 18/19\\)\n- Implement automatic front trunk opening when remote unlock held for 1 second\n- Update front trunk unlock pulse duration from 1s to 8s\n- Add remote button states to API status response\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }
