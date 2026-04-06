@@ -1572,3 +1572,34 @@ SideEffect {
 - App always starts at `home` (never forced to setup screen)
 - Device connection is optional — all screens show `"--"` placeholders when disconnected
 - Setup is accessible via the Settings icon in the full-mode TopAppBar
+
+### Mirror Mode: ODO Instrument Cluster Design
+
+**Target hardware**: 9-inch 1080p landscape screen (~960×540dp at xhdpi / ~245 PPI)
+
+The mirror mode renders as a car instrument cluster (ODO style), not a standard Android UI:
+
+**Layout**: 3×2 grid filling the full screen, separated by 1dp dividers (`Color 0xFF1C1C1C`).
+Each cell: centered icon (40dp) → large bold value (28sp, 1sp letter-spacing) → small caps label (10sp, 2sp letter-spacing).
+
+**ODO colour palette** (defined as file-level constants in `HomeScreen.kt`):
+| Constant     | Hex         | Usage                                  |
+|--------------|-------------|----------------------------------------|
+| `OdoBg`      | `#0A0A0A`   | Screen background                      |
+| `OdoDivider` | `#1C1C1C`   | Grid dividers                          |
+| `OdoLabel`   | `#4A4A4A`   | Dim label text below each value        |
+| `OdoInactive`| `#3A3A3A`   | No data / off / neutral state          |
+| `OdoNormal`  | `#D0D0D0`   | Active but non-critical (lights on, drive mode) |
+| `OdoGood`    | `#4CAF50`   | Positive state (locked, closed, charging) |
+| `OdoWarning` | `#FFB300`   | Attention needed (unlocked, window open) |
+| `OdoAlert`   | `#EF5350`   | Critical alert (doors open, window open+locked, lights off at night) |
+
+**Per-item colour logic**:
+- Car Lock: Good=locked, Warning=unlocked
+- Windows: Good=closed, Warning=open, Alert=open while locked
+- Charging: Good=charging, Normal=not charging
+- Lights: Normal=on, Alert=off at night, Inactive=off during day
+- Gear: Normal=drive, Inactive=park
+- Doors: Good=all closed, Alert=any open
+
+**No interactive elements** in mirror mode — the mirrored screen is not touchable.

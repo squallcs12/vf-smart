@@ -13,8 +13,13 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -26,6 +31,16 @@ import com.vinfast.vf3smart.ui.components.ControlButton
 import com.vinfast.vf3smart.ui.components.StatusCard
 import com.vinfast.vf3smart.viewmodel.CarStatusViewModel
 import com.vinfast.vf3smart.viewmodel.ControlViewModel
+
+// ODO colour palette
+private val OdoBg        = Color(0xFF0A0A0A)
+private val OdoDivider   = Color(0xFF1C1C1C)
+private val OdoLabel     = Color(0xFF4A4A4A)
+private val OdoInactive  = Color(0xFF3A3A3A)
+private val OdoNormal    = Color(0xFFD0D0D0)
+private val OdoGood      = Color(0xFF4CAF50)
+private val OdoWarning   = Color(0xFFFFB300)
+private val OdoAlert     = Color(0xFFEF5350)
 
 @Composable
 fun HomeScreen(
@@ -94,7 +109,8 @@ fun HomeScreen(
     }
 }
 
-// ── Mirror mode: read-only status grid, no interaction ───────────────────────
+// ── Mirror mode: ODO instrument-cluster style, read-only ─────────────────────
+//   Designed for 9-inch 1080p landscape screen (~960×540dp at xhdpi)
 
 @Composable
 private fun MirrorContent(
@@ -102,23 +118,172 @@ private fun MirrorContent(
     connectionState: WebSocketManager.ConnectionState,
     modifier: Modifier = Modifier
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
-        StatusGrid(
-            carStatus = carStatus,
-            columns = 3,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp)
-        )
+    val isLocked    = carStatus?.carLockState == "locked"
+    val windowsOpen = carStatus != null &&
+            (carStatus.windows.leftState == 2 || carStatus.windows.rightState == 2)
+    val isCharging  = carStatus?.chargingStatus == 1
+    val lightsOn    = carStatus != null &&
+            (carStatus.lights.normalLight == 1 || carStatus.lights.demiLight == 1)
+    val isNight     = carStatus?.time?.isNight == true
+    val inDrive     = carStatus?.sensors?.gearDrive == 1
+    val doorsOpen   = carStatus != null && (carStatus.doors.frontLeft == 1 ||
+            carStatus.doors.frontRight == 1 || carStatus.doors.trunk == 1)
 
-        // Tiny connection dot — top-right
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(OdoBg)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // ── Row 1 ──────────────────────────────────────────────────
+            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                OdoCell(
+                    label = "CAR LOCK",
+                    value = if (carStatus == null) "--" else if (isLocked) "LOCKED" else "UNLOCKED",
+                    icon = if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                    color = when {
+                        carStatus == null -> OdoInactive
+                        isLocked -> OdoGood
+                        else -> OdoWarning
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                OdoVerticalDivider()
+                OdoCell(
+                    label = "WINDOWS",
+                    value = if (carStatus == null) "--" else if (windowsOpen) "OPEN" else "CLOSED",
+                    icon = if (windowsOpen) Icons.Default.Warning else Icons.Default.Check,
+                    color = when {
+                        carStatus == null -> OdoInactive
+                        windowsOpen && isLocked -> OdoAlert
+                        windowsOpen -> OdoWarning
+                        else -> OdoGood
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                OdoVerticalDivider()
+                OdoCell(
+                    label = "CHARGING",
+                    value = if (carStatus == null) "--" else if (isCharging) "CHARGING" else "NOT CHARGING",
+                    icon = Icons.Default.BatteryChargingFull,
+                    color = when {
+                        carStatus == null -> OdoInactive
+                        isCharging -> OdoGood
+                        else -> OdoNormal
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            OdoHorizontalDivider()
+
+            // ── Row 2 ──────────────────────────────────────────────────
+            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                OdoCell(
+                    label = "LIGHTS",
+                    value = if (carStatus == null) "--" else if (lightsOn) "ON" else "OFF",
+                    icon = Icons.Default.Lightbulb,
+                    color = when {
+                        carStatus == null -> OdoInactive
+                        lightsOn -> OdoNormal
+                        isNight -> OdoAlert
+                        else -> OdoInactive
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                OdoVerticalDivider()
+                OdoCell(
+                    label = "GEAR",
+                    value = if (carStatus == null) "--" else if (inDrive) "DRIVE" else "PARK",
+                    icon = Icons.Default.DirectionsCar,
+                    color = when {
+                        carStatus == null -> OdoInactive
+                        inDrive -> OdoNormal
+                        else -> OdoInactive
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                OdoVerticalDivider()
+                OdoCell(
+                    label = "DOORS",
+                    value = if (carStatus == null) "--" else if (doorsOpen) "OPEN" else "CLOSED",
+                    icon = if (doorsOpen) Icons.Default.Warning else Icons.Default.Check,
+                    color = when {
+                        carStatus == null -> OdoInactive
+                        doorsOpen -> OdoAlert
+                        else -> OdoGood
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        // Connection dot — top-right
         ConnectionDot(
             connectionState = connectionState,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(6.dp)
+            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
         )
     }
+}
+
+@Composable
+private fun OdoCell(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxHeight(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(40.dp)
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = value,
+            color = color,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            letterSpacing = 1.sp
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = label,
+            color = OdoLabel,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 2.sp,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun OdoVerticalDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxHeight()
+            .width(1.dp)
+            .background(OdoDivider)
+    )
+}
+
+@Composable
+private fun OdoHorizontalDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(OdoDivider)
+    )
 }
 
 // ── Full mode: scrollable layout with header + all quick controls ─────────────
