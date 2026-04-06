@@ -19,7 +19,7 @@
     <shortcut
         android:shortcutId="unlock_car"
         android:enabled="true"
-        android:icon="@drawable/ic_unlock"
+        android:icon="@drawable/ic_lock_open"
         android:shortcutShortLabel="@string/shortcut_unlock_short"
         android:shortcutLongLabel="@string/shortcut_unlock_long">
         <intent
@@ -32,7 +32,7 @@
     <shortcut
         android:shortcutId="close_windows"
         android:enabled="true"
-        android:icon="@drawable/ic_window"
+        android:icon="@drawable/ic_windows"
         android:shortcutShortLabel="@string/shortcut_close_windows_short"
         android:shortcutLongLabel="@string/shortcut_close_windows_long">
         <intent
