@@ -32,7 +32,7 @@ fun ControlButton(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp), // Large touch target
+            .defaultMinSize(minHeight = 52.dp),
         enabled = enabled,
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor ?: MaterialTheme.colorScheme.primary,

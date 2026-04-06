@@ -40,7 +40,7 @@ fun StatusCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .height(120.dp),
+            .defaultMinSize(minHeight = 72.dp),
         colors = CardDefaults.cardColors(
             containerColor = containerColor,
             contentColor = contentColor
