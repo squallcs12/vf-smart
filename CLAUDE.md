@@ -1518,3 +1518,57 @@ See the complete implementation example in the Android Auto app repository, whic
 - Voice feedback with TextToSpeech
 - Secure API key storage with KeyStore
 - Car mode detection and lifecycle management
+
+
+## Android App Architecture Notes
+
+### HomeScreen Dual-Mode Design
+
+The `HomeScreen` has two display modes toggled by a `SmallFloatingActionButton` (bottom-right corner):
+
+**Mirror Mode (default)**
+- Full-screen, no header/chrome, edge-to-edge
+- Read-only 3×2 status grid — no interactive buttons (screen is not touchable when mirrored)
+- System bars (status bar + nav bar) are hidden via `WindowInsetsController`; swipe to peek
+- Tiny 8dp connection dot overlay in top-right corner
+- `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE` allows temporary peek without exiting mirror mode
+
+**Full Mode**
+- Standard scrollable layout with `TopAppBar` (Settings + Debug + connection indicator)
+- 2-column status grid (fixed 120dp row height, safe inside `verticalScroll`)
+- Quick actions card: Lock, Unlock, Beep, Close Windows
+- "More Controls" button navigates to `ControlScreen`
+- System bars restored on switch
+
+**Toggle implementation** (`HomeScreen.kt`):
+```kotlin
+var mirrorMode by rememberSaveable { mutableStateOf(true) }
+
+val view = LocalView.current
+SideEffect {
+    val controller = WindowCompat.getInsetsController((view.context as Activity).window, view)
+    if (mirrorMode) {
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        controller.systemBarsBehavior = BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    } else {
+        controller.show(WindowInsetsCompat.Type.systemBars())
+    }
+}
+```
+
+### Component Sizing
+
+- `StatusCard`: uses `defaultMinSize(minHeight = 72.dp)` — expands to fill parent height when caller passes `fillMaxHeight()`
+- `ControlButton`: uses `defaultMinSize(minHeight = 52.dp)` — same pattern
+
+### StatusGrid Columns
+
+`StatusGrid` takes a `columns: Int` parameter:
+- `columns = 3` → mirror mode: rows use `Modifier.weight(1f)` to fill height (only valid outside scroll)
+- `columns = 2` → full mode: rows use `Modifier.height(120.dp)` (safe inside `verticalScroll`)
+
+### Navigation / Device Connection
+
+- App always starts at `home` (never forced to setup screen)
+- Device connection is optional — all screens show `"--"` placeholders when disconnected
+- Setup is accessible via the Settings icon in the full-mode TopAppBar
