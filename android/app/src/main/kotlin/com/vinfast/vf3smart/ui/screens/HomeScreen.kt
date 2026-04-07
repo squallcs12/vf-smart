@@ -1,8 +1,13 @@
 package com.vinfast.vf3smart.ui.screens
 
+import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.provider.Settings
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -15,6 +20,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -34,7 +41,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.content.ContextCompat
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import com.vinfast.vf3smart.data.model.CarStatus
 import com.vinfast.vf3smart.data.model.TpmsData
 import com.vinfast.vf3smart.data.model.TpmsTire
@@ -198,9 +208,9 @@ private fun MirrorContent(
 
             OdoHorizontalDivider()
 
-            // ── Row 2: TBD | TPMS | TBD ────────────────────────────────
+            // ── Row 2: MAP | TPMS | TBD ────────────────────────────────
             Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                OdoEmptyCell(modifier = Modifier.weight(1f))
+                OdoChargingCell(modifier = Modifier.weight(1f))
                 OdoVerticalDivider()
                 OdoTpmsCell(
                     tpms = carStatus?.tpms,
@@ -417,6 +427,145 @@ private fun TpmsTireValue(
         Text(text = valueText, color = tireColor, fontSize = 20.sp,
             fontWeight = FontWeight.Bold, letterSpacing = 0.sp)
         Text(text = "kPa", color = OdoLabel, fontSize = 8.sp, letterSpacing = 1.sp)
+    }
+}
+
+// ── Nearby charging stations (Overpass API / OpenStreetMap) ─────────────────
+
+private data class NearbyStation(val name: String, val distanceM: Double)
+
+private fun haversineM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val r = 6_371_000.0
+    val dLat = Math.toRadians(lat2 - lat1)
+    val dLon = Math.toRadians(lon2 - lon1)
+    val a = Math.sin(dLat / 2).let { it * it } +
+        Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+        Math.sin(dLon / 2).let { it * it }
+    return r * 2 * Math.asin(Math.sqrt(a))
+}
+
+private suspend fun fetchNearbyChargers(lat: Double, lon: Double): List<NearbyStation> =
+    withContext(Dispatchers.IO) {
+        try {
+            val query = """[out:json];node["amenity"="charging_station"](around:5000,$lat,$lon);out body 10;"""
+            val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+            val conn = java.net.URL("https://overpass-api.de/api/interpreter?data=$encoded")
+                .openConnection().also { it.connectTimeout = 8000; it.readTimeout = 10000 }
+            val json = conn.inputStream.bufferedReader().readText()
+            val elements = org.json.JSONObject(json).getJSONArray("elements")
+            (0 until elements.length()).map { i ->
+                val el = elements.getJSONObject(i)
+                val tags = el.optJSONObject("tags")
+                val name = tags?.optString("name")?.takeIf { it.isNotBlank() }
+                    ?: tags?.optString("operator")?.takeIf { it.isNotBlank() }
+                    ?: tags?.optString("brand")?.takeIf { it.isNotBlank() }
+                    ?: tags?.optString("network")?.takeIf { it.isNotBlank() }
+                    ?: tags?.optString("ref")?.takeIf { it.isNotBlank() }
+                    ?: tags?.optString("addr:street")?.takeIf { it.isNotBlank() }
+                        ?.let { "Station – $it" }
+                    ?: String.format(java.util.Locale.US, "%.4f, %.4f",
+                        el.getDouble("lat"), el.getDouble("lon"))
+                NearbyStation(name, haversineM(lat, lon, el.getDouble("lat"), el.getDouble("lon")))
+            }.sortedBy { it.distanceM }.take(2)
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+@Composable
+private fun OdoChargingCell(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    var stations by remember { mutableStateOf<List<NearbyStation>>(emptyList()) }
+    var statusText by remember { mutableStateOf("LOCATING...") }
+    var refreshKey by remember { mutableIntStateOf(0) }
+
+    val permLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results -> if (results.values.any { it }) refreshKey++ }
+
+    LaunchedEffect(refreshKey) {
+        val hasPerm = ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED ||
+        ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!hasPerm) {
+            statusText = "NO PERMISSION"
+            permLauncher.launch(arrayOf(
+                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION
+            ))
+            return@LaunchedEffect
+        }
+
+        statusText = "LOCATING..."
+        @SuppressLint("MissingPermission")
+        val location = withContext(Dispatchers.IO) {
+            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                ?: lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
+        }
+
+        if (location == null) { statusText = "NO GPS SIGNAL"; return@LaunchedEffect }
+
+        statusText = "SEARCHING..."
+        val result = fetchNearbyChargers(location.latitude, location.longitude)
+        stations = result
+        statusText = if (result.isEmpty()) "NONE NEARBY" else "CHARGING"
+    }
+
+    Column(
+        modifier = modifier.fillMaxHeight(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Bolt,
+            contentDescription = null,
+            tint = if (stations.isNotEmpty()) OdoGood else OdoInactive,
+            modifier = Modifier.size(28.dp)
+        )
+        Spacer(Modifier.height(10.dp))
+        if (stations.isEmpty()) {
+            Text(
+                text = statusText,
+                color = OdoInactive,
+                fontSize = 10.sp,
+                letterSpacing = 1.sp,
+                textAlign = TextAlign.Center
+            )
+        } else {
+            stations.forEachIndexed { i, station ->
+                if (i > 0) Spacer(Modifier.height(12.dp))
+                Text(
+                    text = station.name.uppercase(),
+                    color = OdoNormal,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp)
+                        .basicMarquee()
+                )
+                val distText = if (station.distanceM < 1000)
+                    "${station.distanceM.toInt()} M"
+                else
+                    String.format(java.util.Locale.US, "%.1f KM", station.distanceM / 1000)
+                Text(
+                    text = distText,
+                    color = OdoGood,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(text = "CHARGING", color = OdoLabel, fontSize = 10.sp, letterSpacing = 2.sp)
     }
 }
 
