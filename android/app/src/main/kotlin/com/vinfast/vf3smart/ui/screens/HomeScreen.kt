@@ -7,7 +7,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.provider.Settings
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -32,6 +31,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import com.vinfast.vf3smart.R
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
@@ -44,7 +44,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import com.vinfast.vf3smart.data.model.CarStatus
 import com.vinfast.vf3smart.data.model.TpmsData
 import com.vinfast.vf3smart.data.model.TpmsTire
@@ -93,7 +95,6 @@ fun HomeScreen(
     var foregroundTime by remember { mutableStateOf(System.currentTimeMillis()) }
     LifecycleEventEffect(Lifecycle.Event.ON_START) {
         foregroundTime = System.currentTimeMillis()
-        kmlStationCache = null  // refresh charger data each time app is foregrounded
     }
     var tripTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
@@ -435,11 +436,12 @@ private fun TpmsTireValue(
 
 private const val CHARGER_KML_URL =
     "https://www.google.com/maps/d/kml?mid=1iIZ3L3KEKU0fg5XsIQ6hbRl7NVY8JNA&forcekml=1"
+private const val KML_CACHE_FILE = "charger_kml.json"
 
 private data class NearbyStation(val name: String, val distanceM: Double)
 
-// In-memory cache so the KML is fetched only once per app session
-private var kmlStationCache: List<Pair<String, Pair<Double, Double>>>? = null
+/** L1 in-memory cache — survives recompositions, cleared on process death. */
+private var kmlMemCache: List<Pair<String, Pair<Double, Double>>>? = null
 
 private fun haversineM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
     val r = 6_371_000.0
@@ -451,51 +453,97 @@ private fun haversineM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): 
     return r * 2 * Math.asin(Math.sqrt(a))
 }
 
-/** Fetches and parses the KML once; subsequent calls return the cached list. */
-private suspend fun loadKmlStations(): List<Pair<String, Pair<Double, Double>>> =
-    withContext(Dispatchers.IO) {
-        kmlStationCache?.let { return@withContext it }
-        try {
-            val conn = (java.net.URL(CHARGER_KML_URL).openConnection()
-                    as java.net.HttpURLConnection).also {
-                it.connectTimeout = 10_000
-                it.readTimeout  = 15_000
-                it.setRequestProperty("User-Agent", "VF3Smart/1.0")
-            }
-            val kml = conn.inputStream.bufferedReader().readText()
-            android.util.Log.d("VF3Charging", "KML fetched, length=${kml.length}")
+private fun parseKml(kml: String): List<Pair<String, Pair<Double, Double>>> {
+    val doc = javax.xml.parsers.DocumentBuilderFactory.newInstance()
+        .newDocumentBuilder().parse(kml.byteInputStream())
+    val placemarks = doc.getElementsByTagName("Placemark")
+    val result = mutableListOf<Pair<String, Pair<Double, Double>>>()
+    for (i in 0 until placemarks.length) {
+        val pm = placemarks.item(i) as org.w3c.dom.Element
+        val name = pm.getElementsByTagName("name").item(0)
+            ?.textContent?.trim().takeIf { !it.isNullOrBlank() } ?: continue
+        val coordText = pm.getElementsByTagName("coordinates").item(0)
+            ?.textContent?.trim() ?: continue
+        // KML coordinates: lon,lat[,alt]
+        val parts = coordText.split(",")
+        val lon = parts.getOrNull(0)?.trim()?.toDoubleOrNull() ?: continue
+        val lat = parts.getOrNull(1)?.trim()?.toDoubleOrNull() ?: continue
+        result.add(name to (lat to lon))
+    }
+    return result
+}
 
-            val doc = javax.xml.parsers.DocumentBuilderFactory.newInstance()
-                .newDocumentBuilder().parse(kml.byteInputStream())
-            val placemarks = doc.getElementsByTagName("Placemark")
-            val result = mutableListOf<Pair<String, Pair<Double, Double>>>()
-            for (i in 0 until placemarks.length) {
-                val pm = placemarks.item(i) as org.w3c.dom.Element
-                val name = pm.getElementsByTagName("name").item(0)
-                    ?.textContent?.trim().takeIf { !it.isNullOrBlank() } ?: continue
-                val coordText = pm.getElementsByTagName("coordinates").item(0)
-                    ?.textContent?.trim() ?: continue
-                // KML coordinates: lon,lat[,alt]
-                val parts = coordText.split(",")
-                val lon = parts.getOrNull(0)?.trim()?.toDoubleOrNull() ?: continue
-                val lat = parts.getOrNull(1)?.trim()?.toDoubleOrNull() ?: continue
-                result.add(name to (lat to lon))
+private fun readKmlFileCache(context: Context): List<Pair<String, Pair<Double, Double>>>? =
+    try {
+        val file = java.io.File(context.cacheDir, KML_CACHE_FILE)
+        if (!file.exists()) null
+        else {
+            val arr = org.json.JSONArray(file.readText())
+            (0 until arr.length()).map { i ->
+                val obj = arr.getJSONObject(i)
+                obj.getString("name") to (obj.getDouble("lat") to obj.getDouble("lon"))
             }
-            android.util.Log.d("VF3Charging", "Parsed ${result.size} stations from KML")
-            kmlStationCache = result
-            result
-        } catch (e: Exception) {
-            android.util.Log.e("VF3Charging", "loadKmlStations failed", e)
-            emptyList()
         }
+    } catch (e: Exception) {
+        android.util.Log.w("VF3Charging", "File cache read failed", e)
+        null
     }
 
-private suspend fun fetchNearbyChargers(lat: Double, lon: Double): List<NearbyStation> =
-    withContext(Dispatchers.IO) {
-        loadKmlStations()
-            .map { (name, coords) ->
-                NearbyStation(name, haversineM(lat, lon, coords.first, coords.second))
-            }
+private fun writeKmlFileCache(context: Context, stations: List<Pair<String, Pair<Double, Double>>>) {
+    try {
+        val arr = org.json.JSONArray()
+        stations.forEach { (name, coords) ->
+            arr.put(org.json.JSONObject().apply {
+                put("name", name)
+                put("lat", coords.first)
+                put("lon", coords.second)
+            })
+        }
+        java.io.File(context.cacheDir, KML_CACHE_FILE).writeText(arr.toString())
+    } catch (e: Exception) {
+        android.util.Log.w("VF3Charging", "File cache write failed", e)
+    }
+}
+
+/**
+ * Emits station list immediately from cache (memory → file), then emits again
+ * after fetching fresh KML from the network and updating both caches.
+ */
+private fun kmlStationsFlow(context: Context) = flow {
+    // L1: memory
+    val mem = kmlMemCache
+    if (mem != null) {
+        emit(mem)
+    } else {
+        // L2: file
+        readKmlFileCache(context)?.also { cached ->
+            kmlMemCache = cached
+            emit(cached)
+        }
+    }
+    // Always async-refresh from network
+    try {
+        val conn = (java.net.URL(CHARGER_KML_URL).openConnection()
+                as java.net.HttpURLConnection).also {
+            it.connectTimeout = 10_000
+            it.readTimeout = 15_000
+            it.setRequestProperty("User-Agent", "VF3Smart/1.0")
+        }
+        val fresh = parseKml(conn.inputStream.bufferedReader().readText())
+        if (fresh.isNotEmpty()) {
+            kmlMemCache = fresh
+            writeKmlFileCache(context, fresh)
+            android.util.Log.d("VF3Charging", "KML refreshed: ${fresh.size} stations")
+            emit(fresh)
+        }
+    } catch (e: Exception) {
+        android.util.Log.e("VF3Charging", "KML network refresh failed", e)
+    }
+}.flowOn(Dispatchers.IO)
+
+private fun nearbyChargersFlow(context: Context, lat: Double, lon: Double) =
+    kmlStationsFlow(context).map { all ->
+        all.map { (name, coords) -> NearbyStation(name, haversineM(lat, lon, coords.first, coords.second)) }
             .sortedBy { it.distanceM }
             .take(2)
     }
@@ -516,10 +564,11 @@ private fun OdoChargingCell(modifier: Modifier = Modifier) {
 
     var permGranted by remember { mutableStateOf(hasPerm()) }
 
-    // Re-check permission and clear KML cache each time app is foregrounded
+    // Re-check permission and trigger a fresh KML fetch each time app is foregrounded
+    var foregroundKey by remember { mutableIntStateOf(0) }
     LifecycleEventEffect(Lifecycle.Event.ON_START) {
-        kmlStationCache = null
         permGranted = hasPerm()
+        foregroundKey++
     }
 
     val permLauncher = rememberLauncherForActivityResult(
@@ -552,13 +601,14 @@ private fun OdoChargingCell(modifier: Modifier = Modifier) {
         }
     }
 
-    // Re-fetch chargers on every location update
-    LaunchedEffect(location) {
+    // Re-fetch chargers on location change or foreground — collect emits cached then fresh
+    LaunchedEffect(location, foregroundKey) {
         val loc = location ?: return@LaunchedEffect
         statusText = "SEARCHING..."
-        val result = fetchNearbyChargers(loc.latitude, loc.longitude)
-        stations = result
-        statusText = if (result.isEmpty()) "NONE NEARBY" else "CHARGING"
+        nearbyChargersFlow(context, loc.latitude, loc.longitude).collect { result ->
+            stations = result
+            statusText = if (result.isEmpty()) "NONE NEARBY" else "CHARGING"
+        }
     }
 
     Column(
@@ -587,13 +637,12 @@ private fun OdoChargingCell(modifier: Modifier = Modifier) {
                 Text(
                     text = station.name.uppercase(),
                     color = OdoNormal,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontSize = 9.sp,
                     letterSpacing = 0.5.sp,
-                    maxLines = 1,
-                    modifier = Modifier
-                        .padding(horizontal = 8.dp)
-                        .basicMarquee()
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 8.dp)
                 )
                 val distText = if (station.distanceM < 1000)
                     "${station.distanceM.toInt()} M"
