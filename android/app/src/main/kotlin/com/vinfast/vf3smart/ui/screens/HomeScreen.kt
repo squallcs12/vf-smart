@@ -430,7 +430,9 @@ private fun TpmsTireValue(
     }
 }
 
-// ── Nearby charging stations (Overpass API / OpenStreetMap) ─────────────────
+// ── Nearby charging stations (Google Places API) ─────────────────────────────
+
+private const val PLACES_API_KEY = "AIzaSyCbWBCfilzapl8xTfZc8KpTMGhfX055rQg"
 
 private data class NearbyStation(val name: String, val distanceM: Double)
 
@@ -447,27 +449,44 @@ private fun haversineM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): 
 private suspend fun fetchNearbyChargers(lat: Double, lon: Double): List<NearbyStation> =
     withContext(Dispatchers.IO) {
         try {
-            val query = """[out:json];node["amenity"="charging_station"](around:5000,$lat,$lon);out body 10;"""
-            val encoded = java.net.URLEncoder.encode(query, "UTF-8")
-            val conn = java.net.URL("https://overpass-api.de/api/interpreter?data=$encoded")
-                .openConnection().also { it.connectTimeout = 8000; it.readTimeout = 10000 }
-            val json = conn.inputStream.bufferedReader().readText()
-            val elements = org.json.JSONObject(json).getJSONArray("elements")
-            (0 until elements.length()).map { i ->
-                val el = elements.getJSONObject(i)
-                val tags = el.optJSONObject("tags")
-                val name = tags?.optString("name")?.takeIf { it.isNotBlank() }
-                    ?: tags?.optString("operator")?.takeIf { it.isNotBlank() }
-                    ?: tags?.optString("brand")?.takeIf { it.isNotBlank() }
-                    ?: tags?.optString("network")?.takeIf { it.isNotBlank() }
-                    ?: tags?.optString("ref")?.takeIf { it.isNotBlank() }
-                    ?: tags?.optString("addr:street")?.takeIf { it.isNotBlank() }
-                        ?.let { "Station – $it" }
-                    ?: String.format(java.util.Locale.US, "%.4f, %.4f",
-                        el.getDouble("lat"), el.getDouble("lon"))
-                NearbyStation(name, haversineM(lat, lon, el.getDouble("lat"), el.getDouble("lon")))
-            }.sortedBy { it.distanceM }.take(2)
-        } catch (_: Exception) {
+            val body = """
+                {
+                  "includedTypes": ["electric_vehicle_charging_station"],
+                  "maxResultCount": 2,
+                  "rankPreference": "DISTANCE",
+                  "locationRestriction": {
+                    "circle": {
+                      "center": { "latitude": $lat, "longitude": $lon },
+                      "radius": 5000.0
+                    }
+                  }
+                }
+            """.trimIndent().toByteArray()
+            val conn = (java.net.URL("https://places.googleapis.com/v1/places:searchNearby")
+                .openConnection() as java.net.HttpURLConnection).also {
+                it.requestMethod = "POST"
+                it.setRequestProperty("Content-Type", "application/json")
+                it.setRequestProperty("X-Goog-Api-Key", PLACES_API_KEY)
+                it.setRequestProperty("X-Goog-FieldMask", "places.displayName,places.location")
+                it.connectTimeout = 8000; it.readTimeout = 10000
+                it.doOutput = true
+                it.outputStream.write(body)
+            }
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            val json = stream.bufferedReader().readText()
+            android.util.Log.d("VF3Charging", "Places ($code): $json")
+            if (code !in 200..299) return@withContext emptyList()
+            val places = org.json.JSONObject(json).optJSONArray("places") ?: return@withContext emptyList()
+            (0 until places.length()).map { i ->
+                val place = places.getJSONObject(i)
+                val name = place.optJSONObject("displayName")?.optString("text")
+                    ?.takeIf { it.isNotBlank() } ?: "Charging Station"
+                val loc = place.getJSONObject("location")
+                NearbyStation(name, haversineM(lat, lon, loc.getDouble("latitude"), loc.getDouble("longitude")))
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("VF3Charging", "fetchNearbyChargers failed", e)
             emptyList()
         }
     }
