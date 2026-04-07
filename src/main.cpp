@@ -11,6 +11,7 @@
 #include "webserver.h"
 #include "discovery.h"
 #include "ota.h"
+#include "tpms.h"
 
 void setup() {
   // Initialize Serial Communication
@@ -29,6 +30,9 @@ void setup() {
 
   // Initialize all pins
   initializePins();
+
+  // Initialize TPMS RF receiver
+  initTpms();
 
   // Initialize WiFi based on configuration status
   if (is_configured) {
@@ -121,6 +125,9 @@ void loop() {
 
   // Broadcast UDP discovery message
   handleDiscoveryBroadcast();
+
+  // Decode TPMS RF packets
+  handleTpms();
 
   // Read all sensors and broadcast if any changed
   bool sensorsChanged = readSensors();

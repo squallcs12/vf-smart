@@ -89,6 +89,22 @@ String getCarStatusJSON() {
     }
   }
 
+  // TPMS tire pressure data
+  auto addTire = [&](JsonObject& parent, const char* key, const TpmsTire& tire) {
+    JsonObject t = parent[key].to<JsonObject>();
+    t["valid"]        = tire.valid;
+    t["stale"]        = tire.isStale();
+    t["pressure_kpa"] = serialized(String(tire.pressureKpa, 1));
+    t["temp_c"]       = tire.tempC;
+    t["battery_ok"]   = tire.batteryOk;
+    t["alarm"]        = tire.alarm;
+  };
+  JsonObject tpms = doc["tpms"].to<JsonObject>();
+  addTire(tpms, "fl", tpms_fl);
+  addTire(tpms, "fr", tpms_fr);
+  addTire(tpms, "rl", tpms_rl);
+  addTire(tpms, "rr", tpms_rr);
+
   String output;
   serializeJson(doc, output);
   return output;

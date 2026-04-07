@@ -44,7 +44,10 @@ data class CarStatus(
     val lightReminderEnabled: Boolean,
 
     @SerializedName("time")
-    val time: TimeInfo?
+    val time: TimeInfo?,
+
+    @SerializedName("tpms")
+    val tpms: TpmsData?
 )
 
 data class Sensors(
@@ -147,6 +150,28 @@ data class Controls(
     @SerializedName("armrest")
     val armrest: Int
 )
+
+data class TpmsTire(
+    @SerializedName("valid")        val valid: Boolean,
+    @SerializedName("stale")        val stale: Boolean,
+    @SerializedName("pressure_kpa") val pressureKpa: Float,
+    @SerializedName("temp_c")       val tempC: Int,
+    @SerializedName("battery_ok")   val batteryOk: Boolean,
+    @SerializedName("alarm")        val alarm: Boolean
+)
+
+data class TpmsData(
+    @SerializedName("fl") val fl: TpmsTire,
+    @SerializedName("fr") val fr: TpmsTire,
+    @SerializedName("rl") val rl: TpmsTire,
+    @SerializedName("rr") val rr: TpmsTire
+) {
+    val anyAlarm: Boolean get() = fl.alarm || fr.alarm || rl.alarm || rr.alarm
+    val anyLow: Boolean   get() = listOf(fl, fr, rl, rr)
+        .filter { it.valid && !it.stale }
+        .any    { it.pressureKpa in 80f..179f }
+    val allValid: Boolean get() = fl.valid && fr.valid && rl.valid && rr.valid
+}
 
 data class TimeInfo(
     @SerializedName("synced")

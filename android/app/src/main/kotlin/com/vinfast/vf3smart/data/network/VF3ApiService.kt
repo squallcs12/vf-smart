@@ -158,4 +158,21 @@ interface VF3ApiService {
     suspend fun controlDashcam(
         @Field("state") state: String
     ): ControlResponse
+
+    /**
+     * Get TPMS sensor ID assignments (no auth required)
+     */
+    @GET("/tpms/calibrate")
+    suspend fun getTpmsCalibration(): TpmsCalibrationResponse
+
+    /**
+     * Reset all TPMS sensor assignments (requires API key)
+     */
+    @FormUrlEncoded
+    @POST("/tpms/calibrate")
+    suspend fun tpmsCalibrate(
+        @Field("action") action: String,
+        @Field("a") posA: String? = null,
+        @Field("b") posB: String? = null
+    ): TpmsCalibrationResponse
 }

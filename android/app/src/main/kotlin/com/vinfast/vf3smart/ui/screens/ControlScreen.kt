@@ -28,6 +28,7 @@ import com.vinfast.vf3smart.viewmodel.ControlViewModel
 @Composable
 fun ControlScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToTpmsCalibration: () -> Unit = {},
     modifier: Modifier = Modifier,
     statusViewModel: CarStatusViewModel = hiltViewModel(),
     controlViewModel: ControlViewModel = hiltViewModel()
@@ -290,6 +291,17 @@ fun ControlScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.padding(top = 4.dp)
                 )
+            }
+
+            // TPMS Calibration
+            OutlinedButton(
+                onClick  = onNavigateToTpmsCalibration,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Settings, contentDescription = null,
+                    modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("TPMS Calibration")
             }
 
             Spacer(modifier = Modifier.height(16.dp))

@@ -15,6 +15,7 @@ import com.vinfast.vf3smart.ui.screens.ControlScreen
 import com.vinfast.vf3smart.ui.screens.DebugScreen
 import com.vinfast.vf3smart.ui.screens.HomeScreen
 import com.vinfast.vf3smart.ui.screens.SetupScreen
+import com.vinfast.vf3smart.ui.screens.TpmsCalibrationScreen
 import com.vinfast.vf3smart.ui.theme.VF3SmartTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -59,6 +60,17 @@ class MainActivity : ComponentActivity() {
 
                         composable("controls") {
                             ControlScreen(
+                                onNavigateBack = {
+                                    navController.popBackStack()
+                                },
+                                onNavigateToTpmsCalibration = {
+                                    navController.navigate("tpms_calibration")
+                                }
+                            )
+                        }
+
+                        composable("tpms_calibration") {
+                            TpmsCalibrationScreen(
                                 onNavigateBack = {
                                     navController.popBackStack()
                                 }

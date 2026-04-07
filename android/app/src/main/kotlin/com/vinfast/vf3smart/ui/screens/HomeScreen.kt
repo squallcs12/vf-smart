@@ -19,7 +19,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import com.vinfast.vf3smart.R
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,6 +36,8 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import com.vinfast.vf3smart.data.model.CarStatus
+import com.vinfast.vf3smart.data.model.TpmsData
+import com.vinfast.vf3smart.data.model.TpmsTire
 import com.vinfast.vf3smart.data.network.WebSocketManager
 import com.vinfast.vf3smart.navigation.NavigationNotificationService
 import com.vinfast.vf3smart.navigation.NavigationState
@@ -192,11 +198,14 @@ private fun MirrorContent(
 
             OdoHorizontalDivider()
 
-            // ── Row 2: TBD ─────────────────────────────────────────────
+            // ── Row 2: TBD | TPMS | TBD ────────────────────────────────
             Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 OdoEmptyCell(modifier = Modifier.weight(1f))
                 OdoVerticalDivider()
-                OdoEmptyCell(modifier = Modifier.weight(1f))
+                OdoTpmsCell(
+                    tpms = carStatus?.tpms,
+                    modifier = Modifier.weight(1f)
+                )
                 OdoVerticalDivider()
                 OdoEmptyCell(modifier = Modifier.weight(1f))
             }
@@ -320,6 +329,94 @@ private fun OdoNavCell(
             letterSpacing = 2.sp,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+@Composable
+private fun OdoTpmsCell(
+    tpms: TpmsData?,
+    modifier: Modifier = Modifier
+) {
+    val cellColor = when {
+        tpms == null      -> OdoInactive
+        tpms.anyAlarm     -> OdoAlert
+        tpms.anyLow       -> OdoWarning
+        tpms.allValid     -> OdoGood
+        else              -> OdoInactive
+    }
+
+    Box(modifier = modifier.fillMaxHeight().background(OdoBg)) {
+        Image(
+            painter = painterResource(R.drawable.ic_vf3_top),
+            contentDescription = "VF3",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize()
+        )
+        // Numbers aligned to tire positions
+        OdoTireNumber(tpms?.fl, cellColor,
+            modifier = Modifier.align(Alignment.TopStart).padding(start = 36.dp, top = 48.dp))
+        OdoTireNumber(tpms?.fr, cellColor,
+            modifier = Modifier.align(Alignment.TopEnd).padding(end = 36.dp, top = 48.dp))
+        OdoTireNumber(tpms?.rl, cellColor,
+            modifier = Modifier.align(Alignment.BottomStart).padding(start = 36.dp, bottom = 23.dp))
+        OdoTireNumber(tpms?.rr, cellColor,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 36.dp, bottom = 23.dp))
+    }
+}
+
+// Tire number for ODO mirror mode — no label, no unit
+@Composable
+private fun OdoTireNumber(
+    tire: TpmsTire?,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    val tireColor = when {
+        tire == null || !tire.valid || tire.stale -> OdoInactive
+        tire.alarm                                -> OdoAlert
+        tire.pressureKpa < 180f                  -> OdoWarning
+        else                                      -> color
+    }
+    val valueText = if (tire != null && tire.valid && !tire.stale)
+        String.format("%.1f", tire.pressureKpa / 100f)
+    else "_._"
+
+    Text(
+        text = valueText,
+        color = tireColor,
+        fontSize = 22.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 0.sp,
+        modifier = modifier
+    )
+}
+
+// TpmsTireValue used in calibration screen (with kPa unit)
+@Composable
+private fun TpmsTireValue(
+    position: String,
+    tire: TpmsTire?,
+    color: Color
+) {
+    val tireColor = when {
+        tire == null || !tire.valid || tire.stale -> OdoInactive
+        tire.alarm                                -> OdoAlert
+        tire.pressureKpa < 180f                  -> OdoWarning
+        else                                      -> color
+    }
+    val valueText = if (tire != null && tire.valid && !tire.stale)
+        String.format("%.0f", tire.pressureKpa)
+    else "_._"
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.defaultMinSize(minWidth = 52.dp)
+    ) {
+        Text(text = position, color = OdoLabel, fontSize = 9.sp,
+            letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
+        Text(text = valueText, color = tireColor, fontSize = 20.sp,
+            fontWeight = FontWeight.Bold, letterSpacing = 0.sp)
+        Text(text = "kPa", color = OdoLabel, fontSize = 8.sp, letterSpacing = 1.sp)
     }
 }
 

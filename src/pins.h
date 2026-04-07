@@ -29,6 +29,7 @@
 #define VF3_REMOTE_LOCK_PRESS 18       // GPIO 18 - Car remote lock button press detection (1=pressed, 0=not pressed)
 #define VF3_REMOTE_UNLOCK_PRESS 19     // GPIO 19 - Car remote unlock button press detection (1=pressed, 0=not pressed)
 #define VF3_FACTORY_RESET_BTN 0        // GPIO 0 - Factory reset button (BOOT button, active LOW, hold 10s to reset)
+#define TPMS_RF_PIN 23                 // GPIO 23 - RF 433MHz receiver DATA pin (XY-MK-5V or equivalent)
 
 // ===== DIGITAL OUTPUTS (Controls & Indicators) - PCF8575 I2C I/O Expander =====
 // All outputs now controlled via PCF8575 at I2C address 0x20 (pins P0-P15)

@@ -14,6 +14,7 @@
 #include "webserver/onboarding_endpoints.h"
 #include "webserver/vehicle_accessories_endpoints.h"
 #include "webserver/ota_endpoint.h"
+#include "webserver/tpms_endpoint.h"
 
 AsyncWebServer server(80);
 
@@ -35,6 +36,7 @@ void setupWebServer() {
   registerDashboardEndpoint(server);
   registerVehicleAccessoriesEndpoints(server);
   registerOTAEndpoint(server);
+  registerTpmsEndpoint(server);
 
   // Handle 404
   server.onNotFound([](AsyncWebServerRequest *request){

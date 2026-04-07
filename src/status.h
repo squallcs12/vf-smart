@@ -6,6 +6,7 @@
 #include "pins.h"
 #include "time_sync.h"
 #include "controls/car_state.h"
+#include "tpms.h"
 #include <ArduinoJson.h>
 
 String getCarStatusJSON();

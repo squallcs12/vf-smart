@@ -99,6 +99,27 @@ data class ChargerResponse(
 )
 
 /**
+ * TPMS calibration — GET /tpms/calibrate and POST /tpms/calibrate responses
+ */
+data class TpmsSensorInfo(
+    @SerializedName("id")      val id: String,
+    @SerializedName("learned") val learned: Boolean
+)
+
+data class TpmsSensorAssignments(
+    @SerializedName("fl") val fl: TpmsSensorInfo,
+    @SerializedName("fr") val fr: TpmsSensorInfo,
+    @SerializedName("rl") val rl: TpmsSensorInfo,
+    @SerializedName("rr") val rr: TpmsSensorInfo
+)
+
+data class TpmsCalibrationResponse(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("message") val message: String? = null,
+    @SerializedName("sensors") val sensors: TpmsSensorAssignments? = null
+)
+
+/**
  * Error response (401, 404, 500, etc.)
  */
 data class ErrorResponse(

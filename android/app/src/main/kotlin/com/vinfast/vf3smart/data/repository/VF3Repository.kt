@@ -243,6 +243,27 @@ class VF3Repository @Inject constructor(
     }
 
     /**
+     * Get current TPMS sensor ID assignments
+     */
+    suspend fun getTpmsCalibration(): Result<TpmsCalibrationResponse> = safeApiCall {
+        apiService.getTpmsCalibration()
+    }
+
+    /**
+     * Reset all TPMS sensor assignments
+     */
+    suspend fun tpmsReset(): Result<TpmsCalibrationResponse> = safeApiCall {
+        apiService.tpmsCalibrate("reset")
+    }
+
+    /**
+     * Swap two TPMS tire positions (posA/posB: "fl", "fr", "rl", "rr")
+     */
+    suspend fun tpmsSwap(posA: String, posB: String): Result<TpmsCalibrationResponse> = safeApiCall {
+        apiService.tpmsCalibrate("swap", posA, posB)
+    }
+
+    /**
      * Test connection to device
      * @return true if connection successful, false otherwise
      */
