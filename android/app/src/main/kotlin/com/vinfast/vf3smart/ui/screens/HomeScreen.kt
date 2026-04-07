@@ -1,6 +1,8 @@
 package com.vinfast.vf3smart.ui.screens
 
 import android.app.Activity
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalView
@@ -27,6 +30,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vinfast.vf3smart.data.model.CarStatus
 import com.vinfast.vf3smart.data.network.WebSocketManager
+import com.vinfast.vf3smart.navigation.NavigationNotificationService
+import com.vinfast.vf3smart.navigation.NavigationState
 import com.vinfast.vf3smart.ui.components.ControlButton
 import com.vinfast.vf3smart.ui.components.StatusCard
 import com.vinfast.vf3smart.viewmodel.CarStatusViewModel
@@ -35,9 +40,9 @@ import com.vinfast.vf3smart.viewmodel.ControlViewModel
 // ODO colour palette
 private val OdoBg        = Color(0xFF0A0A0A)
 private val OdoDivider   = Color(0xFF1C1C1C)
-private val OdoLabel     = Color(0xFF4A4A4A)
-private val OdoInactive  = Color(0xFF3A3A3A)
-private val OdoNormal    = Color(0xFFD0D0D0)
+private val OdoLabel     = Color(0xFF909090)
+private val OdoInactive  = Color(0xFF686868)
+private val OdoNormal    = Color(0xFFF0F0F0)
 private val OdoGood      = Color(0xFF4CAF50)
 private val OdoWarning   = Color(0xFFFFB300)
 private val OdoAlert     = Color(0xFFEF5350)
@@ -56,6 +61,14 @@ fun HomeScreen(
     val carStatus by statusViewModel.carStatus.collectAsStateWithLifecycle()
     val connectionState by statusViewModel.connectionState.collectAsStateWithLifecycle()
     val operationState by controlViewModel.operationState.collectAsStateWithLifecycle()
+    val navigationState by NavigationNotificationService.navigationState.collectAsStateWithLifecycle()
+
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        if (!isNotificationListenerGranted(context)) {
+            context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        }
+    }
 
     // Hide system bars in mirror mode for true full-screen display
     val view = LocalView.current
@@ -75,7 +88,8 @@ fun HomeScreen(
         if (mirrorMode) {
             MirrorContent(
                 carStatus = carStatus,
-                connectionState = connectionState
+                connectionState = connectionState,
+                navigationState = navigationState
             )
         } else {
             FullContent(
@@ -116,18 +130,15 @@ fun HomeScreen(
 private fun MirrorContent(
     carStatus: CarStatus?,
     connectionState: WebSocketManager.ConnectionState,
+    navigationState: NavigationState,
     modifier: Modifier = Modifier
 ) {
-    val isLocked    = carStatus?.carLockState == "locked"
-    val windowsOpen = carStatus != null &&
-            (carStatus.windows.leftState == 2 || carStatus.windows.rightState == 2)
-    val isCharging  = carStatus?.chargingStatus == 1
-    val lightsOn    = carStatus != null &&
-            (carStatus.lights.normalLight == 1 || carStatus.lights.demiLight == 1)
-    val isNight     = carStatus?.time?.isNight == true
-    val inDrive     = carStatus?.sensors?.gearDrive == 1
-    val doorsOpen   = carStatus != null && (carStatus.doors.frontLeft == 1 ||
-            carStatus.doors.frontRight == 1 || carStatus.doors.trunk == 1)
+    // ── Derived values ────────────────────────────────────────────────
+    val clockText = carStatus?.time?.currentTime
+        ?.substringAfter(" ")?.take(5) ?: "--:--"
+    val isNight   = carStatus?.time?.isNight == true
+    val tripText  = carStatus?.time
+        ?.let { calcTripTimer(it.bootTime, it.currentTime) } ?: "--:--"
 
     Box(
         modifier = modifier
@@ -135,90 +146,41 @@ private fun MirrorContent(
             .background(OdoBg)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // ── Row 1 ──────────────────────────────────────────────────
+            // ── Row 1: Clock | Navigation | Trip ───────────────────────
             Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                OdoCell(
-                    label = "CAR LOCK",
-                    value = if (carStatus == null) "--" else if (isLocked) "LOCKED" else "UNLOCKED",
-                    icon = if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
-                    color = when {
-                        carStatus == null -> OdoInactive
-                        isLocked -> OdoGood
-                        else -> OdoWarning
-                    },
+                OdoClockCell(
+                    time = clockText,
+                    isNight = isNight,
+                    hasData = carStatus != null,
+                    modifier = Modifier.weight(1f)
+                )
+                OdoVerticalDivider()
+                OdoNavCell(
+                    navigationState = navigationState,
                     modifier = Modifier.weight(1f)
                 )
                 OdoVerticalDivider()
                 OdoCell(
-                    label = "WINDOWS",
-                    value = if (carStatus == null) "--" else if (windowsOpen) "OPEN" else "CLOSED",
-                    icon = if (windowsOpen) Icons.Default.Warning else Icons.Default.Check,
-                    color = when {
-                        carStatus == null -> OdoInactive
-                        windowsOpen && isLocked -> OdoAlert
-                        windowsOpen -> OdoWarning
-                        else -> OdoGood
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-                OdoVerticalDivider()
-                OdoCell(
-                    label = "CHARGING",
-                    value = if (carStatus == null) "--" else if (isCharging) "CHARGING" else "NOT CHARGING",
-                    icon = Icons.Default.BatteryChargingFull,
-                    color = when {
-                        carStatus == null -> OdoInactive
-                        isCharging -> OdoGood
-                        else -> OdoNormal
-                    },
+                    label = "TRIP",
+                    value = tripText,
+                    icon = Icons.Default.Timer,
+                    color = if (carStatus == null) OdoInactive else OdoNormal,
                     modifier = Modifier.weight(1f)
                 )
             }
 
             OdoHorizontalDivider()
 
-            // ── Row 2 ──────────────────────────────────────────────────
+            // ── Row 2: TBD ─────────────────────────────────────────────
             Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                OdoCell(
-                    label = "LIGHTS",
-                    value = if (carStatus == null) "--" else if (lightsOn) "ON" else "OFF",
-                    icon = Icons.Default.Lightbulb,
-                    color = when {
-                        carStatus == null -> OdoInactive
-                        lightsOn -> OdoNormal
-                        isNight -> OdoAlert
-                        else -> OdoInactive
-                    },
-                    modifier = Modifier.weight(1f)
-                )
+                OdoEmptyCell(modifier = Modifier.weight(1f))
                 OdoVerticalDivider()
-                OdoCell(
-                    label = "GEAR",
-                    value = if (carStatus == null) "--" else if (inDrive) "DRIVE" else "PARK",
-                    icon = Icons.Default.DirectionsCar,
-                    color = when {
-                        carStatus == null -> OdoInactive
-                        inDrive -> OdoNormal
-                        else -> OdoInactive
-                    },
-                    modifier = Modifier.weight(1f)
-                )
+                OdoEmptyCell(modifier = Modifier.weight(1f))
                 OdoVerticalDivider()
-                OdoCell(
-                    label = "DOORS",
-                    value = if (carStatus == null) "--" else if (doorsOpen) "OPEN" else "CLOSED",
-                    icon = if (doorsOpen) Icons.Default.Warning else Icons.Default.Check,
-                    color = when {
-                        carStatus == null -> OdoInactive
-                        doorsOpen -> OdoAlert
-                        else -> OdoGood
-                    },
-                    modifier = Modifier.weight(1f)
-                )
+                OdoEmptyCell(modifier = Modifier.weight(1f))
             }
         }
 
-        // Connection dot — top-right
         ConnectionDot(
             connectionState = connectionState,
             modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
@@ -264,6 +226,95 @@ private fun OdoCell(
             textAlign = TextAlign.Center
         )
     }
+}
+
+// Trip timer: elapsed HH:MM between two "yyyy-MM-dd HH:mm:ss" strings
+private fun calcTripTimer(bootTime: String, currentTime: String): String {
+    return try {
+        val fmt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+        val boot = fmt.parse(bootTime) ?: return "--:--"
+        val cur  = fmt.parse(currentTime) ?: return "--:--"
+        val secs = ((cur.time - boot.time) / 1000).coerceAtLeast(0)
+        val h = secs / 3600
+        val m = (secs % 3600) / 60
+        "${h}:${m.toString().padStart(2, '0')}"
+    } catch (_: Exception) { "--:--" }
+}
+
+@Composable
+private fun OdoClockCell(
+    time: String,
+    isNight: Boolean,
+    hasData: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val color = if (hasData) OdoNormal else OdoInactive
+    val icon  = if (isNight) Icons.Default.NightsStay else Icons.Default.WbSunny
+
+    Column(
+        modifier = modifier.fillMaxHeight(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(40.dp))
+        Spacer(Modifier.height(10.dp))
+        Text(time, color = color, fontSize = 28.sp,
+            fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, letterSpacing = 1.sp)
+        Spacer(Modifier.height(6.dp))
+        Text("CLOCK", color = OdoLabel, fontSize = 10.sp,
+            fontWeight = FontWeight.Medium, letterSpacing = 2.sp, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
+private fun OdoNavCell(
+    navigationState: NavigationState,
+    modifier: Modifier = Modifier
+) {
+    val icon = when (navigationState.direction) {
+        NavigationState.Direction.LEFT       -> Icons.Default.ArrowBack
+        NavigationState.Direction.RIGHT      -> Icons.Default.ArrowForward
+        NavigationState.Direction.U_TURN     -> Icons.Default.ArrowDownward
+        NavigationState.Direction.ROUNDABOUT -> Icons.Default.Loop
+        NavigationState.Direction.STRAIGHT   -> Icons.Default.ArrowUpward
+    }
+    val color = if (navigationState.isActive) OdoNormal else OdoInactive
+
+    Column(
+        modifier = modifier.fillMaxHeight(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(40.dp)
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = if (navigationState.isActive) navigationState.distance else "--",
+            color = color,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            letterSpacing = 1.sp
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = if (navigationState.isActive) navigationState.maneuver else "NO NAVIGATION",
+            color = OdoLabel,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 2.sp,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun OdoEmptyCell(modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxHeight())
 }
 
 @Composable
@@ -341,6 +392,7 @@ private fun FullContent(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
+        val context = LocalContext.current
         val isConnected = connectionState == WebSocketManager.ConnectionState.Connected
         val isLoading = operationState is ControlViewModel.OperationState.Loading
         val enabled = isConnected && !isLoading
@@ -356,6 +408,11 @@ private fun FullContent(
             // Disconnected banner
             if (!isConnected) {
                 DisconnectedBanner(connectionState)
+            }
+
+            // Notification access banner (needed for nav directions)
+            if (!isNotificationListenerGranted(context)) {
+                NotificationAccessBanner()
             }
 
             // Status grid — 2 columns
@@ -653,6 +710,54 @@ private fun DisconnectedBanner(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
                 )
+            }
+        }
+    }
+}
+
+private fun isNotificationListenerGranted(context: android.content.Context): Boolean {
+    val flat = android.provider.Settings.Secure.getString(
+        context.contentResolver, "enabled_notification_listeners"
+    )
+    return flat?.contains(context.packageName) == true
+}
+
+@Composable
+private fun NotificationAccessBanner(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.Notifications,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(20.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Navigation Access Required",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Text(
+                    "Grant notification access to show turn-by-turn directions",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                )
+            }
+            TextButton(onClick = {
+                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            }) {
+                Text("Grant")
             }
         }
     }

@@ -54,6 +54,9 @@ data class Sensors(
     @SerializedName("steering_angle")
     val steeringAngle: Int,
 
+    @SerializedName("battery_voltage")
+    val batteryVoltage: String = "0.0",
+
     @SerializedName("gear_drive")
     val gearDrive: Int
 )
