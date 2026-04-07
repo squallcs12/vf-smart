@@ -93,6 +93,7 @@ fun HomeScreen(
     var foregroundTime by remember { mutableStateOf(System.currentTimeMillis()) }
     LifecycleEventEffect(Lifecycle.Event.ON_START) {
         foregroundTime = System.currentTimeMillis()
+        kmlStationCache = null  // refresh charger data each time app is foregrounded
     }
     var tripTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
@@ -505,6 +506,9 @@ private fun OdoChargingCell(modifier: Modifier = Modifier) {
     var stations by remember { mutableStateOf<List<NearbyStation>>(emptyList()) }
     var statusText by remember { mutableStateOf("LOCATING...") }
     var refreshKey by remember { mutableIntStateOf(0) }
+
+    // Re-fetch each time the app is foregrounded (mirrors trip clock reset)
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { refreshKey++ }
 
     val permLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
