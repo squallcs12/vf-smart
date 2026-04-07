@@ -27,7 +27,10 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
 import com.vinfast.vf3smart.data.model.CarStatus
 import com.vinfast.vf3smart.data.network.WebSocketManager
 import com.vinfast.vf3smart.navigation.NavigationNotificationService
@@ -70,6 +73,25 @@ fun HomeScreen(
         }
     }
 
+    // Trip clock: reset on foreground, tick every second
+    var foregroundTime by remember { mutableStateOf(System.currentTimeMillis()) }
+    LifecycleEventEffect(Lifecycle.Event.ON_START) {
+        foregroundTime = System.currentTimeMillis()
+    }
+    var tripTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000)
+            tripTick++
+        }
+    }
+    val tripText = remember(tripTick, foregroundTime) {
+        val secs = (System.currentTimeMillis() - foregroundTime) / 1000
+        val h = secs / 3600
+        val m = (secs % 3600) / 60
+        "${h}:${m.toString().padStart(2, '0')}"
+    }
+
     // Hide system bars in mirror mode for true full-screen display
     val view = LocalView.current
     SideEffect {
@@ -89,7 +111,8 @@ fun HomeScreen(
             MirrorContent(
                 carStatus = carStatus,
                 connectionState = connectionState,
-                navigationState = navigationState
+                navigationState = navigationState,
+                tripText = tripText
             )
         } else {
             FullContent(
@@ -131,14 +154,13 @@ private fun MirrorContent(
     carStatus: CarStatus?,
     connectionState: WebSocketManager.ConnectionState,
     navigationState: NavigationState,
+    tripText: String,
     modifier: Modifier = Modifier
 ) {
     // ── Derived values ────────────────────────────────────────────────
     val clockText = carStatus?.time?.currentTime
         ?.substringAfter(" ")?.take(5) ?: "--:--"
     val isNight   = carStatus?.time?.isNight == true
-    val tripText  = carStatus?.time
-        ?.let { calcTripTimer(it.bootTime, it.currentTime) } ?: "--:--"
 
     Box(
         modifier = modifier
@@ -163,8 +185,7 @@ private fun MirrorContent(
                 OdoCell(
                     label = "TRIP",
                     value = tripText,
-                    icon = Icons.Default.Timer,
-                    color = if (carStatus == null) OdoInactive else OdoNormal,
+                    color = OdoNormal,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -192,8 +213,8 @@ private fun MirrorContent(
 private fun OdoCell(
     label: String,
     value: String,
-    icon: ImageVector,
     color: Color,
+    icon: ImageVector? = null,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -201,13 +222,15 @@ private fun OdoCell(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(40.dp)
-        )
-        Spacer(Modifier.height(10.dp))
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(40.dp)
+            )
+            Spacer(Modifier.height(10.dp))
+        }
         Text(
             text = value,
             color = color,
@@ -228,18 +251,6 @@ private fun OdoCell(
     }
 }
 
-// Trip timer: elapsed HH:MM between two "yyyy-MM-dd HH:mm:ss" strings
-private fun calcTripTimer(bootTime: String, currentTime: String): String {
-    return try {
-        val fmt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
-        val boot = fmt.parse(bootTime) ?: return "--:--"
-        val cur  = fmt.parse(currentTime) ?: return "--:--"
-        val secs = ((cur.time - boot.time) / 1000).coerceAtLeast(0)
-        val h = secs / 3600
-        val m = (secs % 3600) / 60
-        "${h}:${m.toString().padStart(2, '0')}"
-    } catch (_: Exception) { "--:--" }
-}
 
 @Composable
 private fun OdoClockCell(
