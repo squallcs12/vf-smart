@@ -430,11 +430,15 @@ private fun TpmsTireValue(
     }
 }
 
-// ── Nearby charging stations (Google Places API) ─────────────────────────────
+// ── Nearby charging stations (Google My Maps KML) ────────────────────────────
 
-private const val PLACES_API_KEY = "AIzaSyCbWBCfilzapl8xTfZc8KpTMGhfX055rQg"
+private const val CHARGER_KML_URL =
+    "https://www.google.com/maps/d/kml?mid=1iIZ3L3KEKU0fg5XsIQ6hbRl7NVY8JNA&forcekml=1"
 
 private data class NearbyStation(val name: String, val distanceM: Double)
+
+// In-memory cache so the KML is fetched only once per app session
+private var kmlStationCache: List<Pair<String, Pair<Double, Double>>>? = null
 
 private fun haversineM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
     val r = 6_371_000.0
@@ -446,49 +450,53 @@ private fun haversineM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): 
     return r * 2 * Math.asin(Math.sqrt(a))
 }
 
-private suspend fun fetchNearbyChargers(lat: Double, lon: Double): List<NearbyStation> =
+/** Fetches and parses the KML once; subsequent calls return the cached list. */
+private suspend fun loadKmlStations(): List<Pair<String, Pair<Double, Double>>> =
     withContext(Dispatchers.IO) {
+        kmlStationCache?.let { return@withContext it }
         try {
-            val body = """
-                {
-                  "includedTypes": ["electric_vehicle_charging_station"],
-                  "maxResultCount": 2,
-                  "rankPreference": "DISTANCE",
-                  "locationRestriction": {
-                    "circle": {
-                      "center": { "latitude": $lat, "longitude": $lon },
-                      "radius": 5000.0
-                    }
-                  }
-                }
-            """.trimIndent().toByteArray()
-            val conn = (java.net.URL("https://places.googleapis.com/v1/places:searchNearby")
-                .openConnection() as java.net.HttpURLConnection).also {
-                it.requestMethod = "POST"
-                it.setRequestProperty("Content-Type", "application/json")
-                it.setRequestProperty("X-Goog-Api-Key", PLACES_API_KEY)
-                it.setRequestProperty("X-Goog-FieldMask", "places.displayName,places.location")
-                it.connectTimeout = 8000; it.readTimeout = 10000
-                it.doOutput = true
-                it.outputStream.write(body)
+            val conn = (java.net.URL(CHARGER_KML_URL).openConnection()
+                    as java.net.HttpURLConnection).also {
+                it.connectTimeout = 10_000
+                it.readTimeout  = 15_000
+                it.setRequestProperty("User-Agent", "VF3Smart/1.0")
             }
-            val code = conn.responseCode
-            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-            val json = stream.bufferedReader().readText()
-            android.util.Log.d("VF3Charging", "Places ($code): $json")
-            if (code !in 200..299) return@withContext emptyList()
-            val places = org.json.JSONObject(json).optJSONArray("places") ?: return@withContext emptyList()
-            (0 until places.length()).map { i ->
-                val place = places.getJSONObject(i)
-                val name = place.optJSONObject("displayName")?.optString("text")
-                    ?.takeIf { it.isNotBlank() } ?: "Charging Station"
-                val loc = place.getJSONObject("location")
-                NearbyStation(name, haversineM(lat, lon, loc.getDouble("latitude"), loc.getDouble("longitude")))
+            val kml = conn.inputStream.bufferedReader().readText()
+            android.util.Log.d("VF3Charging", "KML fetched, length=${kml.length}")
+
+            val doc = javax.xml.parsers.DocumentBuilderFactory.newInstance()
+                .newDocumentBuilder().parse(kml.byteInputStream())
+            val placemarks = doc.getElementsByTagName("Placemark")
+            val result = mutableListOf<Pair<String, Pair<Double, Double>>>()
+            for (i in 0 until placemarks.length) {
+                val pm = placemarks.item(i) as org.w3c.dom.Element
+                val name = pm.getElementsByTagName("name").item(0)
+                    ?.textContent?.trim().takeIf { !it.isNullOrBlank() } ?: continue
+                val coordText = pm.getElementsByTagName("coordinates").item(0)
+                    ?.textContent?.trim() ?: continue
+                // KML coordinates: lon,lat[,alt]
+                val parts = coordText.split(",")
+                val lon = parts.getOrNull(0)?.trim()?.toDoubleOrNull() ?: continue
+                val lat = parts.getOrNull(1)?.trim()?.toDoubleOrNull() ?: continue
+                result.add(name to (lat to lon))
             }
+            android.util.Log.d("VF3Charging", "Parsed ${result.size} stations from KML")
+            kmlStationCache = result
+            result
         } catch (e: Exception) {
-            android.util.Log.e("VF3Charging", "fetchNearbyChargers failed", e)
+            android.util.Log.e("VF3Charging", "loadKmlStations failed", e)
             emptyList()
         }
+    }
+
+private suspend fun fetchNearbyChargers(lat: Double, lon: Double): List<NearbyStation> =
+    withContext(Dispatchers.IO) {
+        loadKmlStations()
+            .map { (name, coords) ->
+                NearbyStation(name, haversineM(lat, lon, coords.first, coords.second))
+            }
+            .sortedBy { it.distanceM }
+            .take(2)
     }
 
 @Composable
