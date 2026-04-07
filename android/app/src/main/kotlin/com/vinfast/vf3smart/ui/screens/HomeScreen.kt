@@ -500,50 +500,63 @@ private suspend fun fetchNearbyChargers(lat: Double, lon: Double): List<NearbySt
             .take(2)
     }
 
+@SuppressLint("MissingPermission")
 @Composable
 private fun OdoChargingCell(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var stations by remember { mutableStateOf<List<NearbyStation>>(emptyList()) }
     var statusText by remember { mutableStateOf("LOCATING...") }
-    var refreshKey by remember { mutableIntStateOf(0) }
 
-    // Re-fetch each time the app is foregrounded (mirrors trip clock reset)
-    LifecycleEventEffect(Lifecycle.Event.ON_START) { refreshKey++ }
+    fun hasPerm() = ContextCompat.checkSelfPermission(
+        context, android.Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED ||
+    ContextCompat.checkSelfPermission(
+        context, android.Manifest.permission.ACCESS_COARSE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    var permGranted by remember { mutableStateOf(hasPerm()) }
+
+    // Re-check permission and clear KML cache each time app is foregrounded
+    LifecycleEventEffect(Lifecycle.Event.ON_START) {
+        kmlStationCache = null
+        permGranted = hasPerm()
+    }
 
     val permLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { results -> if (results.values.any { it }) refreshKey++ }
+    ) { results -> if (results.values.any { it }) permGranted = true }
 
-    LaunchedEffect(refreshKey) {
-        val hasPerm = ContextCompat.checkSelfPermission(
-            context, android.Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED ||
-        ContextCompat.checkSelfPermission(
-            context, android.Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (!hasPerm) {
+    // Live location updates — register/unregister with permission state
+    var location by remember { mutableStateOf<android.location.Location?>(null) }
+    DisposableEffect(permGranted) {
+        if (!permGranted) {
             statusText = "NO PERMISSION"
             permLauncher.launch(arrayOf(
                 android.Manifest.permission.ACCESS_FINE_LOCATION,
                 android.Manifest.permission.ACCESS_COARSE_LOCATION
             ))
-            return@LaunchedEffect
-        }
-
-        statusText = "LOCATING..."
-        @SuppressLint("MissingPermission")
-        val location = withContext(Dispatchers.IO) {
+            onDispose {}
+        } else {
             val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            val listener = android.location.LocationListener { loc -> location = loc }
+            // Seed immediately with last known location
+            statusText = "LOCATING..."
+            val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
                 ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
                 ?: lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
+            if (seed != null) location = seed else statusText = "NO GPS SIGNAL"
+            // Live updates: every 30 s or 100 m movement
+            try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER,     30_000L, 100f, listener) } catch (_: Exception) {}
+            try { lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER,  30_000L, 100f, listener) } catch (_: Exception) {}
+            onDispose { lm.removeUpdates(listener) }
         }
+    }
 
-        if (location == null) { statusText = "NO GPS SIGNAL"; return@LaunchedEffect }
-
+    // Re-fetch chargers on every location update
+    LaunchedEffect(location) {
+        val loc = location ?: return@LaunchedEffect
         statusText = "SEARCHING..."
-        val result = fetchNearbyChargers(location.latitude, location.longitude)
+        val result = fetchNearbyChargers(loc.latitude, loc.longitude)
         stations = result
         statusText = if (result.isEmpty()) "NONE NEARBY" else "CHARGING"
     }
