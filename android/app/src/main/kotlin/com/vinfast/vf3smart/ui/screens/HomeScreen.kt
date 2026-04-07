@@ -46,7 +46,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
 import com.vinfast.vf3smart.data.model.CarStatus
 import com.vinfast.vf3smart.data.model.TpmsData
 import com.vinfast.vf3smart.data.model.TpmsTire
@@ -541,12 +540,10 @@ private fun kmlStationsFlow(context: Context) = flow {
     }
 }.flowOn(Dispatchers.IO)
 
-private fun nearbyChargersFlow(context: Context, lat: Double, lon: Double) =
-    kmlStationsFlow(context).map { all ->
-        all.map { (name, coords) -> NearbyStation(name, haversineM(lat, lon, coords.first, coords.second)) }
-            .sortedBy { it.distanceM }
-            .take(2)
-    }
+private fun sortNearby(all: List<Pair<String, Pair<Double, Double>>>, lat: Double, lon: Double) =
+    all.map { (name, coords) -> NearbyStation(name, haversineM(lat, lon, coords.first, coords.second)) }
+        .sortedBy { it.distanceM }
+        .take(2)
 
 @SuppressLint("MissingPermission")
 @Composable
@@ -564,11 +561,19 @@ private fun OdoChargingCell(modifier: Modifier = Modifier) {
 
     var permGranted by remember { mutableStateOf(hasPerm()) }
 
-    // Re-check permission and trigger a fresh KML fetch each time app is foregrounded
+    // KML data as Compose state so location effect reacts to it
+    var kmlData by remember { mutableStateOf(kmlMemCache ?: emptyList()) }
+
+    // On foreground: re-check permission + refresh KML from network
     var foregroundKey by remember { mutableIntStateOf(0) }
     LifecycleEventEffect(Lifecycle.Event.ON_START) {
         permGranted = hasPerm()
         foregroundKey++
+    }
+
+    // KML refresh: only on foreground — emits cache first, then network update
+    LaunchedEffect(foregroundKey) {
+        kmlStationsFlow(context).collect { fresh -> kmlData = fresh }
     }
 
     val permLauncher = rememberLauncherForActivityResult(
@@ -588,27 +593,24 @@ private fun OdoChargingCell(modifier: Modifier = Modifier) {
         } else {
             val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
             val listener = android.location.LocationListener { loc -> location = loc }
-            // Seed immediately with last known location
             statusText = "LOCATING..."
             val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
                 ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
                 ?: lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
             if (seed != null) location = seed else statusText = "NO GPS SIGNAL"
-            // Live updates: every 30 s or 100 m movement
             try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER,     30_000L, 100f, listener) } catch (_: Exception) {}
             try { lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER,  30_000L, 100f, listener) } catch (_: Exception) {}
             onDispose { lm.removeUpdates(listener) }
         }
     }
 
-    // Re-fetch chargers on location change or foreground — collect emits cached then fresh
-    LaunchedEffect(location, foregroundKey) {
+    // Re-sort on location change using cached KML — no network call
+    LaunchedEffect(location, kmlData) {
         val loc = location ?: return@LaunchedEffect
-        statusText = "SEARCHING..."
-        nearbyChargersFlow(context, loc.latitude, loc.longitude).collect { result ->
-            stations = result
-            statusText = if (result.isEmpty()) "NONE NEARBY" else "CHARGING"
-        }
+        if (kmlData.isEmpty()) { statusText = "SEARCHING..."; return@LaunchedEffect }
+        val result = sortNearby(kmlData, loc.latitude, loc.longitude)
+        stations = result
+        statusText = if (result.isEmpty()) "NONE NEARBY" else "CHARGING"
     }
 
     Column(
