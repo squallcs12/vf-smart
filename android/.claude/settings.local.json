@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(adb logcat:*)",
+      "WebFetch(domain:stackoverflow.com)",
+      "WebFetch(domain:www.reddit.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:proandroiddev.com)",
+      "WebFetch(domain:issuetracker.google.com)"
+    ]
+  }
+}

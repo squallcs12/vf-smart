@@ -1603,3 +1603,33 @@ Each cell: centered icon (40dp) → large bold value (28sp, 1sp letter-spacing) 
 - Doors: Good=all closed, Alert=any open
 
 **No interactive elements** in mirror mode — the mirrored screen is not touchable.
+
+### ODO Screen — Confirmed Items (Work in Progress)
+
+**Layout**: Single row × 3 columns (full screen height per cell — ~540dp tall on 9-inch 1080p)
+
+**Confirmed cells:**
+1. **Battery Voltage** — horizontal gauge bar + numeric value, color zones by voltage range
+2. **Clock** — large HH:MM from `time.current_time`, sun/moon icon from `time.is_night`
+3. **Trip Timer** — elapsed HH:MM since boot, derived from `time.boot_time` vs `time.current_time` (no firmware change needed)
+
+**Still looking for 3 more features** — must be VF3-specific, not already on VF3 original screen.
+
+### ODO Screen — Feature 4: Google Maps Navigation Direction
+
+**Concept**: Display current Google Maps turn-by-turn instruction on the ODO screen.
+Example: arrow icon + "300 m" + "TURN LEFT"
+
+**Implementation approach**: `NotificationListenerService`
+- Google Maps posts a persistent notification during active navigation
+- Parse `Notification.EXTRA_TITLE` (maneuver, e.g. "Turn left") and `Notification.EXTRA_TEXT` (distance, e.g. "In 300 m")
+- Filter by package: `com.google.android.apps.maps`
+- No Google Maps SDK or API key required
+- Permission required: `BIND_NOTIFICATION_LISTENER_SERVICE` (user must grant in Settings > Notification Access)
+- Expose parsed data via `StateFlow` in a service/repository
+- When no active navigation: show "NO NAVIGATION" in dim inactive color
+
+**ODO cell layout**:
+- Large directional arrow icon (derived from maneuver keyword: left/right/straight/roundabout)
+- Distance text (e.g. "300 m")
+- Maneuver label (e.g. "TURN LEFT") in caps + letter-spacing, ODO style
