@@ -439,6 +439,11 @@ private fun OdoTripCell(
         }
     }
 
+    var colonVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        while (true) { delay(1000); colonVisible = !colonVisible }
+    }
+
     val isStopped = hasGps && speedKmh < 1f
     var hasMovedOnce by remember { mutableStateOf(false) }
     var countdownSecs by remember { mutableIntStateOf(15) }
@@ -501,14 +506,30 @@ private fun OdoTripCell(
                 letterSpacing = 2.sp
             )
             Spacer(Modifier.height(6.dp))
-            Text(
-                text = tripText,
-                color = OdoNormal,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                letterSpacing = 1.sp
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val parts = tripText.split(":")
+                Text(
+                    text = parts[0],
+                    color = OdoNormal,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Text(
+                    text = ":",
+                    color = if (colonVisible) OdoNormal else Color.Transparent,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Text(
+                    text = parts.getOrElse(1) { "00" },
+                    color = OdoNormal,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+            }
         }
     }
 }
