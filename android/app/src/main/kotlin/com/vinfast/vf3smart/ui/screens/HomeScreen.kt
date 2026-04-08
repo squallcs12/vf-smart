@@ -427,9 +427,12 @@ private fun OdoTripCell(
         if (!permGranted) { onDispose {} } else {
             val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
             val listener = android.location.LocationListener { loc ->
+                val spd = if (loc.hasSpeed()) loc.speed * 3.6f else -1f
+                android.util.Log.d("VF3TripCell", "location update: hasSpeed=${loc.hasSpeed()} speed=$spd km/h provider=${loc.provider}")
                 if (loc.hasSpeed()) { speedKmh = loc.speed * 3.6f; hasGps = true }
             }
             val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            android.util.Log.d("VF3TripCell", "seed location: $seed hasSpeed=${seed?.hasSpeed()} speed=${seed?.speed}")
             if (seed != null && seed.hasSpeed()) { speedKmh = seed.speed * 3.6f; hasGps = true }
             try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener) } catch (_: Exception) {}
             onDispose { lm.removeUpdates(listener) }
@@ -437,20 +440,29 @@ private fun OdoTripCell(
     }
 
     val isStopped = hasGps && speedKmh < 1f
+    var hasMovedOnce by remember { mutableStateOf(false) }
     var countdownSecs by remember { mutableIntStateOf(15) }
     var countdownActive by remember { mutableStateOf(false) }
 
     LaunchedEffect(isStopped) {
-        if (isStopped) {
+        android.util.Log.d("VF3TripCell", "isStopped=$isStopped hasGps=$hasGps speedKmh=$speedKmh hasMovedOnce=$hasMovedOnce")
+        if (speedKmh >= 1f) {
+            android.util.Log.d("VF3TripCell", "hasMovedOnce set to true (speedKmh=$speedKmh)")
+            hasMovedOnce = true
+        }
+        if (isStopped && hasMovedOnce) {
+            android.util.Log.d("VF3TripCell", "countdown START")
             countdownSecs = 15
             countdownActive = true
             while (countdownSecs > 0) {
                 delay(1000)
                 countdownSecs--
+                android.util.Log.d("VF3TripCell", "countdown tick: $countdownSecs")
             }
+            android.util.Log.d("VF3TripCell", "countdown DONE")
             countdownActive = false
         } else {
-            // Car moved — allow countdown to show again next stop
+            android.util.Log.d("VF3TripCell", "countdown RESET (car moved or no prior movement)")
             countdownActive = false
             countdownSecs = 15
         }
