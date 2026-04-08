@@ -209,7 +209,7 @@ private fun MirrorContent(
 
             OdoHorizontalDivider()
 
-            // ── Row 2: MAP | TPMS | TBD ────────────────────────────────
+            // ── Row 2: CHARGING | TPMS | SPEED LIMIT ──────────────────
             Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 OdoChargingCell(modifier = Modifier.weight(1f))
                 OdoVerticalDivider()
@@ -218,7 +218,7 @@ private fun MirrorContent(
                     modifier = Modifier.weight(1f)
                 )
                 OdoVerticalDivider()
-                OdoEmptyCell(modifier = Modifier.weight(1f))
+                OdoSpeedLimitCell(modifier = Modifier.weight(1f))
             }
         }
 
@@ -664,9 +664,113 @@ private fun OdoChargingCell(modifier: Modifier = Modifier) {
     }
 }
 
+private suspend fun fetchSpeedLimit(lat: Double, lon: Double): Int? =
+    kotlinx.coroutines.withContext(Dispatchers.IO) {
+        try {
+            val query = "[out:json][timeout:5];way(around:30,${lat},${lon})[highway][maxspeed];out tags 1;"
+            val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+            val url = java.net.URL("https://overpass-api.de/api/interpreter?data=$encoded")
+            val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                connectTimeout = 8_000
+                readTimeout    = 8_000
+                setRequestProperty("User-Agent", "VF3Smart/1.0")
+            }
+            val json = org.json.JSONObject(conn.inputStream.bufferedReader().readText())
+            val elements = json.getJSONArray("elements")
+            if (elements.length() == 0) return@withContext null
+            val tags = elements.getJSONObject(0).getJSONObject("tags")
+            val raw = tags.optString("maxspeed", "").trim()
+            val num = Regex("(\\d+)").find(raw)?.groupValues?.get(1)?.toIntOrNull()
+                ?: return@withContext null
+            if (raw.contains("mph", ignoreCase = true)) (num * 1.60934).toInt() else num
+        } catch (e: Exception) {
+            android.util.Log.w("VF3SpeedLimit", "Fetch failed: ${e.message}")
+            null
+        }
+    }
+
+@SuppressLint("MissingPermission")
 @Composable
-private fun OdoEmptyCell(modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxHeight())
+private fun OdoSpeedLimitCell(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+
+    fun hasPerm() = ContextCompat.checkSelfPermission(
+        context, android.Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED ||
+    ContextCompat.checkSelfPermission(
+        context, android.Manifest.permission.ACCESS_COARSE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    var permGranted by remember { mutableStateOf(hasPerm()) }
+    var location   by remember { mutableStateOf<android.location.Location?>(null) }
+    var speedLimit by remember { mutableStateOf<Int?>(null) }
+    var querying   by remember { mutableStateOf(false) }
+
+    val permLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results -> if (results.values.any { it }) permGranted = true }
+
+    DisposableEffect(permGranted) {
+        if (!permGranted) {
+            permLauncher.launch(arrayOf(
+                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION
+            ))
+            onDispose {}
+        } else {
+            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            val listener = android.location.LocationListener { loc -> location = loc }
+            val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                ?: lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
+            if (seed != null) location = seed
+            try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 30_000L, 100f, listener) } catch (_: Exception) {}
+            try { lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 30_000L, 100f, listener) } catch (_: Exception) {}
+            onDispose { lm.removeUpdates(listener) }
+        }
+    }
+
+    LaunchedEffect(location) {
+        val loc = location ?: return@LaunchedEffect
+        querying = true
+        speedLimit = fetchSpeedLimit(loc.latitude, loc.longitude)
+        querying = false
+    }
+
+    val valueText = speedLimit?.toString() ?: if (querying) "..." else "--"
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier.fillMaxSize()
+    ) {
+        // Outer pastel red ring — aspectRatio(1f) ensures a perfect circle
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .fillMaxHeight()
+                .aspectRatio(1f)
+                .padding(10.dp)
+                .background(Color(0xFFE57373), CircleShape)
+        ) {
+            // Pastel white interior — padding controls ring thickness
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(18.dp)
+                    .background(Color(0xFFFFF3F3), CircleShape)
+            ) {
+                Text(
+                    text = valueText,
+                    color = Color(0xFF5D4040),
+                    fontSize = if (speedLimit != null && speedLimit!! >= 100) 32.sp else 40.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
 }
 
 @Composable
