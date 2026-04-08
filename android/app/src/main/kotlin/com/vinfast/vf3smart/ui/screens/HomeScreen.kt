@@ -185,41 +185,49 @@ private fun MirrorContent(
             .background(OdoBg)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // ── Row 1: Clock | Navigation | Trip ───────────────────────
-            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                OdoClockCell(
-                    time = clockText,
-                    isNight = isNight,
-                    hasData = carStatus != null,
-                    modifier = Modifier.weight(1f)
-                )
-                OdoVerticalDivider()
-                OdoNavCell(
-                    navigationState = navigationState,
-                    modifier = Modifier.weight(1f)
-                )
-                OdoVerticalDivider()
-                OdoCell(
-                    label = "TRIP",
-                    value = tripText,
-                    color = OdoNormal,
-                    modifier = Modifier.weight(1f)
-                )
+            // ── Main 2×3 grid ─────────────────────────────────────────
+            Column(modifier = Modifier.weight(1f)) {
+                // ── Row 1: Clock | Navigation | Trip ─────────────────
+                Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    OdoClockCell(
+                        time = clockText,
+                        isNight = isNight,
+                        hasData = carStatus != null,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OdoVerticalDivider()
+                    OdoNavCell(
+                        navigationState = navigationState,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OdoVerticalDivider()
+                    OdoCell(
+                        label = "TRIP",
+                        value = tripText,
+                        color = OdoNormal,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                OdoHorizontalDivider()
+
+                // ── Row 2: CHARGING | TPMS | SPEED LIMIT ─────────────
+                Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    OdoChargingCell(modifier = Modifier.weight(1f))
+                    OdoVerticalDivider()
+                    OdoTpmsCell(
+                        tpms = carStatus?.tpms,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OdoVerticalDivider()
+                    OdoSpeedLimitCell(modifier = Modifier.weight(1f))
+                }
             }
 
             OdoHorizontalDivider()
 
-            // ── Row 2: CHARGING | TPMS | SPEED LIMIT ──────────────────
-            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                OdoChargingCell(modifier = Modifier.weight(1f))
-                OdoVerticalDivider()
-                OdoTpmsCell(
-                    tpms = carStatus?.tpms,
-                    modifier = Modifier.weight(1f)
-                )
-                OdoVerticalDivider()
-                OdoSpeedLimitCell(modifier = Modifier.weight(1f))
-            }
+            // ── Bottom status bar: Lock | Doors | Gear | Lights | Battery
+            OdoStatusBar(carStatus = carStatus)
         }
 
         ConnectionDot(
@@ -771,6 +779,99 @@ private fun OdoSpeedLimitCell(modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+// ── ODO bottom status bar ─────────────────────────────────────────────────────
+
+@Composable
+private fun OdoStatusBar(carStatus: CarStatus?, modifier: Modifier = Modifier) {
+    val isLocked    = carStatus?.carLockState == "locked"
+    val doorsOpen   = carStatus != null &&
+            (carStatus.doors.frontLeft == 1 || carStatus.doors.frontRight == 1 || carStatus.doors.trunk == 1)
+    val inDrive     = carStatus?.sensors?.gearDrive == 1
+    val lightsOn    = carStatus != null &&
+            (carStatus.lights.normalLight == 1 || carStatus.lights.demiLight == 1)
+    val isNight     = carStatus?.time?.isNight == true
+    val battVoltage = carStatus?.sensors?.batteryVoltage?.let { "${it}V" } ?: "--"
+
+    Row(
+        modifier = modifier.fillMaxWidth().height(40.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        StatusBarItem(
+            icon = if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+            label = if (carStatus == null) "--" else if (isLocked) "LOCKED" else "UNLOCKED",
+            color = if (carStatus == null) OdoInactive else if (isLocked) OdoGood else OdoWarning,
+            modifier = Modifier.weight(1f)
+        )
+        StatusBarDivider()
+        StatusBarItem(
+            icon = if (doorsOpen) Icons.Default.Warning else Icons.Default.Check,
+            label = if (carStatus == null) "--" else if (doorsOpen) "OPEN" else "CLOSED",
+            color = if (carStatus == null) OdoInactive else if (doorsOpen) OdoAlert else OdoGood,
+            modifier = Modifier.weight(1f)
+        )
+        StatusBarDivider()
+        StatusBarItem(
+            icon = Icons.Default.DirectionsCar,
+            label = if (carStatus == null) "--" else if (inDrive) "DRIVE" else "PARK",
+            color = if (carStatus == null) OdoInactive else if (inDrive) OdoNormal else OdoInactive,
+            modifier = Modifier.weight(1f)
+        )
+        StatusBarDivider()
+        StatusBarItem(
+            icon = Icons.Default.Lightbulb,
+            label = if (carStatus == null) "--" else if (lightsOn) "ON" else "OFF",
+            color = when {
+                carStatus == null -> OdoInactive
+                lightsOn          -> OdoNormal
+                isNight           -> OdoAlert
+                else              -> OdoInactive
+            },
+            modifier = Modifier.weight(1f)
+        )
+        StatusBarDivider()
+        StatusBarItem(
+            icon = Icons.Default.BatteryFull,
+            label = battVoltage,
+            color = if (carStatus == null) OdoInactive else OdoNormal,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun StatusBarItem(
+    icon: ImageVector,
+    label: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = label,
+            color = color,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 1.sp
+        )
+    }
+}
+
+@Composable
+private fun StatusBarDivider() {
+    Box(
+        modifier = Modifier
+            .width(1.dp)
+            .fillMaxHeight()
+            .background(OdoDivider)
+    )
 }
 
 @Composable
