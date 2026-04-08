@@ -191,28 +191,10 @@ private fun MirrorContent(
                         modifier = Modifier.weight(1f)
                     )
                     OdoVerticalDivider()
-                    Column(
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "TRIP",
-                            color = OdoLabel,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            letterSpacing = 2.sp
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = tripText,
-                            color = OdoNormal,
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            letterSpacing = 1.sp
-                        )
-                    }
+                    OdoTripCell(
+                        tripText = tripText,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
 
                 OdoHorizontalDivider()
@@ -419,6 +401,103 @@ private fun OdoClockCell(
         Spacer(Modifier.height(6.dp))
         Text("CLOCK", color = OdoLabel, fontSize = 10.sp,
             fontWeight = FontWeight.Medium, letterSpacing = 2.sp, textAlign = TextAlign.Center)
+    }
+}
+
+@SuppressLint("MissingPermission")
+@Composable
+private fun OdoTripCell(
+    tripText: String,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+
+    fun hasPerm() = ContextCompat.checkSelfPermission(
+        context, android.Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED ||
+    ContextCompat.checkSelfPermission(
+        context, android.Manifest.permission.ACCESS_COARSE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    var permGranted by remember { mutableStateOf(hasPerm()) }
+    var hasGps     by remember { mutableStateOf(false) }
+    var speedKmh   by remember { mutableFloatStateOf(0f) }
+
+    DisposableEffect(permGranted) {
+        if (!permGranted) { onDispose {} } else {
+            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            val listener = android.location.LocationListener { loc ->
+                if (loc.hasSpeed()) { speedKmh = loc.speed * 3.6f; hasGps = true }
+            }
+            val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            if (seed != null && seed.hasSpeed()) { speedKmh = seed.speed * 3.6f; hasGps = true }
+            try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener) } catch (_: Exception) {}
+            onDispose { lm.removeUpdates(listener) }
+        }
+    }
+
+    val isStopped = hasGps && speedKmh < 1f
+    var countdownSecs by remember { mutableIntStateOf(15) }
+    var countdownActive by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isStopped) {
+        if (isStopped) {
+            countdownSecs = 15
+            countdownActive = true
+            while (countdownSecs > 0) {
+                delay(1000)
+                countdownSecs--
+            }
+            countdownActive = false
+        } else {
+            // Car moved — allow countdown to show again next stop
+            countdownActive = false
+            countdownSecs = 15
+        }
+    }
+
+    val showCountdown = countdownActive
+
+    Column(
+        modifier = modifier.fillMaxHeight(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        if (showCountdown) {
+            Text(
+                text = "RED LIGHT",
+                color = OdoLabel,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 2.sp
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "$countdownSecs",
+                color = OdoAlert,
+                fontSize = 112.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                letterSpacing = 1.sp
+            )
+        } else {
+            Text(
+                text = "TRIP",
+                color = OdoLabel,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 2.sp
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = tripText,
+                color = OdoNormal,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                letterSpacing = 1.sp
+            )
+        }
     }
 }
 
