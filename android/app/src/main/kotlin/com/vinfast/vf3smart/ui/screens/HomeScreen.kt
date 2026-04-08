@@ -174,11 +174,6 @@ private fun MirrorContent(
     tripText: String,
     modifier: Modifier = Modifier
 ) {
-    // ── Derived values ────────────────────────────────────────────────
-    val clockText = carStatus?.time?.currentTime
-        ?.substringAfter(" ")?.take(5) ?: "--:--"
-    val isNight   = carStatus?.time?.isNight == true
-
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -187,14 +182,9 @@ private fun MirrorContent(
         Column(modifier = Modifier.fillMaxSize()) {
             // ── Main 2×3 grid ─────────────────────────────────────────
             Column(modifier = Modifier.weight(1f)) {
-                // ── Row 1: Clock | Navigation | Trip ─────────────────
+                // ── Row 1: Location | Navigation | Trip ──────────────
                 Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    OdoClockCell(
-                        time = clockText,
-                        isNight = isNight,
-                        hasData = carStatus != null,
-                        modifier = Modifier.weight(1f)
-                    )
+                    OdoLocationCell(modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
                     OdoNavCell(
                         navigationState = navigationState,
@@ -279,6 +269,125 @@ private fun OdoCell(
     }
 }
 
+
+@SuppressLint("MissingPermission")
+@Composable
+private fun OdoLocationCell(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+
+    fun hasPerm() = ContextCompat.checkSelfPermission(
+        context, android.Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED ||
+    ContextCompat.checkSelfPermission(
+        context, android.Manifest.permission.ACCESS_COARSE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    var permGranted by remember { mutableStateOf(hasPerm()) }
+    var location    by remember { mutableStateOf<android.location.Location?>(null) }
+    var street      by remember { mutableStateOf<String?>(null) }
+    var district    by remember { mutableStateOf<String?>(null) }
+    var province    by remember { mutableStateOf<String?>(null) }
+
+    val permLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results -> if (results.values.any { it }) permGranted = true }
+
+    DisposableEffect(permGranted) {
+        if (!permGranted) {
+            permLauncher.launch(arrayOf(
+                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION
+            ))
+            onDispose {}
+        } else {
+            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            val listener = android.location.LocationListener { loc -> location = loc }
+            val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                ?: lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
+            if (seed != null) location = seed
+            try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 30_000L, 100f, listener) } catch (_: Exception) {}
+            try { lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 30_000L, 100f, listener) } catch (_: Exception) {}
+            onDispose { lm.removeUpdates(listener) }
+        }
+    }
+
+    LaunchedEffect(location) {
+        val loc = location ?: return@LaunchedEffect
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
+            try {
+                if (!android.location.Geocoder.isPresent()) return@withContext
+                @Suppress("DEPRECATION")
+                val addresses = android.location.Geocoder(context, java.util.Locale.getDefault())
+                    .getFromLocation(loc.latitude, loc.longitude, 1)
+                val addr = addresses?.firstOrNull() ?: return@withContext
+                street   = addr.thoroughfare
+                district = addr.subLocality ?: addr.locality
+                province = addr.adminArea
+            } catch (e: Exception) {
+                android.util.Log.w("VF3Location", "Geocode failed: ${e.message}")
+            }
+        }
+    }
+
+    val hasData = location != null
+    Column(
+        modifier = modifier.fillMaxHeight(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.LocationOn,
+            contentDescription = null,
+            tint = if (hasData) OdoNormal else OdoInactive,
+            modifier = Modifier.size(32.dp)
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = street ?: if (!hasData) "LOCATING..." else "--",
+            color = if (hasData) OdoNormal else OdoInactive,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            letterSpacing = 0.5.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 12.dp)
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = district ?: "--",
+            color = OdoInactive,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+            letterSpacing = 0.5.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 12.dp)
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = province?.uppercase() ?: "--",
+            color = OdoLabel,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 2.sp,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 12.dp)
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = "LOCATION",
+            color = OdoLabel,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 2.sp
+        )
+    }
+}
 
 @Composable
 private fun OdoClockCell(
