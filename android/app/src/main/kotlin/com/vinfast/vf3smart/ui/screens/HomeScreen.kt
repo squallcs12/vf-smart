@@ -191,12 +191,28 @@ private fun MirrorContent(
                         modifier = Modifier.weight(1f)
                     )
                     OdoVerticalDivider()
-                    OdoCell(
-                        label = "TRIP",
-                        value = tripText,
-                        color = OdoNormal,
-                        modifier = Modifier.weight(1f)
-                    )
+                    Column(
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "TRIP",
+                            color = OdoLabel,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = 2.sp
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = tripText,
+                            color = OdoNormal,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            letterSpacing = 1.sp
+                        )
+                    }
                 }
 
                 OdoHorizontalDivider()
@@ -332,9 +348,9 @@ private fun OdoLocationCell(modifier: Modifier = Modifier) {
 
     val hasData = location != null
     Column(
-        modifier = modifier.fillMaxHeight(),
+        modifier = modifier.fillMaxHeight().padding(top = 16.dp, bottom = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Top
     ) {
         Icon(
             imageVector = Icons.Default.LocationOn,
