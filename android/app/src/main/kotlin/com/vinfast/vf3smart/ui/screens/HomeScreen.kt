@@ -143,11 +143,11 @@ fun HomeScreen(
             )
         }
 
-        // Mode toggle — bottom-right corner, always on top
+        // Mode toggle — right edge, vertically centred, always on top
         SmallFloatingActionButton(
             onClick = { mirrorMode = !mirrorMode },
             modifier = Modifier
-                .align(Alignment.BottomEnd)
+                .align(Alignment.CenterEnd)
                 .padding(12.dp),
             containerColor = if (mirrorMode)
                 MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
