@@ -322,7 +322,7 @@ private fun OdoLocationCell(modifier: Modifier = Modifier) {
                     .getFromLocation(loc.latitude, loc.longitude, 1)
                 val addr = addresses?.firstOrNull() ?: return@withContext
                 street   = addr.thoroughfare
-                district = addr.subLocality ?: addr.locality
+                district = addr.subAdminArea ?: addr.subLocality ?: addr.locality
                 province = addr.adminArea
             } catch (e: Exception) {
                 android.util.Log.w("VF3Location", "Geocode failed: ${e.message}")
@@ -339,18 +339,18 @@ private fun OdoLocationCell(modifier: Modifier = Modifier) {
         Icon(
             imageVector = Icons.Default.LocationOn,
             contentDescription = null,
-            tint = if (hasData) OdoNormal else OdoInactive,
+            tint = OdoInactive,
             modifier = Modifier.size(32.dp)
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = street ?: if (!hasData) "LOCATING..." else "--",
-            color = if (hasData) OdoNormal else OdoInactive,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
+            text = province?.uppercase() ?: if (!hasData) "LOCATING..." else "--",
+            color = OdoLabel,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
-            letterSpacing = 0.5.sp,
-            maxLines = 2,
+            letterSpacing = 2.sp,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 12.dp)
         )
@@ -368,13 +368,13 @@ private fun OdoLocationCell(modifier: Modifier = Modifier) {
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = province?.uppercase() ?: "--",
-            color = OdoLabel,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-            letterSpacing = 2.sp,
+            text = street ?: "--",
+            color = if (hasData) OdoNormal else OdoInactive,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
-            maxLines = 1,
+            letterSpacing = 0.5.sp,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 12.dp)
         )
