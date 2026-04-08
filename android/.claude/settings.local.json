@@ -8,7 +8,12 @@
       "WebFetch(domain:gist.github.com)",
       "WebFetch(domain:proandroiddev.com)",
       "WebFetch(domain:issuetracker.google.com)",
-      "Bash(ls -la /home/bang/bang/vf3-smart/android/app/src/main/res/drawable/ic_vf3_top*)"
+      "Bash(ls -la /home/bang/bang/vf3-smart/android/app/src/main/res/drawable/ic_vf3_top*)",
+      "Bash(adb shell:*)",
+      "Bash(adb pull:*)",
+      "Bash(adb -s emulator-5554 shell screencap /sdcard/screen.png)",
+      "Bash(adb -s emulator-5554 pull /sdcard/screen.png \"C:\\\\Users\\\\daotr\\\\bang\\\\VF3 Smart\\\\android\\\\screen.png\")",
+      "Bash(adb -s emulator-5554 exec-out screencap -p)"
     ]
   }
 }
