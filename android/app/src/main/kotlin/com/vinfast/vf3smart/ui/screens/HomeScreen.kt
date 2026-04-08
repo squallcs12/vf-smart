@@ -473,14 +473,6 @@ private fun OdoTpmsCell(
     tpms: TpmsData?,
     modifier: Modifier = Modifier
 ) {
-    val cellColor = when {
-        tpms == null      -> OdoInactive
-        tpms.anyAlarm     -> OdoAlert
-        tpms.anyLow       -> OdoWarning
-        tpms.allValid     -> OdoGood
-        else              -> OdoInactive
-    }
-
     Box(modifier = modifier.fillMaxHeight().background(OdoBg)) {
         Image(
             painter = painterResource(R.drawable.ic_vf3_top),
@@ -488,38 +480,36 @@ private fun OdoTpmsCell(
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize()
         )
-        // Numbers aligned to tire positions
-        OdoTireNumber(tpms?.fl, cellColor,
+        OdoTireNumber(tpms?.fl,
             modifier = Modifier.align(Alignment.TopStart).padding(start = 36.dp, top = 48.dp))
-        OdoTireNumber(tpms?.fr, cellColor,
+        OdoTireNumber(tpms?.fr,
             modifier = Modifier.align(Alignment.TopEnd).padding(end = 36.dp, top = 48.dp))
-        OdoTireNumber(tpms?.rl, cellColor,
+        OdoTireNumber(tpms?.rl,
             modifier = Modifier.align(Alignment.BottomStart).padding(start = 36.dp, bottom = 23.dp))
-        OdoTireNumber(tpms?.rr, cellColor,
+        OdoTireNumber(tpms?.rr,
             modifier = Modifier.align(Alignment.BottomEnd).padding(end = 36.dp, bottom = 23.dp))
     }
 }
 
-// Tire number for ODO mirror mode — no label, no unit
+// Tire number for ODO mirror mode — color driven by each tire's own pressure value
 @Composable
 private fun OdoTireNumber(
     tire: TpmsTire?,
-    color: Color,
     modifier: Modifier = Modifier
 ) {
-    val tireColor = when {
+    val color = when {
         tire == null || !tire.valid || tire.stale -> OdoInactive
         tire.alarm                                -> OdoAlert
-        tire.pressureKpa < 180f                  -> OdoWarning
-        else                                      -> color
+        tire.pressureKpa < 1.8f                  -> OdoWarning
+        else                                      -> OdoGood
     }
     val valueText = if (tire != null && tire.valid && !tire.stale)
-        String.format("%.1f", tire.pressureKpa / 100f)
+        String.format("%.1f", tire.pressureKpa)
     else "_._"
 
     Text(
         text = valueText,
-        color = tireColor,
+        color = color,
         fontSize = 22.sp,
         fontWeight = FontWeight.Bold,
         letterSpacing = 0.sp,
@@ -537,11 +527,11 @@ private fun TpmsTireValue(
     val tireColor = when {
         tire == null || !tire.valid || tire.stale -> OdoInactive
         tire.alarm                                -> OdoAlert
-        tire.pressureKpa < 180f                  -> OdoWarning
+        tire.pressureKpa < 1.8f                  -> OdoWarning
         else                                      -> color
     }
     val valueText = if (tire != null && tire.valid && !tire.stale)
-        String.format("%.0f", tire.pressureKpa)
+        String.format("%.1f", tire.pressureKpa)
     else "_._"
 
     Column(
@@ -552,7 +542,6 @@ private fun TpmsTireValue(
             letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
         Text(text = valueText, color = tireColor, fontSize = 20.sp,
             fontWeight = FontWeight.Bold, letterSpacing = 0.sp)
-        Text(text = "kPa", color = OdoLabel, fontSize = 8.sp, letterSpacing = 1.sp)
     }
 }
 

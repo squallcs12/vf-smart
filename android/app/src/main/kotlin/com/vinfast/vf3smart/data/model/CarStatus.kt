@@ -169,7 +169,7 @@ data class TpmsData(
     val anyAlarm: Boolean get() = fl.alarm || fr.alarm || rl.alarm || rr.alarm
     val anyLow: Boolean   get() = listOf(fl, fr, rl, rr)
         .filter { it.valid && !it.stale }
-        .any    { it.pressureKpa in 80f..179f }
+        .any    { it.pressureKpa in 0.8f..1.79f }
     val allValid: Boolean get() = fl.valid && fr.valid && rl.valid && rr.valid
 }
 
