@@ -763,7 +763,7 @@ private fun OdoSpeedLimitCell(modifier: Modifier = Modifier) {
                 Text(
                     text = valueText,
                     color = Color(0xFF5D4040),
-                    fontSize = if (speedLimit != null && speedLimit!! >= 100) 32.sp else 40.sp,
+                    fontSize = if (speedLimit != null && speedLimit!! >= 100) 64.sp else 80.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.sp,
                     textAlign = TextAlign.Center
