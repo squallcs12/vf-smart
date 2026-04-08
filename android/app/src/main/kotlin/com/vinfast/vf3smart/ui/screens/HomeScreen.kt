@@ -394,14 +394,6 @@ private fun OdoLocationCell(modifier: Modifier = Modifier) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 12.dp)
         )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = "LOCATION",
-            color = OdoLabel,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-            letterSpacing = 2.sp
-        )
     }
 }
 
@@ -792,8 +784,6 @@ private fun OdoChargingCell(modifier: Modifier = Modifier) {
                 )
             }
         }
-        Spacer(Modifier.height(8.dp))
-        Text(text = "CHARGING", color = OdoLabel, fontSize = 10.sp, letterSpacing = 2.sp)
     }
 }
 
