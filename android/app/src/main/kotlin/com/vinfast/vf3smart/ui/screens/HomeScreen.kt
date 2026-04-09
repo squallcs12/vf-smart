@@ -181,29 +181,42 @@ private fun MirrorContent(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // ── 2×4 grid ──────────────────────────────────────────────
+            var sharedSpeedLimit by remember { mutableStateOf<Int?>(null) }
+
             Column(modifier = Modifier.weight(1f)) {
-                // ── Row 1: Location | Navigation | Trip | [empty] ────
+                // ── Row 1: Location | Navigation | GPS Speed | Trip ───
                 Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     OdoLocationCell(modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
                     OdoNavCell(navigationState = navigationState, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
-                    OdoTripCell(tripText = tripText, modifier = Modifier.weight(1f))
+                    OdoGpsSpeedCell(
+                        speedLimit = sharedSpeedLimit,
+                        modifier = Modifier.weight(1f)
+                    )
                     OdoVerticalDivider()
-                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) // placeholder
+                    OdoTripCell(tripText = tripText, modifier = Modifier.weight(1f))
                 }
 
                 OdoHorizontalDivider()
 
-                // ── Row 2: Charging | TPMS | Speed Limit | [empty] ───
+                // ── Row 2: Charging | TPMS | Speed Limit | Clock ─────
                 Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     OdoChargingCell(modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
                     OdoTpmsCell(tpms = carStatus?.tpms, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
-                    OdoSpeedLimitCell(modifier = Modifier.weight(1f))
+                    OdoSpeedLimitCell(
+                        onSpeedLimitChanged = { sharedSpeedLimit = it },
+                        modifier = Modifier.weight(1f)
+                    )
                     OdoVerticalDivider()
-                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) // placeholder
+                    OdoClockCell(
+                        time = carStatus?.time?.currentTime?.substringAfter(" ") ?: "--:--",
+                        isNight = carStatus?.time?.isNight == true,
+                        hasData = carStatus?.time?.synced == true,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
 
@@ -396,6 +409,77 @@ private fun OdoClockCell(
         Spacer(Modifier.height(6.dp))
         Text("CLOCK", color = OdoLabel, fontSize = 10.sp,
             fontWeight = FontWeight.Medium, letterSpacing = 2.sp, textAlign = TextAlign.Center)
+    }
+}
+
+@SuppressLint("MissingPermission")
+@Composable
+private fun OdoGpsSpeedCell(
+    speedLimit: Int? = null,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+
+    fun hasPerm() = ContextCompat.checkSelfPermission(
+        context, android.Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED ||
+    ContextCompat.checkSelfPermission(
+        context, android.Manifest.permission.ACCESS_COARSE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    var permGranted by remember { mutableStateOf(hasPerm()) }
+    var speedKmh    by remember { mutableFloatStateOf(0f) }
+    var hasData     by remember { mutableStateOf(false) }
+
+    DisposableEffect(permGranted) {
+        if (!permGranted) { onDispose {} } else {
+            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            val listener = android.location.LocationListener { loc ->
+                if (loc.hasSpeed()) { speedKmh = loc.speed * 3.6f; hasData = true }
+            }
+            val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            if (seed != null && seed.hasSpeed()) { speedKmh = seed.speed * 3.6f; hasData = true }
+            try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener) } catch (_: Exception) {}
+            onDispose { lm.removeUpdates(listener) }
+        }
+    }
+
+    val speed = speedKmh.toInt()
+    val overLimit       = speedLimit != null && speed >= speedLimit
+    val overLimitPlus5  = speedLimit != null && speed >= speedLimit + 5
+    val speedColor = when {
+        !hasData        -> OdoInactive
+        overLimitPlus5  -> OdoAlert
+        overLimit       -> OdoWarning
+        else            -> OdoNormal
+    }
+    val speedFontSize = when {
+        overLimit && speedLimit!! >= 100 -> 64.sp
+        overLimit                        -> 80.sp
+        else                             -> 28.sp
+    }
+
+    Column(
+        modifier = modifier.fillMaxHeight(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = if (hasData) "$speed" else "--",
+            color = speedColor,
+            fontSize = speedFontSize,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            letterSpacing = 1.sp
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = "KM/H",
+            color = OdoLabel,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 2.sp
+        )
     }
 }
 
@@ -908,7 +992,10 @@ private suspend fun fetchSpeedLimit(lat: Double, lon: Double): Int? =
 
 @SuppressLint("MissingPermission")
 @Composable
-private fun OdoSpeedLimitCell(modifier: Modifier = Modifier) {
+private fun OdoSpeedLimitCell(
+    onSpeedLimitChanged: (Int?) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
 
     fun hasPerm() = ContextCompat.checkSelfPermission(
@@ -952,6 +1039,7 @@ private fun OdoSpeedLimitCell(modifier: Modifier = Modifier) {
         querying = true
         speedLimit = fetchSpeedLimit(loc.latitude, loc.longitude)
         querying = false
+        onSpeedLimitChanged(speedLimit)
     }
 
     val valueText = speedLimit?.toString() ?: if (querying) "..." else "--"
