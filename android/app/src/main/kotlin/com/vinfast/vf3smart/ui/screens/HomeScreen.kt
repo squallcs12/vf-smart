@@ -211,12 +211,7 @@ private fun MirrorContent(
                         modifier = Modifier.weight(1f)
                     )
                     OdoVerticalDivider()
-                    OdoClockCell(
-                        time = carStatus?.time?.currentTime?.substringAfter(" ") ?: "--:--",
-                        isNight = carStatus?.time?.isNight == true,
-                        hasData = carStatus?.time?.synced == true,
-                        modifier = Modifier.weight(1f)
-                    )
+                    OdoClockCell(modifier = Modifier.weight(1f))
                 }
             }
 
@@ -387,24 +382,95 @@ private fun OdoLocationCell(modifier: Modifier = Modifier) {
     }
 }
 
+private suspend fun fetchWeatherCode(lat: Double, lon: Double): Int? =
+    kotlinx.coroutines.withContext(Dispatchers.IO) {
+        try {
+            val url = java.net.URL(
+                "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current_weather=true"
+            )
+            val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                connectTimeout = 10_000; readTimeout = 10_000
+                setRequestProperty("User-Agent", "VF3Smart/1.0")
+            }
+            org.json.JSONObject(conn.inputStream.bufferedReader().readText())
+                .getJSONObject("current_weather").getInt("weathercode")
+        } catch (e: Exception) {
+            null  // silent fail — no internet or timeout
+        }
+    }
+
+// WMO weather code → Material icon
+private fun weatherIconFor(code: Int?, isNight: Boolean): ImageVector = when {
+    code == null          -> if (isNight) Icons.Default.NightsStay else Icons.Default.WbSunny
+    code == 0             -> if (isNight) Icons.Default.NightsStay else Icons.Default.WbSunny  // clear
+    code in 1..3          -> Icons.Default.WbCloudy    // partly cloudy
+    code in 45..48        -> Icons.Default.Cloud        // fog
+    code in 51..67        -> Icons.Default.WaterDrop    // drizzle / rain
+    code in 71..77        -> Icons.Default.AcUnit       // snow
+    code in 80..82        -> Icons.Default.WaterDrop    // rain showers
+    code >= 95            -> Icons.Default.Bolt         // thunderstorm
+    else                  -> Icons.Default.Cloud
+}
+
+@SuppressLint("MissingPermission")
 @Composable
-private fun OdoClockCell(
-    time: String,
-    isNight: Boolean,
-    hasData: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val color = if (hasData) OdoNormal else OdoInactive
-    val icon  = if (isNight) Icons.Default.NightsStay else Icons.Default.WbSunny
+private fun OdoClockCell(modifier: Modifier = Modifier) {
+    // Clock tick
+    var now by remember { mutableStateOf(java.util.Calendar.getInstance()) }
+    LaunchedEffect(Unit) {
+        while (true) { delay(1000); now = java.util.Calendar.getInstance() }
+    }
+
+    // Weather via Open-Meteo (no API key required)
+    val context = LocalContext.current
+    var weatherCode     by remember { mutableStateOf<Int?>(null) }
+    var location        by remember { mutableStateOf<android.location.Location?>(null) }
+    var lastFetchTime   by remember { mutableStateOf(0L) }
+
+    val hasPerm = ContextCompat.checkSelfPermission(
+        context, android.Manifest.permission.ACCESS_COARSE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED ||
+    ContextCompat.checkSelfPermission(
+        context, android.Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    DisposableEffect(hasPerm) {
+        if (!hasPerm) { onDispose {} } else {
+            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            val listener = android.location.LocationListener { loc -> location = loc }
+            val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            if (seed != null) location = seed
+            try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 60_000L, 500f, listener) } catch (_: Exception) {}
+            try { lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 60_000L, 500f, listener) } catch (_: Exception) {}
+            onDispose { lm.removeUpdates(listener) }
+        }
+    }
+
+    LaunchedEffect(location) {
+        val loc = location ?: return@LaunchedEffect
+        val elapsed = System.currentTimeMillis() - lastFetchTime
+        val interval = if (weatherCode != null) 30 * 60 * 1000L else 5 * 60 * 1000L
+        if (elapsed < interval) return@LaunchedEffect
+        lastFetchTime = System.currentTimeMillis()
+        val result = fetchWeatherCode(loc.latitude, loc.longitude)
+        if (result != null) weatherCode = result  // keep last good value on failure
+    }
+
+    val hour    = now.get(java.util.Calendar.HOUR_OF_DAY)
+    val minute  = now.get(java.util.Calendar.MINUTE)
+    val isNight = hour < 6 || hour >= 18
+    val time    = String.format("%02d:%02d", hour, minute)
+    val icon    = weatherIconFor(weatherCode, isNight)
 
     Column(
         modifier = modifier.fillMaxHeight(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(40.dp))
+        Icon(icon, contentDescription = null, tint = OdoNormal, modifier = Modifier.size(40.dp))
         Spacer(Modifier.height(10.dp))
-        Text(time, color = color, fontSize = 28.sp,
+        Text(time, color = OdoNormal, fontSize = 28.sp,
             fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, letterSpacing = 1.sp)
         Spacer(Modifier.height(6.dp))
         Text("CLOCK", color = OdoLabel, fontSize = 10.sp,
@@ -453,11 +519,7 @@ private fun OdoGpsSpeedCell(
         overLimit       -> OdoWarning
         else            -> OdoNormal
     }
-    val speedFontSize = when {
-        overLimit && speedLimit!! >= 100 -> 64.sp
-        overLimit                        -> 80.sp
-        else                             -> 28.sp
-    }
+    val speedFontSize = if (speed >= 100) 64.sp else 80.sp
 
     Column(
         modifier = modifier.fillMaxHeight(),
