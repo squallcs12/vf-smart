@@ -180,35 +180,30 @@ private fun MirrorContent(
             .background(OdoBg)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // ── Main 2×3 grid ─────────────────────────────────────────
+            // ── 2×4 grid ──────────────────────────────────────────────
             Column(modifier = Modifier.weight(1f)) {
-                // ── Row 1: Location | Navigation | Trip ──────────────
+                // ── Row 1: Location | Navigation | Trip | [empty] ────
                 Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     OdoLocationCell(modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
-                    OdoNavCell(
-                        navigationState = navigationState,
-                        modifier = Modifier.weight(1f)
-                    )
+                    OdoNavCell(navigationState = navigationState, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
-                    OdoTripCell(
-                        tripText = tripText,
-                        modifier = Modifier.weight(1f)
-                    )
+                    OdoTripCell(tripText = tripText, modifier = Modifier.weight(1f))
+                    OdoVerticalDivider()
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) // placeholder
                 }
 
                 OdoHorizontalDivider()
 
-                // ── Row 2: CHARGING | TPMS | SPEED LIMIT ─────────────
+                // ── Row 2: Charging | TPMS | Speed Limit | [empty] ───
                 Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     OdoChargingCell(modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
-                    OdoTpmsCell(
-                        tpms = carStatus?.tpms,
-                        modifier = Modifier.weight(1f)
-                    )
+                    OdoTpmsCell(tpms = carStatus?.tpms, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
                     OdoSpeedLimitCell(modifier = Modifier.weight(1f))
+                    OdoVerticalDivider()
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) // placeholder
                 }
             }
 
@@ -769,7 +764,7 @@ private fun kmlStationsFlow(context: Context) = flow {
 private fun sortNearby(all: List<Pair<String, Pair<Double, Double>>>, lat: Double, lon: Double) =
     all.map { (name, coords) -> NearbyStation(name, haversineM(lat, lon, coords.first, coords.second)) }
         .sortedBy { it.distanceM }
-        .take(2)
+        .take(1)
 
 @SuppressLint("MissingPermission")
 @Composable
@@ -860,30 +855,28 @@ private fun OdoChargingCell(modifier: Modifier = Modifier) {
                 textAlign = TextAlign.Center
             )
         } else {
-            stations.forEachIndexed { i, station ->
-                if (i > 0) Spacer(Modifier.height(12.dp))
-                Text(
-                    text = station.name.uppercase(),
-                    color = OdoNormal,
-                    fontSize = 9.sp,
-                    letterSpacing = 0.5.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 8.dp)
-                )
-                val distText = if (station.distanceM < 1000)
-                    "${station.distanceM.toInt()} M"
-                else
-                    String.format(java.util.Locale.US, "%.1f KM", station.distanceM / 1000)
-                Text(
-                    text = distText,
-                    color = OdoGood,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                )
-            }
+            val station = stations.first()
+            Text(
+                text = station.name.uppercase(),
+                color = OdoNormal,
+                fontSize = 9.sp,
+                letterSpacing = 0.5.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+            val distText = if (station.distanceM < 1000)
+                "${station.distanceM.toInt()} M"
+            else
+                String.format(java.util.Locale.US, "%.1f KM", station.distanceM / 1000)
+            Text(
+                text = distText,
+                color = OdoGood,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
         }
     }
 }
