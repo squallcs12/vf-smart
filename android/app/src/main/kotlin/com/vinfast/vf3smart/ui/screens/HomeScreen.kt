@@ -1022,9 +1022,9 @@ private fun OdoChargingCell(modifier: Modifier = Modifier) {
             Text(
                 text = station.name.uppercase(),
                 color = OdoNormal,
-                fontSize = 9.sp,
+                fontSize = 12.sp,
                 letterSpacing = 0.5.sp,
-                maxLines = 2,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 8.dp)
