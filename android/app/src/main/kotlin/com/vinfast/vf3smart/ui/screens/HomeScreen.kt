@@ -59,7 +59,7 @@ import com.vinfast.vf3smart.viewmodel.ControlViewModel
 
 // ODO colour palette
 private val OdoBg        = Color(0xFF0A0A0A)
-private val OdoDivider   = Color(0xFF1C1C1C)
+private val OdoDivider   = Color(0xFF3A3A3A)
 private val OdoLabel     = Color(0xFF909090)
 private val OdoInactive  = Color(0xFF686868)
 private val OdoNormal    = Color(0xFFF0F0F0)
@@ -382,20 +382,27 @@ private fun OdoLocationCell(modifier: Modifier = Modifier) {
     }
 }
 
-private suspend fun fetchWeatherCode(lat: Double, lon: Double): Int? =
+private data class WeatherData(val current: Int, val nextHour: Int)
+
+private suspend fun fetchWeather(lat: Double, lon: Double): WeatherData? =
     kotlinx.coroutines.withContext(Dispatchers.IO) {
         try {
             val url = java.net.URL(
-                "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current_weather=true"
+                "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
+                "&current_weather=true&hourly=weathercode&forecast_days=1"
             )
             val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
                 connectTimeout = 10_000; readTimeout = 10_000
                 setRequestProperty("User-Agent", "VF3Smart/1.0")
             }
-            org.json.JSONObject(conn.inputStream.bufferedReader().readText())
-                .getJSONObject("current_weather").getInt("weathercode")
+            val json    = org.json.JSONObject(conn.inputStream.bufferedReader().readText())
+            val current = json.getJSONObject("current_weather").getInt("weathercode")
+            val codes   = json.getJSONObject("hourly").getJSONArray("weathercode")
+            val nextIdx = (java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) + 1) % 24
+            val nextHour = codes.getInt(nextIdx)
+            WeatherData(current, nextHour)
         } catch (e: Exception) {
-            null  // silent fail — no internet or timeout
+            null  // silent fail
         }
     }
 
@@ -423,7 +430,7 @@ private fun OdoClockCell(modifier: Modifier = Modifier) {
 
     // Weather via Open-Meteo (no API key required)
     val context = LocalContext.current
-    var weatherCode     by remember { mutableStateOf<Int?>(null) }
+    var weather         by remember { mutableStateOf<WeatherData?>(null) }
     var location        by remember { mutableStateOf<android.location.Location?>(null) }
     var lastFetchTime   by remember { mutableStateOf(0L) }
 
@@ -450,25 +457,35 @@ private fun OdoClockCell(modifier: Modifier = Modifier) {
     LaunchedEffect(location) {
         val loc = location ?: return@LaunchedEffect
         val elapsed = System.currentTimeMillis() - lastFetchTime
-        val interval = if (weatherCode != null) 30 * 60 * 1000L else 5 * 60 * 1000L
+        val interval = if (weather != null) 30 * 60 * 1000L else 5 * 60 * 1000L
         if (elapsed < interval) return@LaunchedEffect
         lastFetchTime = System.currentTimeMillis()
-        val result = fetchWeatherCode(loc.latitude, loc.longitude)
-        if (result != null) weatherCode = result  // keep last good value on failure
+        val result = fetchWeather(loc.latitude, loc.longitude)
+        if (result != null) weather = result  // keep last good value on failure
     }
 
-    val hour    = now.get(java.util.Calendar.HOUR_OF_DAY)
-    val minute  = now.get(java.util.Calendar.MINUTE)
-    val isNight = hour < 6 || hour >= 18
-    val time    = String.format("%02d:%02d", hour, minute)
-    val icon    = weatherIconFor(weatherCode, isNight)
+    val hour         = now.get(java.util.Calendar.HOUR_OF_DAY)
+    val minute       = now.get(java.util.Calendar.MINUTE)
+    val isNight      = hour < 6 || hour >= 18
+    val nextIsNight  = (hour + 1) % 24 < 6 || (hour + 1) % 24 >= 18
+    val time         = String.format("%02d:%02d", hour, minute)
+    val currentIcon  = weatherIconFor(weather?.current, isNight)
+    val nextIcon     = weatherIconFor(weather?.nextHour, nextIsNight)
 
     Column(
         modifier = modifier.fillMaxHeight(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(icon, contentDescription = null, tint = OdoNormal, modifier = Modifier.size(40.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(currentIcon, contentDescription = "now", tint = OdoNormal, modifier = Modifier.size(32.dp))
+            Icon(Icons.Default.ArrowForward, contentDescription = null,
+                tint = OdoInactive, modifier = Modifier.size(16.dp).padding(horizontal = 2.dp))
+            Icon(nextIcon, contentDescription = "+1h", tint = OdoInactive, modifier = Modifier.size(24.dp))
+        }
         Spacer(Modifier.height(10.dp))
         Text(time, color = OdoNormal, fontSize = 28.sp,
             fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, letterSpacing = 1.sp)
