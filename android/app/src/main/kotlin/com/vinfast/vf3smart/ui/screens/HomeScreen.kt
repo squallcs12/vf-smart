@@ -473,25 +473,43 @@ private fun OdoClockCell(modifier: Modifier = Modifier) {
     val nextIcon     = weatherIconFor(weather?.nextHour, nextIsNight)
 
     Column(
-        modifier = modifier.fillMaxHeight(),
+        modifier = modifier.fillMaxSize().padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
+        // Weather row — top
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Icon(currentIcon, contentDescription = "now", tint = OdoNormal, modifier = Modifier.size(32.dp))
+            Icon(currentIcon, contentDescription = "now", tint = OdoNormal, modifier = Modifier.size(48.dp))
+            Spacer(Modifier.width(8.dp))
             Icon(Icons.Default.ArrowForward, contentDescription = null,
-                tint = OdoInactive, modifier = Modifier.size(16.dp).padding(horizontal = 2.dp))
-            Icon(nextIcon, contentDescription = "+1h", tint = OdoInactive, modifier = Modifier.size(24.dp))
+                tint = OdoInactive, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Icon(nextIcon, contentDescription = "+1h", tint = OdoInactive, modifier = Modifier.size(36.dp))
         }
-        Spacer(Modifier.height(10.dp))
-        Text(time, color = OdoNormal, fontSize = 28.sp,
-            fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, letterSpacing = 1.sp)
-        Spacer(Modifier.height(6.dp))
-        Text("CLOCK", color = OdoLabel, fontSize = 10.sp,
-            fontWeight = FontWeight.Medium, letterSpacing = 2.sp, textAlign = TextAlign.Center)
+
+        // Time — middle, fills remaining space
+        Text(
+            text = time,
+            color = OdoNormal,
+            fontSize = 52.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            letterSpacing = 2.sp
+        )
+
+        // Label — bottom
+        Text(
+            text = "CLOCK",
+            color = OdoLabel,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 2.sp,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
