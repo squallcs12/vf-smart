@@ -761,21 +761,39 @@ private fun OdoTpmsCell(
     tpms: TpmsData?,
     modifier: Modifier = Modifier
 ) {
-    Box(modifier = modifier.fillMaxHeight().background(OdoBg)) {
-        Image(
-            painter = painterResource(R.drawable.ic_vf3_top),
-            contentDescription = "VF3",
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize()
-        )
-        OdoTireNumber(tpms?.fl,
-            modifier = Modifier.align(Alignment.TopStart).padding(start = 36.dp, top = 48.dp))
-        OdoTireNumber(tpms?.fr,
-            modifier = Modifier.align(Alignment.TopEnd).padding(end = 36.dp, top = 48.dp))
-        OdoTireNumber(tpms?.rl,
-            modifier = Modifier.align(Alignment.BottomStart).padding(start = 36.dp, bottom = 23.dp))
-        OdoTireNumber(tpms?.rr,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 36.dp, bottom = 23.dp))
+    BoxWithConstraints(modifier = modifier.fillMaxHeight().background(OdoBg).padding(10.dp)) {
+        val sideW = maxWidth * 0.20f
+        val frontPad = maxHeight * 0.10f
+        val rearPad  = maxHeight * 0.07f
+
+        Row(modifier = Modifier.fillMaxSize()) {
+            // Left column: FL (front) + RL (rear)
+            Column(
+                modifier = Modifier.width(sideW).fillMaxHeight(),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                OdoTireNumber(tpms?.fl, modifier = Modifier.padding(top = frontPad))
+                OdoTireNumber(tpms?.rl, modifier = Modifier.padding(bottom = rearPad))
+            }
+
+            // Center: car image fills remaining width
+            Image(
+                painter = painterResource(R.drawable.ic_vf3_top),
+                contentDescription = "VF3",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.weight(1f).fillMaxHeight()
+            )
+
+            // Right column: FR (front) + RR (rear)
+            Column(
+                modifier = Modifier.width(sideW).fillMaxHeight(),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                OdoTireNumber(tpms?.fr, modifier = Modifier.padding(top = frontPad))
+                OdoTireNumber(tpms?.rr, modifier = Modifier.padding(bottom = rearPad))
+            }
+        }
     }
 }
 
