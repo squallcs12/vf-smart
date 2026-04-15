@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — VF Smart</title>
+  <meta name="description" content="Privacy Policy for VF Smart Android app." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --purple:      #7C3AED;
+      --purple-light:#9F67FF;
+      --bg:          #0B0B0F;
+      --surface:     #16161E;
+      --surface2:    #1E1E2A;
+      --border:      #2A2A38;
+      --text:        #E8E8F0;
+      --text-muted:  #7A7A9A;
+      --green:       #4CAF50;
+      --radius:      10px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    a { color: var(--purple-light); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* NAV */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(11,11,15,.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 56px;
+    }
+    .nav-logo { font-weight: 700; font-size: 1.05rem; color: var(--text); display: flex; align-items: center; gap: 8px; }
+    .nav-logo svg { color: var(--purple-light); }
+    .nav-back { font-size: .85rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+    .nav-back:hover { color: var(--text); text-decoration: none; }
+
+    /* LAYOUT */
+    .page {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 56px 24px 80px;
+    }
+
+    /* HEADER */
+    .page-header { margin-bottom: 48px; padding-bottom: 32px; border-bottom: 1px solid var(--border); }
+    .page-header h1 { font-size: 2rem; font-weight: 800; letter-spacing: -.02em; margin-bottom: 10px; }
+    .meta { font-size: .85rem; color: var(--text-muted); display: flex; gap: 20px; flex-wrap: wrap; }
+    .meta span { display: flex; align-items: center; gap: 5px; }
+
+    /* SECTIONS */
+    .toc {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px 24px;
+      margin-bottom: 48px;
+    }
+    .toc h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); margin-bottom: 12px; }
+    .toc ol { padding-left: 20px; }
+    .toc li { font-size: .9rem; margin-bottom: 6px; }
+
+    h2 {
+      font-size: 1.2rem; font-weight: 700;
+      margin-top: 44px; margin-bottom: 12px;
+      padding-bottom: 8px; border-bottom: 1px solid var(--border);
+      scroll-margin-top: 72px;
+    }
+    h3 { font-size: 1rem; font-weight: 600; margin-top: 20px; margin-bottom: 8px; color: var(--purple-light); }
+
+    p { margin-bottom: 14px; font-size: .95rem; color: var(--text); }
+    p:last-child { margin-bottom: 0; }
+
+    ul, ol { padding-left: 22px; margin-bottom: 14px; }
+    li { font-size: .95rem; margin-bottom: 6px; }
+
+    /* DATA TABLE */
+    .data-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: .88rem; }
+    .data-table th {
+      text-align: left; padding: 9px 14px;
+      background: var(--surface2); color: var(--text-muted);
+      font-size: .75rem; letter-spacing: .07em; text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    .data-table td { padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .data-table tr:last-child td { border-bottom: none; }
+
+    /* CALLOUT */
+    .callout {
+      background: var(--surface); border-left: 3px solid var(--purple);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 14px 18px; margin: 16px 0; font-size: .9rem;
+    }
+    .callout.green { border-left-color: var(--green); }
+    .callout strong { display: block; margin-bottom: 4px; }
+
+    code {
+      font-family: ui-monospace, monospace; font-size: .85em;
+      background: var(--surface2); padding: 1px 5px;
+      border-radius: 4px; color: var(--purple-light);
+    }
+
+    /* FOOTER */
+    footer {
+      background: var(--surface); border-top: 1px solid var(--border);
+      padding: 32px 24px; text-align: center;
+    }
+    footer p { font-size: .85rem; color: var(--text-muted); margin-bottom: 10px; }
+    .footer-links { display: flex; gap: 20px; justify-content: center; font-size: .85rem; }
+
+    @media (max-width: 600px) {
+      .page { padding: 36px 16px 60px; }
+      .page-header h1 { font-size: 1.6rem; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M3 17l2-9h14l2 9"/><path d="M1 17h22"/><circle cx="7" cy="20" r="1"/><circle cx="17" cy="20" r="1"/>
+    </svg>
+    VF Smart
+  </div>
+  <a class="nav-back" href="index.html">
+    ← Back to home
+  </a>
+</nav>
+
+<div class="page">
+
+  <div class="page-header">
+    <h1>Privacy Policy</h1>
+    <div class="meta">
+      <span>📅 Effective date: April 15, 2026</span>
+      <span>📱 Applies to: VF Smart Android app</span>
+    </div>
+  </div>
+
+  <div class="toc">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#data-collected">Data we collect</a></li>
+      <li><a href="#permissions">Android permissions explained</a></li>
+      <li><a href="#third-party">Third-party services</a></li>
+      <li><a href="#data-storage">How data is stored</a></li>
+      <li><a href="#data-sharing">Data sharing</a></li>
+      <li><a href="#children">Children's privacy</a></li>
+      <li><a href="#your-rights">Your rights</a></li>
+      <li><a href="#changes">Changes to this policy</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ol>
+  </div>
+
+  <!-- 1 -->
+  <h2 id="overview">1. Overview</h2>
+  <p>
+    VF Smart ("the app") is a companion application for the VF Smart ESP32 hardware module.
+    It connects to a device on your local WiFi network to control and monitor your VinFast VF3
+    electric vehicle.
+  </p>
+  <div class="callout green">
+    <strong>Short version</strong>
+    All data stays on your device or on your local network. We do not operate any servers, collect analytics,
+    or sell data. The only external network contact the app makes is with Google Play for subscription management.
+  </div>
+
+  <!-- 2 -->
+  <h2 id="data-collected">2. Data we collect</h2>
+  <p>The app collects only what is necessary to function:</p>
+
+  <table class="data-table">
+    <thead>
+      <tr><th>Data</th><th>Why</th><th>Where stored</th><th>Sent externally</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>ESP32 device IP address</td>
+        <td>Connect to your car's controller</td>
+        <td>On-device, encrypted</td>
+        <td>No</td>
+      </tr>
+      <tr>
+        <td>API key</td>
+        <td>Authenticate commands to the ESP32</td>
+        <td>On-device, encrypted</td>
+        <td>No — sent only to your local ESP32</td>
+      </tr>
+      <tr>
+        <td>Device name &amp; MAC address</td>
+        <td>Identify and display your device</td>
+        <td>On-device, encrypted</td>
+        <td>No</td>
+      </tr>
+      <tr>
+        <td>First launch date</td>
+        <td>Track 14-day free trial period</td>
+        <td>On-device, unencrypted</td>
+        <td>No</td>
+      </tr>
+      <tr>
+        <td>Subscription purchase token</td>
+        <td>Verify active subscription with Google Play</td>
+        <td>Managed by Google Play</td>
+        <td>Yes — Google Play only</td>
+      </tr>
+      <tr>
+        <td>Location (coarse / fine)</td>
+        <td>Find nearby charging stations (optional feature)</td>
+        <td>Not stored; used in-session only</td>
+        <td>No</td>
+      </tr>
+      <tr>
+        <td>Google Maps notifications</td>
+        <td>Show turn-by-turn on the ODO screen</td>
+        <td>Not stored; displayed in-session only</td>
+        <td>No</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>We do <strong>not</strong> collect: names, email addresses, phone numbers, crash reports, analytics events, advertising identifiers, or any vehicle telemetry.</p>
+
+  <!-- 3 -->
+  <h2 id="permissions">3. Android permissions explained</h2>
+
+  <h3>INTERNET &amp; ACCESS_NETWORK_STATE</h3>
+  <p>Required to communicate with the ESP32 device over your local WiFi network via HTTP and WebSocket.</p>
+
+  <h3>ACCESS_WIFI_STATE &amp; CHANGE_WIFI_MULTICAST_STATE</h3>
+  <p>Used for UDP broadcast discovery (port 8888) to automatically find the ESP32 on your network without manual IP entry.</p>
+
+  <h3>ACCESS_FINE_LOCATION &amp; ACCESS_COARSE_LOCATION</h3>
+  <p>Optionally used to search for nearby EV charging stations. Location is sent to the charging-station lookup service only when you actively use that feature and is never stored or logged by the app.</p>
+
+  <h3>BIND_NOTIFICATION_LISTENER_SERVICE</h3>
+  <p>
+    Allows the app to read notifications from Google Maps while navigation is active.
+    Only notifications from <code>com.google.android.apps.maps</code> are read, and only to extract
+    the current maneuver instruction (e.g. "Turn left in 300 m") for display on the ODO screen.
+    No notification content is stored or transmitted.
+  </p>
+  <div class="callout">
+    <strong>How to grant / revoke</strong>
+    Settings → Apps → Special app access → Notification access → VF Smart.
+    The ODO navigation feature simply shows "NO NAVIGATION" if this permission is not granted.
+  </div>
+
+  <h3>com.android.vending.BILLING</h3>
+  <p>Required for the Google Play in-app subscription. See <a href="#third-party">Third-party services</a>.</p>
+
+  <!-- 4 -->
+  <h2 id="third-party">4. Third-party services</h2>
+
+  <h3>Google Play Billing</h3>
+  <p>
+    The app uses Google Play's billing system to manage the Premium subscription.
+    When you subscribe, Google processes the payment and provides the app with a purchase token.
+    The app uses that token solely to verify subscription status locally.
+    Google's handling of your payment information is governed by
+    <a href="https://policies.google.com/privacy" target="_blank">Google's Privacy Policy</a>.
+  </p>
+
+  <h3>Google Assistant / App Actions</h3>
+  <p>
+    Voice commands ("Hey Google, lock my car") are processed entirely by Google Assistant on your device.
+    The app receives a deep-link intent from the Assistant and executes the corresponding action on the
+    local ESP32. No voice data is received or stored by the app.
+  </p>
+
+  <h3>Android Auto</h3>
+  <p>
+    The Android Auto integration displays car status and control buttons on a car's head unit screen.
+    No additional data is collected beyond what the main app already uses.
+  </p>
+
+  <p>The app contains <strong>no advertising SDKs, analytics SDKs, or crash-reporting SDKs</strong>.</p>
+
+  <!-- 5 -->
+  <h2 id="data-storage">5. How data is stored</h2>
+  <p>
+    Sensitive configuration (device IP, API key, device name, MAC address) is stored using
+    Android's <strong>EncryptedSharedPreferences</strong> with AES-256-GCM encryption, backed by the
+    Android Keystore. This data is accessible only to the app and is not included in device backups.
+  </p>
+  <p>
+    Non-sensitive data (first launch timestamp) is stored in standard SharedPreferences on-device.
+  </p>
+  <p>
+    No data is stored in the cloud, on remote servers, or in any location outside your device.
+  </p>
+
+  <!-- 6 -->
+  <h2 id="data-sharing">6. Data sharing</h2>
+  <p>
+    We do not sell, rent, or share your personal data with any third party, except as described in
+    <a href="#third-party">Section 4</a> (Google Play Billing, governed by Google's own privacy policy).
+  </p>
+  <p>
+    API commands (e.g. lock, unlock) are sent to the ESP32 device on your local network.
+    They never leave your network and are not relayed through any intermediary server.
+  </p>
+
+  <!-- 7 -->
+  <h2 id="children">7. Children's privacy</h2>
+  <p>
+    This app is not directed at children under the age of 13. We do not knowingly collect
+    personal information from children. If you believe a child has provided personal information
+    through the app, please contact us and we will delete it promptly.
+  </p>
+
+  <!-- 8 -->
+  <h2 id="your-rights">8. Your rights</h2>
+  <p>Because all data is stored locally on your device, you have full control over it at all times:</p>
+  <ul>
+    <li><strong>Access:</strong> All stored data is visible through the app's Settings screen.</li>
+    <li><strong>Delete:</strong> Use <em>Settings → Clear device configuration</em> in the app, or uninstall the app, to erase all locally stored data.</li>
+    <li><strong>Subscription:</strong> Manage or cancel your subscription at any time through the Google Play Store → Subscriptions.</li>
+    <li><strong>Location:</strong> Revoke location permission at any time in Android Settings → Apps → VF Smart → Permissions.</li>
+    <li><strong>Notification access:</strong> Revoke at any time in Android Settings → Apps → Special app access → Notification access.</li>
+  </ul>
+
+  <!-- 9 -->
+  <h2 id="changes">9. Changes to this policy</h2>
+  <p>
+    If we make material changes to this policy, we will update the effective date at the top of this page
+    and post the new version at this URL. Continued use of the app after changes are posted constitutes
+    acceptance of the updated policy.
+  </p>
+
+  <!-- 10 -->
+  <h2 id="contact">10. Contact</h2>
+  <p>
+    For questions or concerns about this privacy policy or your data, contact us at:<br />
+    <a href="mailto:v.bangdt8@vindynamics.net">v.bangdt8@vindynamics.net</a>
+  </p>
+  <p>
+    Source code for the app is available at
+    <a href="https://github.com/squallcs12/vf-smart" target="_blank">github.com/squallcs12/vf-smart</a>.
+  </p>
+
+</div>
+
+<footer>
+  <p>VF Smart · Privacy Policy · Effective April 15, 2026</p>
+  <div class="footer-links">
+    <a href="index.html">Home</a>
+    <a href="https://github.com/squallcs12/vf-smart" target="_blank">GitHub</a>
+    <a href="mailto:v.bangdt8@vindynamics.net">Contact</a>
+  </div>
+</footer>
+
+</body>
+</html>
