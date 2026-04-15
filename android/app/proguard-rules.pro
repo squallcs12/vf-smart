@@ -25,7 +25,7 @@
 -keep class * implements com.google.gson.JsonDeserializer
 
 # Keep data model classes
--keep class com.vinfast.vf3smart.data.model.** { *; }
+-keep class com.daotranbang.vfsmart.data.model.** { *; }
 
 # WebSocket
 -keep class okhttp3.ws.** { *; }

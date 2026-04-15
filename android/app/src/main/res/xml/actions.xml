@@ -36,12 +36,12 @@
     </action>
 
     <!-- Custom action for honking horn -->
-    <action intentName="com.vinfast.vf3smart.HONK">
+    <action intentName="com.daotranbang.vfsmart.HONK">
         <fulfillment urlTemplate="vf3smart://command/honk" />
     </action>
 
     <!-- Custom action for accessory power -->
-    <action intentName="com.vinfast.vf3smart.ACCESSORY_POWER">
+    <action intentName="com.daotranbang.vfsmart.ACCESSORY_POWER">
         <parameter name="state" required="true">
             <entity-set-reference entitySetId="PowerStateEntitySet"/>
         </parameter>
@@ -53,7 +53,7 @@
     </action>
 
     <!-- Custom action for charger -->
-    <action intentName="com.vinfast.vf3smart.CHARGER">
+    <action intentName="com.daotranbang.vfsmart.CHARGER">
         <fulfillment urlTemplate="vf3smart://command/charger/unlock" />
     </action>
 </actions>

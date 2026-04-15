@@ -8,11 +8,11 @@ plugins {
 }
 
 android {
-    namespace = "com.vinfast.vf3smart"
+    namespace = "com.daotranbang.vfsmart"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.vinfast.vf3smart"
+        applicationId = "com.daotranbang.vfsmart"
         minSdk = 28
         targetSdk = 35
         versionCode = 1

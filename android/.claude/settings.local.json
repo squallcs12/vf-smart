@@ -13,7 +13,12 @@
       "Bash(adb pull:*)",
       "Bash(adb -s emulator-5554 shell screencap /sdcard/screen.png)",
       "Bash(adb -s emulator-5554 pull /sdcard/screen.png \"C:\\\\Users\\\\daotr\\\\bang\\\\VF3 Smart\\\\android\\\\screen.png\")",
-      "Bash(adb -s emulator-5554 exec-out screencap -p)"
+      "Bash(adb -s emulator-5554 exec-out screencap -p)",
+      "Bash(xargs sed *)",
+      "Bash(./gradlew clean *)",
+      "Bash(convert /home/bang/Downloads/Gemini_Generated_Image_wyz8enwyz8enwyz8.png -fuzz 15% -transparent '#00cc00' -resize 512x512 /home/bang/Downloads/ic_launcher_512.png)",
+      "Bash(pip3 show *)",
+      "Bash(python3 *)"
     ]
   }
 }
