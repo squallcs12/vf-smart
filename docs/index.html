@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VF Smart — ESP32 Smart Control for VinFast VF3</title>
+  <meta name="description" content="Open-source ESP32 smart control system for VinFast VF3. WiFi remote control, Android companion app, Google Assistant voice commands, real-time sensor monitoring." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --purple:      #7C3AED;
+      --purple-light:#9F67FF;
+      --purple-dim:  #3D1F7A;
+      --bg:          #0B0B0F;
+      --surface:     #16161E;
+      --surface2:    #1E1E2A;
+      --border:      #2A2A38;
+      --text:        #E8E8F0;
+      --text-muted:  #7A7A9A;
+      --green:       #4CAF50;
+      --radius:      12px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    a { color: var(--purple-light); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── NAV ─────────────────────────────────────────────────────── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(11,11,15,.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 56px;
+    }
+    .nav-logo { font-weight: 700; font-size: 1.1rem; color: var(--text); display: flex; align-items: center; gap: 8px; }
+    .nav-logo svg { color: var(--purple-light); }
+    .nav-links { display: flex; gap: 24px; font-size: .9rem; }
+    .nav-links a { color: var(--text-muted); transition: color .2s; }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+    .nav-cta {
+      background: var(--purple); color: #fff; padding: 7px 16px;
+      border-radius: 8px; font-size: .85rem; font-weight: 600;
+      transition: background .2s;
+    }
+    .nav-cta:hover { background: var(--purple-light); text-decoration: none; }
+
+    /* ── HERO ────────────────────────────────────────────────────── */
+    .hero {
+      padding: 96px 24px 80px;
+      text-align: center;
+      background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(124,58,237,.25) 0%, transparent 70%);
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(124,58,237,.15); border: 1px solid rgba(124,58,237,.35);
+      color: var(--purple-light); font-size: .8rem; font-weight: 600;
+      padding: 4px 12px; border-radius: 20px; margin-bottom: 20px;
+      letter-spacing: .05em; text-transform: uppercase;
+    }
+    .hero h1 {
+      font-size: clamp(2.4rem, 6vw, 4rem);
+      font-weight: 800; letter-spacing: -.02em;
+      line-height: 1.1; margin-bottom: 20px;
+    }
+    .hero h1 span { color: var(--purple-light); }
+    .hero p {
+      font-size: 1.15rem; color: var(--text-muted);
+      max-width: 580px; margin: 0 auto 36px;
+    }
+    .hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 24px; border-radius: 10px;
+      font-weight: 600; font-size: .95rem; transition: all .2s;
+    }
+    .btn-primary { background: var(--purple); color: #fff; }
+    .btn-primary:hover { background: var(--purple-light); text-decoration: none; }
+    .btn-outline {
+      background: transparent; color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover { border-color: var(--purple-light); color: var(--purple-light); text-decoration: none; }
+
+    /* ── SECTION SHARED ──────────────────────────────────────────── */
+    section { padding: 72px 24px; }
+    .container { max-width: 1100px; margin: 0 auto; }
+    .section-label {
+      font-size: .75rem; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--purple-light);
+      margin-bottom: 10px;
+    }
+    .section-title {
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      font-weight: 700; letter-spacing: -.02em; margin-bottom: 12px;
+    }
+    .section-sub { color: var(--text-muted); font-size: 1rem; max-width: 560px; margin-bottom: 48px; }
+
+    /* ── FEATURES ────────────────────────────────────────────────── */
+    #features { background: var(--surface); }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+    .feature-card {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px;
+      transition: border-color .2s, transform .2s;
+    }
+    .feature-card:hover { border-color: var(--purple); transform: translateY(-2px); }
+    .feature-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      background: rgba(124,58,237,.15); border: 1px solid rgba(124,58,237,.25);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; margin-bottom: 14px;
+    }
+    .feature-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
+    .feature-card p { font-size: .88rem; color: var(--text-muted); line-height: 1.5; }
+
+    /* ── SCREENSHOTS ─────────────────────────────────────────────── */
+    #screenshots { background: var(--bg); }
+    .screenshots-scroll {
+      display: flex; gap: 16px; overflow-x: auto;
+      padding-bottom: 12px; scroll-snap-type: x mandatory;
+    }
+    .screenshots-scroll::-webkit-scrollbar { height: 4px; }
+    .screenshots-scroll::-webkit-scrollbar-track { background: var(--surface); }
+    .screenshots-scroll::-webkit-scrollbar-thumb { background: var(--purple-dim); border-radius: 4px; }
+    .screenshot-item {
+      flex: 0 0 auto; scroll-snap-align: start;
+      width: min(480px, 90vw);
+    }
+    .screenshot-item img {
+      width: 100%; border-radius: var(--radius);
+      border: 1px solid var(--border); display: block;
+    }
+    .screenshot-item p {
+      font-size: .8rem; color: var(--text-muted);
+      text-align: center; margin-top: 8px;
+    }
+
+    /* ── ARCHITECTURE ────────────────────────────────────────────── */
+    #architecture { background: var(--surface); }
+    .arch-diagram {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 32px; margin-bottom: 32px;
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-size: .82rem; color: var(--text-muted); line-height: 1.8;
+      overflow-x: auto; white-space: pre;
+    }
+    .arch-diagram .hl { color: var(--purple-light); font-weight: 600; }
+    .arch-diagram .green { color: var(--green); }
+    .specs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .spec-card {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px;
+    }
+    .spec-card .label { font-size: .75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+    .spec-card .value { font-size: 1.05rem; font-weight: 600; }
+
+    /* ── API ─────────────────────────────────────────────────────── */
+    #api { background: var(--bg); }
+    .api-table-wrap { overflow-x: auto; }
+    table {
+      width: 100%; border-collapse: collapse; font-size: .88rem;
+    }
+    th {
+      text-align: left; padding: 10px 14px;
+      background: var(--surface2); color: var(--text-muted);
+      font-size: .75rem; letter-spacing: .07em; text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(124,58,237,.04); }
+    .method {
+      display: inline-block; font-size: .72rem; font-weight: 700;
+      padding: 2px 7px; border-radius: 4px; font-family: monospace;
+    }
+    .get  { background: rgba(76,175,80,.15);  color: #81C784; }
+    .post { background: rgba(124,58,237,.15); color: var(--purple-light); }
+    code {
+      font-family: ui-monospace, monospace; font-size: .85em;
+      background: var(--surface2); padding: 1px 5px; border-radius: 4px;
+      color: var(--purple-light);
+    }
+
+    /* ── INSTALL ─────────────────────────────────────────────────── */
+    #install { background: var(--surface); }
+    .steps { display: flex; flex-direction: column; gap: 20px; }
+    .step { display: flex; gap: 16px; }
+    .step-num {
+      flex: 0 0 32px; height: 32px;
+      background: var(--purple); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: .85rem;
+    }
+    .step-body h4 { font-size: .95rem; font-weight: 600; margin-bottom: 4px; }
+    .step-body p  { font-size: .88rem; color: var(--text-muted); }
+    pre {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 20px;
+      font-family: ui-monospace, monospace; font-size: .82rem;
+      color: var(--text); overflow-x: auto; margin-top: 8px;
+      line-height: 1.6;
+    }
+    pre .comment { color: var(--text-muted); }
+    pre .cmd { color: var(--green); }
+
+    /* ── FOOTER ──────────────────────────────────────────────────── */
+    footer {
+      background: var(--surface); border-top: 1px solid var(--border);
+      padding: 40px 24px; text-align: center;
+    }
+    .footer-logo { font-weight: 700; font-size: 1.1rem; margin-bottom: 8px; }
+    footer p { font-size: .85rem; color: var(--text-muted); margin-bottom: 16px; }
+    .footer-links { display: flex; gap: 20px; justify-content: center; font-size: .85rem; }
+
+    /* ── RESPONSIVE ──────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .nav-links { display: none; }
+      .hero { padding: 64px 16px 56px; }
+      section { padding: 52px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M3 17l2-9h14l2 9"/><path d="M1 17h22"/><circle cx="7" cy="20" r="1"/><circle cx="17" cy="20" r="1"/>
+    </svg>
+    VF Smart
+  </div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#screenshots">Screenshots</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#api">API</a>
+    <a href="#install">Install</a>
+  </div>
+  <a class="btn nav-cta" href="https://github.com/squallcs12/vf3-smart" target="_blank">
+    GitHub →
+  </a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+    Open Source · ESP32 · VinFast VF3
+  </div>
+  <h1>Smart Control for<br><span>VinFast VF3</span></h1>
+  <p>
+    An ESP32-based aftermarket system that adds WiFi remote control,
+    real-time monitoring, voice commands, and an Android companion app
+    to your VinFast VF3 electric car.
+  </p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="https://github.com/squallcs12/vf3-smart" target="_blank">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836a9.59 9.59 0 012.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+      View on GitHub
+    </a>
+    <a class="btn btn-outline" href="#install">Quick Start</a>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="container">
+    <div class="section-label">What it does</div>
+    <h2 class="section-title">Everything your VF3 was missing</h2>
+    <p class="section-sub">
+      Connects to your car's control bus via ESP32 and exposes every feature
+      through a local WiFi REST API and a companion Android app.
+    </p>
+    <div class="features-grid">
+
+      <div class="feature-card">
+        <div class="feature-icon">📱</div>
+        <h3>Android Companion App</h3>
+        <p>Real-time dashboard with ODO instrument cluster mode, quick actions, full controls, and Android Auto support.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🌐</div>
+        <h3>WiFi REST API</h3>
+        <p>Full HTTP API with WebSocket real-time updates. Control every car function from any device on your local network.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🎙️</div>
+        <h3>Google Assistant</h3>
+        <p>"Hey Google, lock my car." Voice commands via Android Auto App Actions — no cloud required beyond your phone.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <h3>Smart Lock Automation</h3>
+        <p>Auto-close windows on lock, fold mirrors on power-off, re-open mirrors on power-on. All configurable.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Charging Monitoring</h3>
+        <p>Real-time charging detection, automatic charger-port unlock when charging stops, battery voltage telemetry.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🛡️</div>
+        <h3>Safety Reminders</h3>
+        <p>Headlight reminder at night while in Drive, 50 ms sensor loop for immediate response, noise-filtered ADC readings.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🔄</div>
+        <h3>OTA Firmware Updates</h3>
+        <p>Upload new firmware or filesystem images over HTTP — no USB cable needed. Supports ArduinoOTA and PlatformIO.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🗺️</div>
+        <h3>Navigation on ODO Screen</h3>
+        <p>Reads Google Maps turn-by-turn from notifications and displays current maneuver and distance on the instrument cluster.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🔍</div>
+        <h3>Auto Device Discovery</h3>
+        <p>UDP broadcast on port 8888 lets the app find the ESP32 automatically — no manual IP entry required.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- SCREENSHOTS -->
+<section id="screenshots">
+  <div class="container">
+    <div class="section-label">App UI</div>
+    <h2 class="section-title">Android companion app</h2>
+    <p class="section-sub">Designed for both handheld use and a fixed 9-inch car display in ODO instrument cluster mode.</p>
+    <div class="screenshots-scroll">
+      <div class="screenshot-item">
+        <img src="images/screen-odo.png" alt="ODO instrument cluster mode" loading="lazy" />
+        <p>ODO instrument cluster — for fixed 9-inch display</p>
+      </div>
+      <div class="screenshot-item">
+        <img src="images/screen-home.png" alt="Home dashboard" loading="lazy" />
+        <p>Home dashboard — live status cards</p>
+      </div>
+      <div class="screenshot-item">
+        <img src="images/screen-4.png" alt="Quick actions" loading="lazy" />
+        <p>Quick actions — lock, unlock, beep, windows</p>
+      </div>
+      <div class="screenshot-item">
+        <img src="images/screen-controls.png" alt="Controls screen" loading="lazy" />
+        <p>Controls — gear, doors, full action list</p>
+      </div>
+      <div class="screenshot-item">
+        <img src="images/screen-5.png" alt="Window controls" loading="lazy" />
+        <p>Window controls — per-window open / close</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section id="architecture">
+  <div class="container">
+    <div class="section-label">How it works</div>
+    <h2 class="section-title">System architecture</h2>
+    <p class="section-sub">ESP32 sits between the car's control bus and your phone. All processing is local — no cloud.</p>
+
+    <div class="arch-diagram"><span class="hl">  Android App  </span>          <span class="hl">  VF Smart ESP32  </span>         <span class="hl">  VinFast VF3  </span>
+  ┌─────────────┐           ┌──────────────────┐          ┌──────────────┐
+  │  Compose UI │  WiFi     │  AsyncWebServer  │  GPIO    │  Door / Lock │
+  │  HomeScreen │──────────▶│  REST API :80    │─────────▶│  Window Ctrl │
+  │  ODO Cluster│           │  WebSocket /ws   │          │  Mirror Fold │
+  │  Auto App   │◀──────────│  OTA /ota/update │          │  Buzzer      │
+  └─────────────┘  JSON     ├──────────────────┤  I2C     │  Charger     │
+                            │  PCF8575 expander│─────────▶│  Accessories │
+  <span class="green">  Google       </span>          ├──────────────────┤          └──────────────┘
+  <span class="green">  Assistant    </span>          │  ADC sensors     │◀─────────  Battery V
+  <span class="green">  Voice cmd    </span>──────────▶│  Brake / Steer   │◀─────────  Brake pedal
+                            │  NTP time sync   │◀─────────  Gear / Speed
+                            └──────────────────┘</div>
+
+    <div class="specs-grid">
+      <div class="spec-card"><div class="label">MCU</div><div class="value">ESP32 Dev Module</div></div>
+      <div class="spec-card"><div class="label">Framework</div><div class="value">Arduino / PlatformIO</div></div>
+      <div class="spec-card"><div class="label">I/O Expander</div><div class="value">PCF8575 (I2C)</div></div>
+      <div class="spec-card"><div class="label">Control Loop</div><div class="value">50 ms (20 Hz)</div></div>
+      <div class="spec-card"><div class="label">API Protocol</div><div class="value">HTTP REST + WebSocket</div></div>
+      <div class="spec-card"><div class="label">Android Min SDK</div><div class="value">API 28 (Android 9)</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- API -->
+<section id="api">
+  <div class="container">
+    <div class="section-label">REST API</div>
+    <h2 class="section-title">HTTP endpoints</h2>
+    <p class="section-sub">All POST endpoints require an API key in the <code>X-API-Key</code> header. GET endpoints are open.</p>
+    <div class="api-table-wrap">
+      <table>
+        <thead>
+          <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="method get">GET</span></td><td><code>/car/status</code></td><td>Full car status JSON</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/car/lock</code></td><td>Lock the car</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/car/unlock</code></td><td>Unlock the car</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/car/windows/close</code></td><td>Close windows (30 s timer)</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/car/windows/stop</code></td><td>Stop window operation</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/car/side-mirrors</code></td><td>Open / close side mirrors</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/car/buzzer</code></td><td>Buzzer on / off / beep</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/car/frunk/open</code></td><td>Unlock front trunk</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/car/charger-unlock</code></td><td>Release charger port</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/car/dashcam</code></td><td>Toggle dashcam</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/car/light-reminder</code></td><td>Enable / disable night reminder</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/ota/update</code></td><td>Upload firmware or filesystem .bin</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/factory-reset</code></td><td>Wipe config, reboot to onboarding</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- INSTALL -->
+<section id="install">
+  <div class="container">
+    <div class="section-label">Get started</div>
+    <h2 class="section-title">Firmware quick start</h2>
+    <p class="section-sub">Requires PlatformIO and an ESP32 development board.</p>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h4>Clone the repo</h4>
+          <pre><span class="cmd">git clone</span> https://github.com/squallcs12/vf3-smart.git
+<span class="cmd">cd</span> vf3-smart</pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h4>Build and flash firmware</h4>
+          <pre><span class="comment"># Upload filesystem (web assets)</span>
+<span class="cmd">pio run</span> --target uploadfs
+
+<span class="comment"># Upload firmware</span>
+<span class="cmd">pio run</span> --target upload</pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h4>Complete onboarding</h4>
+          <p>On first boot the device creates a WiFi AP <code>VF3-SETUP</code> (password: <code>setup123</code>). Connect and visit <code>http://192.168.4.1</code> to set your WiFi credentials and API key.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h4>Test the API</h4>
+          <pre><span class="comment"># Get car status</span>
+<span class="cmd">curl</span> http://&lt;device-ip&gt;/car/status
+
+<span class="comment"># Lock the car</span>
+<span class="cmd">curl</span> -X POST http://&lt;device-ip&gt;/car/lock \
+  -H "X-API-Key: YOUR_API_KEY"</pre>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">VF Smart</div>
+  <p>ESP32 smart control system for VinFast VF3 · Open source under MIT license</p>
+  <div class="footer-links">
+    <a href="https://github.com/squallcs12/vf3-smart" target="_blank">GitHub</a>
+    <a href="https://github.com/squallcs12/vf3-smart/issues" target="_blank">Issues</a>
+    <a href="https://github.com/squallcs12/vf3-smart/blob/main/CLAUDE.md" target="_blank">Docs</a>
+  </div>
+</footer>
+
+</body>
+</html>
