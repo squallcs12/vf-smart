@@ -302,7 +302,13 @@ private fun OdoLocationCell(modifier: Modifier = Modifier) {
             onDispose {}
         } else {
             val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            val listener = android.location.LocationListener { loc -> location = loc }
+            val listener = object : android.location.LocationListener {
+                override fun onLocationChanged(loc: android.location.Location) { location = loc }
+                override fun onProviderDisabled(provider: String) {}
+                override fun onProviderEnabled(provider: String) {}
+                @Suppress("DEPRECATION")
+                override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?) {}
+            }
             val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
                 ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
                 ?: lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
@@ -444,7 +450,13 @@ private fun OdoClockCell(modifier: Modifier = Modifier) {
     DisposableEffect(hasPerm) {
         if (!hasPerm) { onDispose {} } else {
             val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            val listener = android.location.LocationListener { loc -> location = loc }
+            val listener = object : android.location.LocationListener {
+                override fun onLocationChanged(loc: android.location.Location) { location = loc }
+                override fun onProviderDisabled(provider: String) {}
+                override fun onProviderEnabled(provider: String) {}
+                @Suppress("DEPRECATION")
+                override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?) {}
+            }
             val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
                 ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
             if (seed != null) location = seed
@@ -535,8 +547,14 @@ private fun OdoGpsSpeedCell(
     DisposableEffect(permGranted) {
         if (!permGranted) { onDispose {} } else {
             val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            val listener = android.location.LocationListener { loc ->
-                if (loc.hasSpeed()) { speedKmh = loc.speed * 3.6f; hasData = true }
+            val listener = object : android.location.LocationListener {
+                override fun onLocationChanged(loc: android.location.Location) {
+                    if (loc.hasSpeed()) { speedKmh = loc.speed * 3.6f; hasData = true }
+                }
+                override fun onProviderDisabled(provider: String) {}
+                override fun onProviderEnabled(provider: String) {}
+                @Suppress("DEPRECATION")
+                override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?) {}
             }
             val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
             if (seed != null && seed.hasSpeed()) { speedKmh = seed.speed * 3.6f; hasData = true }
@@ -602,10 +620,16 @@ private fun OdoTripCell(
     DisposableEffect(permGranted) {
         if (!permGranted) { onDispose {} } else {
             val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            val listener = android.location.LocationListener { loc ->
-                val spd = if (loc.hasSpeed()) loc.speed * 3.6f else -1f
-                android.util.Log.d("VF3TripCell", "location update: hasSpeed=${loc.hasSpeed()} speed=$spd km/h provider=${loc.provider}")
-                if (loc.hasSpeed()) { speedKmh = loc.speed * 3.6f; hasGps = true }
+            val listener = object : android.location.LocationListener {
+                override fun onLocationChanged(loc: android.location.Location) {
+                    val spd = if (loc.hasSpeed()) loc.speed * 3.6f else -1f
+                    android.util.Log.d("VF3TripCell", "location update: hasSpeed=${loc.hasSpeed()} speed=$spd km/h provider=${loc.provider}")
+                    if (loc.hasSpeed()) { speedKmh = loc.speed * 3.6f; hasGps = true }
+                }
+                override fun onProviderDisabled(provider: String) {}
+                override fun onProviderEnabled(provider: String) {}
+                @Suppress("DEPRECATION")
+                override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?) {}
             }
             val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
             android.util.Log.d("VF3TripCell", "seed location: $seed hasSpeed=${seed?.hasSpeed()} speed=${seed?.speed}")
@@ -1012,7 +1036,13 @@ private fun OdoChargingCell(modifier: Modifier = Modifier) {
             onDispose {}
         } else {
             val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            val listener = android.location.LocationListener { loc -> location = loc }
+            val listener = object : android.location.LocationListener {
+                override fun onLocationChanged(loc: android.location.Location) { location = loc }
+                override fun onProviderDisabled(provider: String) {}
+                override fun onProviderEnabled(provider: String) {}
+                @Suppress("DEPRECATION")
+                override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?) {}
+            }
             statusText = "LOCATING..."
             val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
                 ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
@@ -1138,7 +1168,13 @@ private fun OdoSpeedLimitCell(
             onDispose {}
         } else {
             val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            val listener = android.location.LocationListener { loc -> location = loc }
+            val listener = object : android.location.LocationListener {
+                override fun onLocationChanged(loc: android.location.Location) { location = loc }
+                override fun onProviderDisabled(provider: String) {}
+                override fun onProviderEnabled(provider: String) {}
+                @Suppress("DEPRECATION")
+                override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?) {}
+            }
             val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
                 ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
                 ?: lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
