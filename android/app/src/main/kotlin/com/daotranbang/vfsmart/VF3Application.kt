@@ -1,9 +1,14 @@
 package com.daotranbang.vfsmart
 
+import android.app.AlarmManager
 import android.app.Application
+import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
-import com.daotranbang.vfsmart.ui.CrashActivity
+import android.os.Process
+import com.daotranbang.vfsmart.ui.MainActivity
 import dagger.hilt.android.HiltAndroidApp
+import kotlin.system.exitProcess
 
 @HiltAndroidApp
 class VF3Application : Application() {
@@ -13,25 +18,20 @@ class VF3Application : Application() {
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             try {
-                val message = buildString {
-                    append(throwable.javaClass.simpleName)
-                    append(": ")
-                    append(throwable.message ?: "No message")
-                    // Skip stack trace on OOM — stackTraceToString() itself can throw OOM
-                    if (throwable !is OutOfMemoryError) {
-                        append("\n\n")
-                        val stack = try { throwable.stackTraceToString().take(500) }
-                                    catch (_: Throwable) { "Stack trace unavailable" }
-                        append(stack)
-                    }
-                }
-                val intent = Intent(this, CrashActivity::class.java).apply {
-                    putExtra("error", message)
+                val restartIntent = Intent(this, MainActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 }
-                startActivity(intent)
+                val pending = PendingIntent.getActivity(
+                    this, 0, restartIntent,
+                    PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+                )
+                val alarm = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                alarm.set(AlarmManager.RTC, System.currentTimeMillis() + 1_000, pending)
             } catch (_: Exception) {
                 defaultHandler?.uncaughtException(thread, throwable)
+            } finally {
+                Process.killProcess(Process.myPid())
+                exitProcess(1)
             }
         }
     }
