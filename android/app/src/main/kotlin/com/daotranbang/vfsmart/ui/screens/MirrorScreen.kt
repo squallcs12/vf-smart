@@ -845,19 +845,24 @@ private fun OdoChargingCell(modifier: Modifier = Modifier) {
         }
     }
 
-    // On each location update, stream through the cache file to find the closest station.
+    // Recalculate closest station every 5 minutes using the latest known location.
     // Only the single winning NearbyStation is ever held in memory.
-    LaunchedEffect(location) {
-        val loc = location ?: return@LaunchedEffect
-        statusText = "SEARCHING..."
-        val result = kotlinx.coroutines.withContext(Dispatchers.IO) {
-            findClosestStation(context, loc.latitude, loc.longitude)
-        }
-        closest = result
-        statusText = when {
-            result != null -> "NEARBY"
-            java.io.File(context.cacheDir, KML_CACHE_FILE).exists() -> "NONE NEARBY"
-            else -> "LOADING..."
+    LaunchedEffect(Unit) {
+        while (true) {
+            val loc = location
+            if (loc != null) {
+                statusText = "SEARCHING..."
+                val result = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    findClosestStation(context, loc.latitude, loc.longitude)
+                }
+                closest = result
+                statusText = when {
+                    result != null -> "NEARBY"
+                    java.io.File(context.cacheDir, KML_CACHE_FILE).exists() -> "NONE NEARBY"
+                    else -> "LOADING..."
+                }
+            }
+            delay(5 * 60 * 1000L)
         }
     }
 
