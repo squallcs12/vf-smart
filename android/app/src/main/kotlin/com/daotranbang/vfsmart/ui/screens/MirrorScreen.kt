@@ -46,8 +46,6 @@ import com.daotranbang.vfsmart.navigation.NavigationState
 import com.daotranbang.vfsmart.viewmodel.CarStatusViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
 
 // ── ODO colour palette ────────────────────────────────────────────────────────
 private val OdoBg       = Color(0xFF0A0A0A)
@@ -675,8 +673,6 @@ private const val KML_CACHE_FILE = "charger_kml.json"
 
 private data class NearbyStation(val name: String, val distanceM: Double)
 
-private var kmlMemCache: List<Pair<String, Pair<Double, Double>>>? = null
-
 private fun haversineM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
     val r    = 6_371_000.0
     val dLat = Math.toRadians(lat2 - lat1)
@@ -687,89 +683,117 @@ private fun haversineM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): 
     return r * 2 * Math.asin(Math.sqrt(a))
 }
 
-private fun parseKml(kml: String): List<Pair<String, Pair<Double, Double>>> {
-    val doc = javax.xml.parsers.DocumentBuilderFactory.newInstance()
-        .newDocumentBuilder().parse(kml.byteInputStream())
-    val placemarks = doc.getElementsByTagName("Placemark")
-    val result = mutableListOf<Pair<String, Pair<Double, Double>>>()
-    for (i in 0 until minOf(placemarks.length, 500)) {
-        val pm = placemarks.item(i) as org.w3c.dom.Element
-        val name = pm.getElementsByTagName("name").item(0)
-            ?.textContent?.trim().takeIf { !it.isNullOrBlank() } ?: continue
-        val coordText = pm.getElementsByTagName("coordinates").item(0)
-            ?.textContent?.trim() ?: continue
-        val parts = coordText.split(",")
-        val lon = parts.getOrNull(0)?.trim()?.toDoubleOrNull() ?: continue
-        val lat = parts.getOrNull(1)?.trim()?.toDoubleOrNull() ?: continue
-        result.add(name to (lat to lon))
-    }
-    return result
-}
+/**
+ * SAX-parse a KML stream and write stations to [outputFile] as line-delimited text:
+ *   name|lat|lon
+ * Never holds more than one station in memory at a time.
+ */
+private fun parseKmlToFile(kmlStream: java.io.InputStream, outputFile: java.io.File) {
+    var inPlacemark   = false
+    var inName        = false
+    var inCoordinates = false
+    val nameBuilder   = StringBuilder()
+    val coordBuilder  = StringBuilder()
+    var count         = 0
 
-private fun readKmlFileCache(context: Context): List<Pair<String, Pair<Double, Double>>>? =
+    val writer = outputFile.bufferedWriter()
     try {
-        val file = java.io.File(context.cacheDir, KML_CACHE_FILE)
-        if (!file.exists()) null
-        else {
-            val arr = org.json.JSONArray(file.readText())
-            (0 until arr.length()).map { i ->
-                val obj = arr.getJSONObject(i)
-                obj.getString("name") to (obj.getDouble("lat") to obj.getDouble("lon"))
-            }
-        }
-    } catch (e: Exception) {
-        android.util.Log.w("VF3Charging", "File cache read failed", e)
-        null
-    }
-
-private fun writeKmlFileCache(context: Context, stations: List<Pair<String, Pair<Double, Double>>>) {
-    try {
-        val arr = org.json.JSONArray()
-        stations.forEach { (name, coords) ->
-            arr.put(org.json.JSONObject().apply {
-                put("name", name); put("lat", coords.first); put("lon", coords.second)
+        javax.xml.parsers.SAXParserFactory.newInstance().newSAXParser()
+            .parse(kmlStream, object : org.xml.sax.helpers.DefaultHandler() {
+                override fun startElement(uri: String, localName: String, qName: String,
+                                          attrs: org.xml.sax.Attributes) {
+                    when (qName) {
+                        "Placemark"   -> { inPlacemark = true; nameBuilder.clear(); coordBuilder.clear() }
+                        "name"        -> if (inPlacemark) { inName = true; nameBuilder.clear() }
+                        "coordinates" -> if (inPlacemark) { inCoordinates = true; coordBuilder.clear() }
+                    }
+                }
+                override fun characters(ch: CharArray, start: Int, length: Int) {
+                    if (inName)        nameBuilder.append(ch, start, length)
+                    if (inCoordinates) coordBuilder.append(ch, start, length)
+                }
+                override fun endElement(uri: String, localName: String, qName: String) {
+                    when (qName) {
+                        "name"        -> inName = false
+                        "coordinates" -> {
+                            inCoordinates = false
+                            if (inPlacemark && count < 500) {
+                                val name  = nameBuilder.toString().trim()
+                                val raw   = coordBuilder.toString().trim()
+                                val comma1 = raw.indexOf(',')
+                                val comma2 = if (comma1 >= 0) raw.indexOf(',', comma1 + 1) else -1
+                                val lon = raw.substring(0, comma1.coerceAtLeast(0)).toDoubleOrNull()
+                                val lat = if (comma1 >= 0) {
+                                    val end = if (comma2 > comma1) comma2 else raw.length
+                                    raw.substring(comma1 + 1, end).trim().toDoubleOrNull()
+                                } else null
+                                if (lon != null && lat != null && name.isNotBlank()) {
+                                    writer.write("${name.replace("|", " ")}|$lat|$lon\n")
+                                    count++
+                                }
+                            }
+                        }
+                        "Placemark"   -> inPlacemark = false
+                    }
+                }
             })
-        }
-        java.io.File(context.cacheDir, KML_CACHE_FILE).writeText(arr.toString())
-    } catch (e: Exception) {
-        android.util.Log.w("VF3Charging", "File cache write failed", e)
+        android.util.Log.d("VF3Charging", "KML parsed: $count stations written")
+    } finally {
+        writer.close()
     }
 }
 
-private fun kmlStationsFlow(context: Context) = flow {
-    val mem = kmlMemCache
-    if (mem != null) {
-        emit(mem)
-    } else {
-        readKmlFileCache(context)?.also { cached -> kmlMemCache = cached; emit(cached) }
-    }
+/**
+ * Download fresh KML from network and write to the cache file via a temp file
+ * (atomic rename), so the reader never sees a partial file.
+ * No data is held in memory after this returns.
+ */
+private fun refreshKmlFromNetwork(context: Context) {
     try {
         val conn = (java.net.URL(CHARGER_KML_URL).openConnection()
-                as java.net.HttpURLConnection).also {
-            it.connectTimeout = 10_000; it.readTimeout = 15_000
-            it.setRequestProperty("User-Agent", "VF3Smart/1.0")
+                as java.net.HttpURLConnection).apply {
+            connectTimeout = 10_000; readTimeout = 15_000
+            setRequestProperty("User-Agent", "VF3Smart/1.0")
         }
-        val fresh = parseKml(conn.inputStream.bufferedReader().readText())
-        if (fresh.isNotEmpty()) {
-            kmlMemCache = fresh
-            writeKmlFileCache(context, fresh)
-            android.util.Log.d("VF3Charging", "KML refreshed: ${fresh.size} stations")
-            emit(fresh)
-        }
+        val tmp  = java.io.File(context.cacheDir, "$KML_CACHE_FILE.tmp")
+        val dest = java.io.File(context.cacheDir, KML_CACHE_FILE)
+        conn.inputStream.use { parseKmlToFile(it, tmp) }
+        if (tmp.length() > 0) tmp.renameTo(dest)
+        else tmp.delete()
     } catch (e: Exception) {
         android.util.Log.e("VF3Charging", "KML network refresh failed", e)
     }
-}.flowOn(Dispatchers.IO)
+}
 
-private fun sortNearby(all: List<Pair<String, Pair<Double, Double>>>, lat: Double, lon: Double) =
-    all.map { (name, coords) -> NearbyStation(name, haversineM(lat, lon, coords.first, coords.second)) }
-        .sortedBy { it.distanceM }.take(1)
+/**
+ * Stream through the cache file line by line and return only the closest station.
+ * O(1) memory regardless of how many stations are in the file.
+ */
+private fun findClosestStation(context: Context, userLat: Double, userLon: Double): NearbyStation? {
+    val file = java.io.File(context.cacheDir, KML_CACHE_FILE)
+    if (!file.exists()) return null
+    var closest: NearbyStation? = null
+    var minDist = Double.MAX_VALUE
+    file.bufferedReader().useLines { lines ->
+        lines.forEach { line ->
+            val i1 = line.indexOf('|')
+            if (i1 < 1) return@forEach
+            val i2 = line.indexOf('|', i1 + 1)
+            if (i2 < 0) return@forEach
+            val stLat = line.substring(i1 + 1, i2).toDoubleOrNull() ?: return@forEach
+            val stLon = line.substring(i2 + 1).toDoubleOrNull() ?: return@forEach
+            val dist  = haversineM(userLat, userLon, stLat, stLon)
+            if (dist < minDist) { minDist = dist; closest = NearbyStation(line.substring(0, i1), dist) }
+        }
+    }
+    return closest
+}
 
 @SuppressLint("MissingPermission")
 @Composable
 private fun OdoChargingCell(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    var stations   by remember { mutableStateOf<List<NearbyStation>>(emptyList()) }
+    var closest    by remember { mutableStateOf<NearbyStation?>(null) }
     var statusText by remember { mutableStateOf("LOCATING...") }
 
     fun hasPerm() = ContextCompat.checkSelfPermission(
@@ -779,13 +803,13 @@ private fun OdoChargingCell(modifier: Modifier = Modifier) {
         context, android.Manifest.permission.ACCESS_COARSE_LOCATION
     ) == PackageManager.PERMISSION_GRANTED
 
-    var permGranted  by remember { mutableStateOf(hasPerm()) }
-    var kmlData      by remember { mutableStateOf(kmlMemCache ?: emptyList()) }
+    var permGranted   by remember { mutableStateOf(hasPerm()) }
     var foregroundKey by remember { mutableIntStateOf(0) }
     LifecycleEventEffect(Lifecycle.Event.ON_START) { permGranted = hasPerm(); foregroundKey++ }
 
+    // Refresh cache file from network in background — no data kept in RAM
     LaunchedEffect(foregroundKey) {
-        kmlStationsFlow(context).collect { fresh -> kmlData = fresh }
+        kotlinx.coroutines.withContext(Dispatchers.IO) { refreshKmlFromNetwork(context) }
     }
 
     val permLauncher = rememberLauncherForActivityResult(
@@ -821,25 +845,33 @@ private fun OdoChargingCell(modifier: Modifier = Modifier) {
         }
     }
 
-    LaunchedEffect(location, kmlData) {
+    // On each location update, stream through the cache file to find the closest station.
+    // Only the single winning NearbyStation is ever held in memory.
+    LaunchedEffect(location) {
         val loc = location ?: return@LaunchedEffect
-        if (kmlData.isEmpty()) { statusText = "SEARCHING..."; return@LaunchedEffect }
-        val result = sortNearby(kmlData, loc.latitude, loc.longitude)
-        stations = result
-        statusText = if (result.isEmpty()) "NONE NEARBY" else "CHARGING"
+        statusText = "SEARCHING..."
+        val result = kotlinx.coroutines.withContext(Dispatchers.IO) {
+            findClosestStation(context, loc.latitude, loc.longitude)
+        }
+        closest = result
+        statusText = when {
+            result != null -> "NEARBY"
+            java.io.File(context.cacheDir, KML_CACHE_FILE).exists() -> "NONE NEARBY"
+            else -> "LOADING..."
+        }
     }
 
     Column(modifier = modifier.fillMaxHeight(),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Icon(imageVector = Icons.Filled.Bolt, contentDescription = null,
-            tint = if (stations.isNotEmpty()) OdoGood else OdoInactive,
+            tint = if (closest != null) OdoGood else OdoInactive,
             modifier = Modifier.size(28.dp))
         Spacer(Modifier.height(10.dp))
-        if (stations.isEmpty()) {
+        if (closest == null) {
             Text(text = statusText, color = OdoInactive, fontSize = 10.sp,
                 letterSpacing = 1.sp, textAlign = TextAlign.Center)
         } else {
-            val station = stations.first()
+            val station = closest!!
             Text(text = station.name.uppercase(), color = OdoNormal, fontSize = 12.sp,
                 letterSpacing = 0.5.sp, maxLines = 3, overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 8.dp))

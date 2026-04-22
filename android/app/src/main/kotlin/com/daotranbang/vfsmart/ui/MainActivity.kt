@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity() {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     NavHost(
                         navController = navController,
-                        startDestination = "home",
+                        startDestination = "mirror",
                         modifier = Modifier.padding(innerPadding)
                     ) {
                         composable("setup") {
@@ -51,14 +51,22 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToDebug    = { navController.navigate("debug") },
                                 onNavigateToSetup    = { navController.navigate("setup") },
                                 onNavigateToMirror   = {
-                                    navController.navigate("mirror") { launchSingleTop = true }
+                                    navController.navigate("mirror") {
+                                        popUpTo("mirror") { inclusive = false }
+                                        launchSingleTop = true
+                                    }
                                 }
                             )
                         }
 
                         composable("mirror") {
                             MirrorScreen(
-                                onNavigateBack = { navController.popBackStack() }
+                                onNavigateBack = {
+                                    navController.navigate("home") {
+                                        popUpTo("mirror") { inclusive = false }
+                                        launchSingleTop = true
+                                    }
+                                }
                             )
                         }
 
