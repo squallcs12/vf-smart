@@ -1,12 +1,7 @@
 package com.daotranbang.vfsmart.ui.screens
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
-import android.content.pm.PackageManager
-import android.location.LocationManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -28,7 +23,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -41,8 +35,9 @@ import com.daotranbang.vfsmart.data.model.CarStatus
 import com.daotranbang.vfsmart.data.model.TpmsData
 import com.daotranbang.vfsmart.data.model.TpmsTire
 import com.daotranbang.vfsmart.data.network.WebSocketManager
-import com.daotranbang.vfsmart.navigation.NavigationGattServer
+import com.daotranbang.vfsmart.navigation.GpsState
 import com.daotranbang.vfsmart.navigation.NavigationState
+import com.daotranbang.vfsmart.navigation.VF3GattServer
 import com.daotranbang.vfsmart.viewmodel.CarStatusViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -66,31 +61,29 @@ fun MirrorScreen(
 ) {
     val carStatus       by statusViewModel.carStatus.collectAsStateWithLifecycle()
     val connectionState by statusViewModel.connectionState.collectAsStateWithLifecycle()
-    val navigationState by NavigationGattServer.navigationState.collectAsStateWithLifecycle()
+    val navigationState by VF3GattServer.navigationState.collectAsStateWithLifecycle()
+    val gpsState        by VF3GattServer.gpsState.collectAsStateWithLifecycle()
+    val tpmsData        by VF3GattServer.tpmsState.collectAsStateWithLifecycle()
 
-    // Trip clock: reset each time screen comes to foreground
+    // Trip clock — resets each time screen comes to foreground
     var foregroundTime by remember { mutableStateOf(System.currentTimeMillis()) }
     LifecycleEventEffect(Lifecycle.Event.ON_START) { foregroundTime = System.currentTimeMillis() }
     var tripTick by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
-        while (true) { delay(1000); tripTick++ }
-    }
+    LaunchedEffect(Unit) { while (true) { delay(1000); tripTick++ } }
     val tripText = remember(tripTick, foregroundTime) {
         val secs = (System.currentTimeMillis() - foregroundTime) / 1000
-        val h = secs / 3600
-        val m = (secs % 3600) / 60
-        "${h}:${m.toString().padStart(2, '0')}"
+        "${secs / 3600}:${((secs % 3600) / 60).toString().padStart(2, '0')}"
     }
 
-    // Start GATT server while mirror screen is active; stop on exit
+    // Start GATT server (nav + gps + tpms); stop when screen leaves
     val context = LocalContext.current
-    val gattServer = remember { NavigationGattServer(context) }
+    val gattServer = remember { VF3GattServer(context) }
     DisposableEffect(Unit) {
         gattServer.start()
         onDispose { gattServer.stop() }
     }
 
-    // Hide system bars; restore when leaving
+    // Hide system bars; restore on exit
     val view = LocalView.current
     DisposableEffect(Unit) {
         val window = (view.context as Activity).window
@@ -106,33 +99,39 @@ fun MirrorScreen(
             carStatus       = carStatus,
             connectionState = connectionState,
             navigationState = navigationState,
+            gpsState        = gpsState,
+            tpmsData        = tpmsData,
             tripText        = tripText
         )
 
         SmallFloatingActionButton(
-            onClick          = onNavigateBack,
-            modifier         = Modifier.align(Alignment.BottomEnd).padding(8.dp),
-            containerColor   = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+            onClick        = onNavigateBack,
+            modifier       = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
         ) {
-            Icon(
-                imageVector     = Icons.Default.FullscreenExit,
-                contentDescription = "Exit mirror mode",
-                modifier        = Modifier.size(18.dp)
-            )
+            Icon(Icons.Default.FullscreenExit, contentDescription = "Exit mirror mode",
+                modifier = Modifier.size(18.dp))
         }
     }
 }
 
-// ── Mirror layout: ODO instrument-cluster style ───────────────────────────────
+// ── Mirror layout ─────────────────────────────────────────────────────────────
 
 @Composable
 private fun MirrorContent(
     carStatus: CarStatus?,
     connectionState: WebSocketManager.ConnectionState,
     navigationState: NavigationState,
+    gpsState: GpsState,
+    tpmsData: TpmsData?,
     tripText: String,
     modifier: Modifier = Modifier
 ) {
+    // Derive shared values from GPS state once — all cells read these
+    val location = gpsState.toLocation()
+    val speedKmh = gpsState.speedKmh
+    val hasSpeed = gpsState.isActive
+
     Box(modifier = modifier.fillMaxSize().background(OdoBg)) {
         Column(modifier = Modifier.fillMaxSize()) {
             var sharedSpeedLimit by remember { mutableStateOf<Int?>(null) }
@@ -140,42 +139,39 @@ private fun MirrorContent(
             Column(modifier = Modifier.weight(1f)) {
                 // Row 1: Location | Navigation | GPS Speed | Trip
                 Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    OdoLocationCell(modifier = Modifier.weight(1f))
+                    OdoLocationCell(location = location, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
                     OdoNavCell(navigationState = navigationState, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
-                    OdoGpsSpeedCell(speedLimit = sharedSpeedLimit, modifier = Modifier.weight(1f))
+                    OdoGpsSpeedCell(speedKmh = speedKmh, hasSpeed = hasSpeed,
+                        speedLimit = sharedSpeedLimit, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
-                    OdoTripCell(tripText = tripText, modifier = Modifier.weight(1f))
+                    OdoTripCell(speedKmh = speedKmh, hasSpeed = hasSpeed,
+                        tripText = tripText, modifier = Modifier.weight(1f))
                 }
 
                 OdoHorizontalDivider()
 
                 // Row 2: Charging | TPMS | Speed Limit | Clock
                 Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    OdoChargingCell(modifier = Modifier.weight(1f))
+                    OdoChargingCell(location = location, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
-                    OdoTpmsCell(tpms = carStatus?.tpms, modifier = Modifier.weight(1f))
+                    OdoTpmsCell(tpms = tpmsData, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
-                    OdoSpeedLimitCell(
+                    OdoSpeedLimitCell(location = location,
                         onSpeedLimitChanged = { sharedSpeedLimit = it },
-                        modifier = Modifier.weight(1f)
-                    )
+                        modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
-                    OdoClockCell(modifier = Modifier.weight(1f))
+                    OdoClockCell(location = location, modifier = Modifier.weight(1f))
                 }
             }
 
             OdoHorizontalDivider()
-
-            // Bottom status bar
             OdoStatusBar(carStatus = carStatus)
         }
 
-        ConnectionDot(
-            connectionState = connectionState,
-            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
-        )
+        ConnectionDot(connectionState = connectionState,
+            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
     }
 }
 
@@ -209,53 +205,15 @@ private fun OdoCell(
 
 // ── Location cell ─────────────────────────────────────────────────────────────
 
-@SuppressLint("MissingPermission")
 @Composable
-private fun OdoLocationCell(modifier: Modifier = Modifier) {
+private fun OdoLocationCell(
+    location: android.location.Location?,
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
-
-    fun hasPerm() = ContextCompat.checkSelfPermission(
-        context, android.Manifest.permission.ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED ||
-    ContextCompat.checkSelfPermission(
-        context, android.Manifest.permission.ACCESS_COARSE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
-
-    var permGranted by remember { mutableStateOf(hasPerm()) }
-    var location    by remember { mutableStateOf<android.location.Location?>(null) }
-    var street      by remember { mutableStateOf<String?>(null) }
-    var district    by remember { mutableStateOf<String?>(null) }
-    var province    by remember { mutableStateOf<String?>(null) }
-
-    val permLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { results -> if (results.values.any { it }) permGranted = true }
-
-    DisposableEffect(permGranted) {
-        if (!permGranted) {
-            permLauncher.launch(arrayOf(
-                android.Manifest.permission.ACCESS_FINE_LOCATION,
-                android.Manifest.permission.ACCESS_COARSE_LOCATION
-            ))
-            onDispose {}
-        } else {
-            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            val listener = object : android.location.LocationListener {
-                override fun onLocationChanged(loc: android.location.Location) { location = loc }
-                override fun onProviderDisabled(provider: String) {}
-                override fun onProviderEnabled(provider: String) {}
-                @Suppress("DEPRECATION")
-                override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?) {}
-            }
-            val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-                ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                ?: lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
-            if (seed != null) location = seed
-            try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 30_000L, 100f, listener) } catch (_: Exception) {}
-            try { lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 30_000L, 100f, listener) } catch (_: Exception) {}
-            onDispose { lm.removeUpdates(listener) }
-        }
-    }
+    var street   by remember { mutableStateOf<String?>(null) }
+    var district by remember { mutableStateOf<String?>(null) }
+    var province by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(location) {
         val loc = location ?: return@LaunchedEffect
@@ -285,7 +243,7 @@ private fun OdoLocationCell(modifier: Modifier = Modifier) {
             tint = OdoInactive, modifier = Modifier.size(32.dp))
         Spacer(Modifier.height(8.dp))
         Text(
-            text = province?.uppercase() ?: if (!hasData) "LOCATING..." else "--",
+            text = province?.uppercase() ?: if (!hasData) "NO GPS" else "--",
             color = OdoLabel, fontSize = 10.sp, fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center, letterSpacing = 2.sp, maxLines = 1,
             overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp)
@@ -322,76 +280,45 @@ private suspend fun fetchWeather(lat: Double, lon: Double): WeatherData? =
                 connectTimeout = 10_000; readTimeout = 10_000
                 setRequestProperty("User-Agent", "VF3Smart/1.0")
             }
-            val json     = org.json.JSONObject(conn.inputStream.bufferedReader().readText())
-            val current  = json.getJSONObject("current_weather").getInt("weathercode")
-            val codes    = json.getJSONObject("hourly").getJSONArray("weathercode")
-            val nextIdx  = (java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) + 1) % 24
-            val nextHour = codes.getInt(nextIdx)
-            WeatherData(current, nextHour)
-        } catch (e: Exception) {
-            null
-        }
+            val json    = org.json.JSONObject(conn.inputStream.bufferedReader().readText())
+            val current = json.getJSONObject("current_weather").getInt("weathercode")
+            val codes   = json.getJSONObject("hourly").getJSONArray("weathercode")
+            val nextIdx = (java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) + 1) % 24
+            WeatherData(current, codes.getInt(nextIdx))
+        } catch (e: Exception) { null }
     }
 
 private fun weatherIconFor(code: Int?, isNight: Boolean): ImageVector = when {
-    code == null     -> if (isNight) Icons.Default.NightsStay else Icons.Default.WbSunny
-    code == 0        -> if (isNight) Icons.Default.NightsStay else Icons.Default.WbSunny
-    code in 1..3     -> Icons.Default.WbCloudy
-    code in 45..48   -> Icons.Default.Cloud
-    code in 51..67   -> Icons.Default.WaterDrop
-    code in 71..77   -> Icons.Default.AcUnit
-    code in 80..82   -> Icons.Default.WaterDrop
-    code >= 95       -> Icons.Default.Bolt
-    else             -> Icons.Default.Cloud
+    code == null   -> if (isNight) Icons.Default.NightsStay else Icons.Default.WbSunny
+    code == 0      -> if (isNight) Icons.Default.NightsStay else Icons.Default.WbSunny
+    code in 1..3   -> Icons.Default.WbCloudy
+    code in 45..48 -> Icons.Default.Cloud
+    code in 51..67 -> Icons.Default.WaterDrop
+    code in 71..77 -> Icons.Default.AcUnit
+    code in 80..82 -> Icons.Default.WaterDrop
+    code >= 95     -> Icons.Default.Bolt
+    else           -> Icons.Default.Cloud
 }
 
 // ── Clock cell ────────────────────────────────────────────────────────────────
 
-@SuppressLint("MissingPermission")
 @Composable
-private fun OdoClockCell(modifier: Modifier = Modifier) {
-    // Reuse a single Calendar instance to avoid per-second allocations
+private fun OdoClockCell(
+    location: android.location.Location?,
+    modifier: Modifier = Modifier
+) {
     val cal = remember { java.util.Calendar.getInstance() }
     var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) { delay(1000); nowMs = System.currentTimeMillis() }
-    }
+    LaunchedEffect(Unit) { while (true) { delay(1000); nowMs = System.currentTimeMillis() } }
     cal.timeInMillis = nowMs
 
-    val context = LocalContext.current
-    var weather  by remember { mutableStateOf<WeatherData?>(null) }
-    var location by remember { mutableStateOf<android.location.Location?>(null) }
+    var weather by remember { mutableStateOf<WeatherData?>(null) }
 
-    val hasPerm = ContextCompat.checkSelfPermission(
-        context, android.Manifest.permission.ACCESS_COARSE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED ||
-    ContextCompat.checkSelfPermission(
-        context, android.Manifest.permission.ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
-
-    DisposableEffect(hasPerm) {
-        if (!hasPerm) { onDispose {} } else {
-            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            val listener = object : android.location.LocationListener {
-                override fun onLocationChanged(loc: android.location.Location) { location = loc }
-                override fun onProviderDisabled(provider: String) {}
-                override fun onProviderEnabled(provider: String) {}
-                @Suppress("DEPRECATION")
-                override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?) {}
-            }
-            val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-                ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-            if (seed != null) location = seed
-            try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 60_000L, 500f, listener) } catch (_: Exception) {}
-            try { lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 60_000L, 500f, listener) } catch (_: Exception) {}
-            onDispose { lm.removeUpdates(listener) }
-        }
-    }
-
-    // Fetch weather immediately, then every 30 minutes
+    // rememberUpdatedState so the timer loop always sees the latest location
+    val currentLocation by rememberUpdatedState(location)
     LaunchedEffect(Unit) {
         while (true) {
-            val loc = location
+            val loc = currentLocation
             if (loc != null) {
                 val result = fetchWeather(loc.latitude, loc.longitude)
                 if (result != null) weather = result
@@ -404,7 +331,6 @@ private fun OdoClockCell(modifier: Modifier = Modifier) {
     val minute      = cal.get(java.util.Calendar.MINUTE)
     val isNight     = hour < 6 || hour >= 18
     val nextIsNight = (hour + 1) % 24 < 6 || (hour + 1) % 24 >= 18
-    val time        = String.format("%02d:%02d", hour, minute)
     val currentIcon = weatherIconFor(weather?.current, isNight)
     val nextIcon    = weatherIconFor(weather?.nextHour, nextIsNight)
 
@@ -413,19 +339,20 @@ private fun OdoClockCell(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        Row(verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(currentIcon, contentDescription = "now", tint = OdoNormal, modifier = Modifier.size(48.dp))
+            modifier = Modifier.fillMaxWidth()) {
+            Icon(currentIcon, contentDescription = "now", tint = OdoNormal,
+                modifier = Modifier.size(48.dp))
             Spacer(Modifier.width(8.dp))
             Icon(Icons.Default.ArrowForward, contentDescription = null,
                 tint = OdoInactive, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Icon(nextIcon, contentDescription = "+1h", tint = OdoInactive, modifier = Modifier.size(36.dp))
+            Icon(nextIcon, contentDescription = "+1h", tint = OdoInactive,
+                modifier = Modifier.size(36.dp))
         }
-        Text(text = time, color = OdoNormal, fontSize = 52.sp, fontWeight = FontWeight.Bold,
+        Text(text = String.format("%02d:%02d", hour, minute), color = OdoNormal,
+            fontSize = 52.sp, fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center, letterSpacing = 2.sp)
         Text(text = "CLOCK", color = OdoLabel, fontSize = 10.sp,
             fontWeight = FontWeight.Medium, letterSpacing = 2.sp)
@@ -434,58 +361,28 @@ private fun OdoClockCell(modifier: Modifier = Modifier) {
 
 // ── GPS speed cell ────────────────────────────────────────────────────────────
 
-@SuppressLint("MissingPermission")
 @Composable
 private fun OdoGpsSpeedCell(
+    speedKmh: Float,
+    hasSpeed: Boolean,
     speedLimit: Int? = null,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    fun hasPerm() = ContextCompat.checkSelfPermission(
-        context, android.Manifest.permission.ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
-
-    var permGranted by remember { mutableStateOf(hasPerm()) }
-    var speedKmh    by remember { mutableFloatStateOf(0f) }
-    var hasData     by remember { mutableStateOf(false) }
-
-    DisposableEffect(permGranted) {
-        if (!permGranted) { onDispose {} } else {
-            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            val listener = object : android.location.LocationListener {
-                override fun onLocationChanged(loc: android.location.Location) {
-                    if (loc.hasSpeed()) { speedKmh = loc.speed * 3.6f; hasData = true }
-                }
-                override fun onProviderDisabled(provider: String) {}
-                override fun onProviderEnabled(provider: String) {}
-                @Suppress("DEPRECATION")
-                override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?) {}
-            }
-            val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-            if (seed != null && seed.hasSpeed()) { speedKmh = seed.speed * 3.6f; hasData = true }
-            try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener) } catch (_: Exception) {}
-            onDispose { lm.removeUpdates(listener) }
-        }
-    }
-
-    val speed         = speedKmh.toInt()
-    val overLimit     = speedLimit != null && speed >= speedLimit
+    val speed          = speedKmh.toInt()
+    val overLimit      = speedLimit != null && speed >= speedLimit
     val overLimitPlus5 = speedLimit != null && speed >= speedLimit + 5
     val speedColor = when {
-        !hasData       -> OdoInactive
+        !hasSpeed      -> OdoInactive
         overLimitPlus5 -> OdoAlert
         overLimit      -> OdoWarning
         else           -> OdoNormal
     }
-    val speedFontSize = if (speed >= 100) 64.sp else 80.sp
 
-    Column(
-        modifier = modifier.fillMaxHeight(),
+    Column(modifier = modifier.fillMaxHeight(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(text = if (hasData) "$speed" else "--", color = speedColor,
-            fontSize = speedFontSize, fontWeight = FontWeight.Bold,
+        verticalArrangement = Arrangement.Center) {
+        Text(text = if (hasSpeed) "$speed" else "--", color = speedColor,
+            fontSize = if (speed >= 100) 64.sp else 80.sp, fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center, letterSpacing = 1.sp)
         Spacer(Modifier.height(6.dp))
         Text(text = "KM/H", color = OdoLabel, fontSize = 10.sp,
@@ -495,62 +392,29 @@ private fun OdoGpsSpeedCell(
 
 // ── Trip cell ─────────────────────────────────────────────────────────────────
 
-@SuppressLint("MissingPermission")
 @Composable
 private fun OdoTripCell(
+    speedKmh: Float,
+    hasSpeed: Boolean,
     tripText: String,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    fun hasPerm() = ContextCompat.checkSelfPermission(
-        context, android.Manifest.permission.ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
+    var colonVisible   by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) { while (true) { delay(1000); colonVisible = !colonVisible } }
 
-    var permGranted by remember { mutableStateOf(hasPerm()) }
-    var hasGps      by remember { mutableStateOf(false) }
-    var speedKmh    by remember { mutableFloatStateOf(0f) }
-
-    DisposableEffect(permGranted) {
-        if (!permGranted) { onDispose {} } else {
-            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            val listener = object : android.location.LocationListener {
-                override fun onLocationChanged(loc: android.location.Location) {
-                    val spd = if (loc.hasSpeed()) loc.speed * 3.6f else -1f
-                    android.util.Log.d("VF3TripCell", "location update: hasSpeed=${loc.hasSpeed()} speed=$spd km/h provider=${loc.provider}")
-                    if (loc.hasSpeed()) { speedKmh = loc.speed * 3.6f; hasGps = true }
-                }
-                override fun onProviderDisabled(provider: String) {}
-                override fun onProviderEnabled(provider: String) {}
-                @Suppress("DEPRECATION")
-                override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?) {}
-            }
-            val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-            android.util.Log.d("VF3TripCell", "seed location: $seed hasSpeed=${seed?.hasSpeed()} speed=${seed?.speed}")
-            if (seed != null && seed.hasSpeed()) { speedKmh = seed.speed * 3.6f; hasGps = true }
-            try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener) } catch (_: Exception) {}
-            onDispose { lm.removeUpdates(listener) }
-        }
-    }
-
-    var colonVisible by remember { mutableStateOf(true) }
-    LaunchedEffect(Unit) {
-        while (true) { delay(1000); colonVisible = !colonVisible }
-    }
-
-    val isStopped = hasGps && speedKmh < 1f
-    var hasMovedOnce  by remember { mutableStateOf(false) }
-    var countdownSecs by remember { mutableIntStateOf(15) }
+    var hasMovedOnce   by remember { mutableStateOf(false) }
+    var countdownSecs  by remember { mutableIntStateOf(15) }
     var countdownActive by remember { mutableStateOf(false) }
+    val isStopped = hasSpeed && speedKmh < 1f
 
     LaunchedEffect(isStopped) {
-        android.util.Log.d("VF3TripCell", "isStopped=$isStopped hasGps=$hasGps speedKmh=$speedKmh hasMovedOnce=$hasMovedOnce")
         if (speedKmh >= 1f) {
-            hasMovedOnce = true
+            hasMovedOnce    = true
             countdownActive = false
-            countdownSecs = 15
+            countdownSecs   = 15
         } else if (isStopped && hasMovedOnce) {
             countdownActive = true
-            countdownSecs = 15
+            countdownSecs   = 15
             while (countdownSecs > 0) {
                 delay(1000)
                 if (!countdownActive) break
@@ -560,13 +424,11 @@ private fun OdoTripCell(
         }
     }
 
-    Column(
-        modifier = modifier.fillMaxHeight(),
+    Column(modifier = modifier.fillMaxHeight(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
+        verticalArrangement = Arrangement.Center) {
         if (countdownActive && countdownSecs > 0) {
-            Icon(imageVector = Icons.Default.Timer, contentDescription = null,
+            Icon(Icons.Default.Timer, contentDescription = null,
                 tint = OdoWarning, modifier = Modifier.size(32.dp))
             Spacer(Modifier.height(8.dp))
             Text(text = "$countdownSecs", color = OdoWarning, fontSize = 28.sp,
@@ -580,11 +442,11 @@ private fun OdoTripCell(
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val parts = tripText.split(":")
-                Text(text = parts[0], color = OdoNormal, fontSize = 28.sp,
+                Text(parts[0], color = OdoNormal, fontSize = 28.sp,
                     fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                Text(text = ":", color = if (colonVisible) OdoNormal else Color.Transparent,
+                Text(":", color = if (colonVisible) OdoNormal else Color.Transparent,
                     fontSize = 28.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                Text(text = parts.getOrElse(1) { "00" }, color = OdoNormal, fontSize = 28.sp,
+                Text(parts.getOrElse(1) { "00" }, color = OdoNormal, fontSize = 28.sp,
                     fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
             }
         }
@@ -607,13 +469,10 @@ private fun OdoNavCell(
     }
     val color = if (navigationState.isActive) OdoNormal else OdoInactive
 
-    Column(
-        modifier = modifier.fillMaxHeight(),
+    Column(modifier = modifier.fillMaxHeight(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(imageVector = icon, contentDescription = null, tint = color,
-            modifier = Modifier.size(40.dp))
+        verticalArrangement = Arrangement.Center) {
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(40.dp))
         Spacer(Modifier.height(10.dp))
         Text(text = if (navigationState.isActive) navigationState.distance else "--",
             color = color, fontSize = 28.sp, fontWeight = FontWeight.Bold,
@@ -666,11 +525,9 @@ private fun OdoTireNumber(tire: TpmsTire?, modifier: Modifier = Modifier) {
         tire.pressureKpa < 1.8f                  -> OdoWarning
         else                                      -> OdoGood
     }
-    val valueText = if (tire != null && tire.valid && !tire.stale)
-        String.format("%.1f", tire.pressureKpa)
-    else "_._"
-
-    Text(text = valueText, color = color, fontSize = 22.sp,
+    val text = if (tire != null && tire.valid && !tire.stale)
+        String.format("%.1f", tire.pressureKpa) else "_._"
+    Text(text = text, color = color, fontSize = 22.sp,
         fontWeight = FontWeight.Bold, letterSpacing = 0.sp, modifier = modifier)
 }
 
@@ -692,11 +549,6 @@ private fun haversineM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): 
     return r * 2 * Math.asin(Math.sqrt(a))
 }
 
-/**
- * SAX-parse a KML stream and write stations to [outputFile] as line-delimited text:
- *   name|lat|lon
- * Never holds more than one station in memory at a time.
- */
 private fun parseKmlToFile(kmlStream: java.io.InputStream, outputFile: java.io.File) {
     var inPlacemark   = false
     var inName        = false
@@ -727,12 +579,12 @@ private fun parseKmlToFile(kmlStream: java.io.InputStream, outputFile: java.io.F
                         "coordinates" -> {
                             inCoordinates = false
                             if (inPlacemark) {
-                                val name  = nameBuilder.toString().trim()
-                                val raw   = coordBuilder.toString().trim()
+                                val name   = nameBuilder.toString().trim()
+                                val raw    = coordBuilder.toString().trim()
                                 val comma1 = raw.indexOf(',')
                                 val comma2 = if (comma1 >= 0) raw.indexOf(',', comma1 + 1) else -1
-                                val lon = raw.substring(0, comma1.coerceAtLeast(0)).toDoubleOrNull()
-                                val lat = if (comma1 >= 0) {
+                                val lon    = raw.substring(0, comma1.coerceAtLeast(0)).toDoubleOrNull()
+                                val lat    = if (comma1 >= 0) {
                                     val end = if (comma2 > comma1) comma2 else raw.length
                                     raw.substring(comma1 + 1, end).trim().toDoubleOrNull()
                                 } else null
@@ -742,7 +594,7 @@ private fun parseKmlToFile(kmlStream: java.io.InputStream, outputFile: java.io.F
                                 }
                             }
                         }
-                        "Placemark"   -> inPlacemark = false
+                        "Placemark" -> inPlacemark = false
                     }
                 }
             })
@@ -752,11 +604,6 @@ private fun parseKmlToFile(kmlStream: java.io.InputStream, outputFile: java.io.F
     }
 }
 
-/**
- * Download fresh KML from network and write to the cache file via a temp file
- * (atomic rename), so the reader never sees a partial file.
- * No data is held in memory after this returns.
- */
 private fun refreshKmlFromNetwork(context: Context) {
     try {
         val conn = (java.net.URL(CHARGER_KML_URL).openConnection()
@@ -767,17 +614,12 @@ private fun refreshKmlFromNetwork(context: Context) {
         val tmp  = java.io.File(context.cacheDir, "$KML_CACHE_FILE.tmp")
         val dest = java.io.File(context.cacheDir, KML_CACHE_FILE)
         conn.inputStream.use { parseKmlToFile(it, tmp) }
-        if (tmp.length() > 0) tmp.renameTo(dest)
-        else tmp.delete()
+        if (tmp.length() > 0) tmp.renameTo(dest) else tmp.delete()
     } catch (e: Exception) {
         android.util.Log.e("VF3Charging", "KML network refresh failed", e)
     }
 }
 
-/**
- * Stream through the cache file line by line and return only the closest station.
- * O(1) memory regardless of how many stations are in the file.
- */
 private fun findClosestStation(context: Context, userLat: Double, userLon: Double): NearbyStation? {
     val file = java.io.File(context.cacheDir, KML_CACHE_FILE)
     if (!file.exists()) return null
@@ -785,10 +627,8 @@ private fun findClosestStation(context: Context, userLat: Double, userLon: Doubl
     var minDist = Double.MAX_VALUE
     file.bufferedReader().useLines { lines ->
         lines.forEach { line ->
-            val i1 = line.indexOf('|')
-            if (i1 < 1) return@forEach
-            val i2 = line.indexOf('|', i1 + 1)
-            if (i2 < 0) return@forEach
+            val i1 = line.indexOf('|'); if (i1 < 1) return@forEach
+            val i2 = line.indexOf('|', i1 + 1); if (i2 < 0) return@forEach
             val stLat = line.substring(i1 + 1, i2).toDoubleOrNull() ?: return@forEach
             val stLon = line.substring(i2 + 1).toDoubleOrNull() ?: return@forEach
             val dist  = haversineM(userLat, userLon, stLat, stLon)
@@ -798,86 +638,48 @@ private fun findClosestStation(context: Context, userLat: Double, userLon: Doubl
     return closest
 }
 
-@SuppressLint("MissingPermission")
 @Composable
-private fun OdoChargingCell(modifier: Modifier = Modifier) {
-    val context = LocalContext.current
+private fun OdoChargingCell(
+    location: android.location.Location?,
+    modifier: Modifier = Modifier
+) {
+    val context    = LocalContext.current
     var closest    by remember { mutableStateOf<NearbyStation?>(null) }
-    var statusText by remember { mutableStateOf("LOCATING...") }
+    var statusText by remember { mutableStateOf("LOADING...") }
 
-    fun hasPerm() = ContextCompat.checkSelfPermission(
-        context, android.Manifest.permission.ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED ||
-    ContextCompat.checkSelfPermission(
-        context, android.Manifest.permission.ACCESS_COARSE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
-
-    var permGranted   by remember { mutableStateOf(hasPerm()) }
     var foregroundKey by remember { mutableIntStateOf(0) }
-    LifecycleEventEffect(Lifecycle.Event.ON_START) { permGranted = hasPerm(); foregroundKey++ }
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { foregroundKey++ }
 
-    // Refresh cache file from network in background — no data kept in RAM
     LaunchedEffect(foregroundKey) {
         kotlinx.coroutines.withContext(Dispatchers.IO) { refreshKmlFromNetwork(context) }
     }
 
-    val permLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { results -> if (results.values.any { it }) permGranted = true }
-
-    var location by remember { mutableStateOf<android.location.Location?>(null) }
-    DisposableEffect(permGranted) {
-        if (!permGranted) {
-            statusText = "NO PERMISSION"
-            permLauncher.launch(arrayOf(
-                android.Manifest.permission.ACCESS_FINE_LOCATION,
-                android.Manifest.permission.ACCESS_COARSE_LOCATION
-            ))
-            onDispose {}
-        } else {
-            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            val listener = object : android.location.LocationListener {
-                override fun onLocationChanged(loc: android.location.Location) { location = loc }
-                override fun onProviderDisabled(provider: String) {}
-                override fun onProviderEnabled(provider: String) {}
-                @Suppress("DEPRECATION")
-                override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?) {}
-            }
-            statusText = "LOCATING..."
-            val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-                ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                ?: lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
-            if (seed != null) location = seed else statusText = "NO GPS SIGNAL"
-            try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER,    30_000L, 100f, listener) } catch (_: Exception) {}
-            try { lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 30_000L, 100f, listener) } catch (_: Exception) {}
-            onDispose { lm.removeUpdates(listener) }
-        }
-    }
-
-    // Recalculate closest station every 5 minutes using the latest known location.
-    // Only the single winning NearbyStation is ever held in memory.
+    val currentLocation by rememberUpdatedState(location)
     LaunchedEffect(Unit) {
         while (true) {
-            val loc = location
+            val loc = currentLocation
             if (loc != null) {
                 statusText = "SEARCHING..."
                 val result = kotlinx.coroutines.withContext(Dispatchers.IO) {
                     findClosestStation(context, loc.latitude, loc.longitude)
                 }
-                closest = result
+                closest    = result
                 statusText = when {
                     result != null -> "NEARBY"
                     java.io.File(context.cacheDir, KML_CACHE_FILE).exists() -> "NONE NEARBY"
                     else -> "LOADING..."
                 }
+            } else {
+                statusText = "NO GPS"
             }
             delay(5 * 60 * 1000L)
         }
     }
 
     Column(modifier = modifier.fillMaxHeight(),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Icon(imageVector = Icons.Filled.Bolt, contentDescription = null,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center) {
+        Icon(Icons.Filled.Bolt, contentDescription = null,
             tint = if (closest != null) OdoGood else OdoInactive,
             modifier = Modifier.size(28.dp))
         Spacer(Modifier.height(10.dp))
@@ -889,10 +691,8 @@ private fun OdoChargingCell(modifier: Modifier = Modifier) {
             Text(text = station.name.uppercase(), color = OdoNormal, fontSize = 12.sp,
                 letterSpacing = 0.5.sp, maxLines = 3, overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 8.dp))
-            val distText = if (station.distanceM < 1000)
-                "${station.distanceM.toInt()} M"
-            else
-                String.format(java.util.Locale.US, "%.1f KM", station.distanceM / 1000)
+            val distText = if (station.distanceM < 1000) "${station.distanceM.toInt()} M"
+                           else String.format(java.util.Locale.US, "%.1f KM", station.distanceM / 1000)
             Text(text = distText, color = OdoGood, fontSize = 20.sp,
                 fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         }
@@ -914,9 +714,8 @@ private suspend fun fetchSpeedLimit(lat: Double, lon: Double): Int? =
             val json     = org.json.JSONObject(conn.inputStream.bufferedReader().readText())
             val elements = json.getJSONArray("elements")
             if (elements.length() == 0) return@withContext null
-            val tags = elements.getJSONObject(0).getJSONObject("tags")
-            val raw  = tags.optString("maxspeed", "").trim()
-            val num  = Regex("(\\d+)").find(raw)?.groupValues?.get(1)?.toIntOrNull()
+            val raw = elements.getJSONObject(0).getJSONObject("tags").optString("maxspeed", "").trim()
+            val num = Regex("(\\d+)").find(raw)?.groupValues?.get(1)?.toIntOrNull()
                 ?: return@withContext null
             if (raw.contains("mph", ignoreCase = true)) (num * 1.60934).toInt() else num
         } catch (e: Exception) {
@@ -925,51 +724,14 @@ private suspend fun fetchSpeedLimit(lat: Double, lon: Double): Int? =
         }
     }
 
-@SuppressLint("MissingPermission")
 @Composable
 private fun OdoSpeedLimitCell(
+    location: android.location.Location?,
     onSpeedLimitChanged: (Int?) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    fun hasPerm() = ContextCompat.checkSelfPermission(
-        context, android.Manifest.permission.ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
-
-    var permGranted by remember { mutableStateOf(hasPerm()) }
-    var location    by remember { mutableStateOf<android.location.Location?>(null) }
-    var speedLimit  by remember { mutableStateOf<Int?>(null) }
-    var querying    by remember { mutableStateOf(false) }
-
-    val permLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { results -> if (results.values.any { it }) permGranted = true }
-
-    DisposableEffect(permGranted) {
-        if (!permGranted) {
-            permLauncher.launch(arrayOf(
-                android.Manifest.permission.ACCESS_FINE_LOCATION,
-                android.Manifest.permission.ACCESS_COARSE_LOCATION
-            ))
-            onDispose {}
-        } else {
-            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            val listener = object : android.location.LocationListener {
-                override fun onLocationChanged(loc: android.location.Location) { location = loc }
-                override fun onProviderDisabled(provider: String) {}
-                override fun onProviderEnabled(provider: String) {}
-                @Suppress("DEPRECATION")
-                override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?) {}
-            }
-            val seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-                ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                ?: lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
-            if (seed != null) location = seed
-            try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 30_000L, 100f, listener) } catch (_: Exception) {}
-            try { lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 30_000L, 100f, listener) } catch (_: Exception) {}
-            onDispose { lm.removeUpdates(listener) }
-        }
-    }
+    var speedLimit by remember { mutableStateOf<Int?>(null) }
+    var querying   by remember { mutableStateOf(false) }
 
     LaunchedEffect(location) {
         val loc = location ?: return@LaunchedEffect
@@ -982,19 +744,16 @@ private fun OdoSpeedLimitCell(
     val valueText = speedLimit?.toString() ?: if (querying) "..." else "--"
 
     Box(contentAlignment = Alignment.Center, modifier = modifier.fillMaxSize()) {
-        Box(
-            contentAlignment = Alignment.Center,
+        Box(contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxHeight().aspectRatio(1f).padding(10.dp)
-                .background(Color(0xFFE57373), CircleShape)
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
+                .background(Color(0xFFE57373), CircleShape)) {
+            Box(contentAlignment = Alignment.Center,
                 modifier = Modifier.fillMaxSize().padding(18.dp)
-                    .background(Color(0xFFFFF3F3), CircleShape)
-            ) {
+                    .background(Color(0xFFFFF3F3), CircleShape)) {
                 Text(text = valueText, color = Color(0xFF5D4040),
                     fontSize = if (speedLimit != null && speedLimit!! >= 100) 64.sp else 80.sp,
-                    fontWeight = FontWeight.Bold, letterSpacing = 0.sp, textAlign = TextAlign.Center)
+                    fontWeight = FontWeight.Bold, letterSpacing = 0.sp,
+                    textAlign = TextAlign.Center)
             }
         }
     }
@@ -1040,8 +799,7 @@ private fun OdoStatusBar(carStatus: CarStatus?, modifier: Modifier = Modifier) {
             },
             modifier = Modifier.weight(1f))
         StatusBarDivider()
-        StatusBarItem(icon = Icons.Default.BatteryFull,
-            label = battVoltage,
+        StatusBarItem(icon = Icons.Default.BatteryFull, label = battVoltage,
             color = if (carStatus == null) OdoInactive else OdoNormal,
             modifier = Modifier.weight(1f))
     }
@@ -1049,10 +807,7 @@ private fun OdoStatusBar(carStatus: CarStatus?, modifier: Modifier = Modifier) {
 
 @Composable
 private fun StatusBarItem(
-    icon: ImageVector,
-    label: String,
-    color: Color,
-    modifier: Modifier = Modifier
+    icon: ImageVector, label: String, color: Color, modifier: Modifier = Modifier
 ) {
     Row(modifier = modifier, horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically) {
