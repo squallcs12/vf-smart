@@ -38,8 +38,6 @@ class WebSocketManager @Inject constructor(
     private var autoReconnectEnabled = true
     private var reconnectAttempts = 0
     private val maxReconnectAttempts = 10
-
-    // Track previous status for change detection
     private var previousStatus: CarStatus? = null
 
     companion object {
@@ -80,9 +78,6 @@ class WebSocketManager @Inject constructor(
                 try {
                     val status = gson.fromJson(text, CarStatus::class.java)
                     _statusFlow.value = status
-
-                    // Debug: Log what actually changed
-                    logStatusChanges(previousStatus, status)
                     previousStatus = status
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to parse status JSON", e)
@@ -156,126 +151,6 @@ class WebSocketManager @Inject constructor(
     fun cleanup() {
         disconnect()
         coroutineScope.cancel()
-    }
-
-    /**
-     * Log status changes for debugging
-     */
-    private fun logStatusChanges(prev: CarStatus?, current: CarStatus) {
-        if (prev == null) {
-            Log.d(TAG, "Initial status received: locked=${current.carLockState}")
-            return
-        }
-
-        val changes = mutableListOf<String>()
-
-        // Check sensors
-        if (prev.sensors.brake != current.sensors.brake) {
-            changes.add("brake: ${prev.sensors.brake} -> ${current.sensors.brake}")
-        }
-        if (prev.sensors.steeringAngle != current.sensors.steeringAngle) {
-            changes.add("steering: ${prev.sensors.steeringAngle} -> ${current.sensors.steeringAngle}")
-        }
-        if (prev.sensors.gearDrive != current.sensors.gearDrive) {
-            changes.add("gear: ${prev.sensors.gearDrive} -> ${current.sensors.gearDrive}")
-        }
-
-        // Check doors
-        if (prev.doors.frontLeft != current.doors.frontLeft) {
-            changes.add("door_FL: ${prev.doors.frontLeft} -> ${current.doors.frontLeft}")
-        }
-        if (prev.doors.frontRight != current.doors.frontRight) {
-            changes.add("door_FR: ${prev.doors.frontRight} -> ${current.doors.frontRight}")
-        }
-        if (prev.doors.trunk != current.doors.trunk) {
-            changes.add("trunk: ${prev.doors.trunk} -> ${current.doors.trunk}")
-        }
-        if (prev.doors.locked != current.doors.locked) {
-            changes.add("doors_locked: ${prev.doors.locked} -> ${current.doors.locked}")
-        }
-
-        // Check windows
-        if (prev.windows.leftState != current.windows.leftState) {
-            changes.add("window_left: ${prev.windows.leftState} -> ${current.windows.leftState}")
-        }
-        if (prev.windows.rightState != current.windows.rightState) {
-            changes.add("window_right: ${prev.windows.rightState} -> ${current.windows.rightState}")
-        }
-
-        // Check seats
-        if (prev.seats.frontLeftOccupied != current.seats.frontLeftOccupied) {
-            changes.add("seat_FL: ${prev.seats.frontLeftOccupied} -> ${current.seats.frontLeftOccupied}")
-        }
-        if (prev.seats.frontRightOccupied != current.seats.frontRightOccupied) {
-            changes.add("seat_FR: ${prev.seats.frontRightOccupied} -> ${current.seats.frontRightOccupied}")
-        }
-        if (prev.seats.frontLeftSeatbelt != current.seats.frontLeftSeatbelt) {
-            changes.add("seatbelt_FL: ${prev.seats.frontLeftSeatbelt} -> ${current.seats.frontLeftSeatbelt}")
-        }
-        if (prev.seats.frontRightSeatbelt != current.seats.frontRightSeatbelt) {
-            changes.add("seatbelt_FR: ${prev.seats.frontRightSeatbelt} -> ${current.seats.frontRightSeatbelt}")
-        }
-
-        // Check lights
-        if (prev.lights.demiLight != current.lights.demiLight) {
-            changes.add("demi_light: ${prev.lights.demiLight} -> ${current.lights.demiLight}")
-        }
-        if (prev.lights.normalLight != current.lights.normalLight) {
-            changes.add("normal_light: ${prev.lights.normalLight} -> ${current.lights.normalLight}")
-        }
-
-        // Check proximity
-        if (prev.proximity.rearLeft != current.proximity.rearLeft) {
-            changes.add("proximity_rear_L: ${prev.proximity.rearLeft} -> ${current.proximity.rearLeft}")
-        }
-        if (prev.proximity.rearRight != current.proximity.rearRight) {
-            changes.add("proximity_rear_R: ${prev.proximity.rearRight} -> ${current.proximity.rearRight}")
-        }
-
-        // Check controls
-        if (prev.controls.brakePressed != current.controls.brakePressed) {
-            changes.add("brake_pressed: ${prev.controls.brakePressed} -> ${current.controls.brakePressed}")
-        }
-        if (prev.controls.accessoryPower != current.controls.accessoryPower) {
-            changes.add("accessory_power: ${prev.controls.accessoryPower} -> ${current.controls.accessoryPower}")
-        }
-        if (prev.controls.insideCameras != current.controls.insideCameras) {
-            changes.add("inside_cameras: ${prev.controls.insideCameras} -> ${current.controls.insideCameras}")
-        }
-        if (prev.controls.carLock != current.controls.carLock) {
-            changes.add("car_lock: ${prev.controls.carLock} -> ${current.controls.carLock}")
-        }
-        if (prev.controls.carUnlock != current.controls.carUnlock) {
-            changes.add("car_unlock: ${prev.controls.carUnlock} -> ${current.controls.carUnlock}")
-        }
-        if (prev.controls.dashcam != current.controls.dashcam) {
-            changes.add("dashcam: ${prev.controls.dashcam} -> ${current.controls.dashcam}")
-        }
-        if (prev.controls.odoScreen != current.controls.odoScreen) {
-            changes.add("odo_screen: ${prev.controls.odoScreen} -> ${current.controls.odoScreen}")
-        }
-        if (prev.controls.armrest != current.controls.armrest) {
-            changes.add("armrest: ${prev.controls.armrest} -> ${current.controls.armrest}")
-        }
-
-        // Check top-level fields
-        if (prev.chargingStatus != current.chargingStatus) {
-            changes.add("charging: ${prev.chargingStatus} -> ${current.chargingStatus}")
-        }
-        if (prev.carLockState != current.carLockState) {
-            changes.add("lock_state: ${prev.carLockState} -> ${current.carLockState}")
-        }
-        if (prev.windowCloseActive != current.windowCloseActive) {
-            changes.add("window_close_active: ${prev.windowCloseActive} -> ${current.windowCloseActive}")
-        }
-        if (prev.lightReminderEnabled != current.lightReminderEnabled) {
-            changes.add("light_reminder: ${prev.lightReminderEnabled} -> ${current.lightReminderEnabled}")
-        }
-
-        // Log only if there are changes
-        if (changes.isNotEmpty()) {
-            Log.d(TAG, "STATUS CHANGES: ${changes.joinToString(", ")}")
-        }
     }
 
     sealed class ConnectionState {

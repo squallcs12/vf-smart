@@ -43,6 +43,14 @@
             </intent-filter>
         </activity>
 
+        <!-- Crash reporter -->
+        <activity
+            android:name=".ui.CrashActivity"
+            android:exported="false"
+            android:theme="@style/Theme.VF3Smart"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance" />
+
         <!-- Voice Assistant Activity (handles Google Assistant commands) -->
         <activity
             android:name=".ui.VoiceAssistantActivity"

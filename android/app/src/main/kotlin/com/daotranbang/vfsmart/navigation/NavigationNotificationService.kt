@@ -124,9 +124,12 @@ class NavigationNotificationService : NotificationListenerService() {
     private fun iconToBitmap(icon: Icon): Bitmap? {
         val drawable = icon.loadDrawable(this) ?: return null
         if (drawable is BitmapDrawable) return drawable.bitmap
-        val w = drawable.intrinsicWidth.coerceAtLeast(64)
-        val h = drawable.intrinsicHeight.coerceAtLeast(64)
-        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        // Cap at 128×128 and use RGB_565 (2 bytes/px vs 4) to keep allocation small
+        val raw = drawable.intrinsicWidth.coerceAtLeast(64)
+        val scale = if (raw > 128) 128f / raw else 1f
+        val w = (drawable.intrinsicWidth.coerceAtLeast(64) * scale).toInt()
+        val h = (drawable.intrinsicHeight.coerceAtLeast(64) * scale).toInt()
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.RGB_565)
         val canvas = Canvas(bmp)
         drawable.setBounds(0, 0, w, h)
         drawable.draw(canvas)

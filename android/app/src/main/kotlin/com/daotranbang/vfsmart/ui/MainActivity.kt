@@ -14,6 +14,7 @@ import androidx.navigation.compose.rememberNavController
 import com.daotranbang.vfsmart.ui.screens.ControlScreen
 import com.daotranbang.vfsmart.ui.screens.DebugScreen
 import com.daotranbang.vfsmart.ui.screens.HomeScreen
+import com.daotranbang.vfsmart.ui.screens.MirrorScreen
 import com.daotranbang.vfsmart.ui.screens.SetupScreen
 import com.daotranbang.vfsmart.ui.screens.TpmsCalibrationScreen
 import com.daotranbang.vfsmart.ui.theme.VF3SmartTheme
@@ -46,15 +47,18 @@ class MainActivity : ComponentActivity() {
 
                         composable("home") {
                             HomeScreen(
-                                onNavigateToControls = {
-                                    navController.navigate("controls")
-                                },
-                                onNavigateToDebug = {
-                                    navController.navigate("debug")
-                                },
-                                onNavigateToSetup = {
-                                    navController.navigate("setup")
+                                onNavigateToControls = { navController.navigate("controls") },
+                                onNavigateToDebug    = { navController.navigate("debug") },
+                                onNavigateToSetup    = { navController.navigate("setup") },
+                                onNavigateToMirror   = {
+                                    navController.navigate("mirror") { launchSingleTop = true }
                                 }
+                            )
+                        }
+
+                        composable("mirror") {
+                            MirrorScreen(
+                                onNavigateBack = { navController.popBackStack() }
                             )
                         }
 

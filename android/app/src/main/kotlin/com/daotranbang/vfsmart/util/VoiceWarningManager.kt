@@ -20,6 +20,7 @@ class VoiceWarningManager @Inject constructor(
     private var tts: TextToSpeech? = null
     private var isInitialized = false
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var currentSpeechJob: Job? = null
 
     companion object {
         private const val TAG = "VoiceWarningManager"
@@ -64,7 +65,8 @@ class VoiceWarningManager @Inject constructor(
             return
         }
 
-        coroutineScope.launch {
+        currentSpeechJob?.cancel()
+        currentSpeechJob = coroutineScope.launch {
             repeat(repeatCount) { index ->
                 val utteranceId = "warning_$index"
 
