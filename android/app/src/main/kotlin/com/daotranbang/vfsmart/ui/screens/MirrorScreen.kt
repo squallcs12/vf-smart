@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.BackHandler
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -75,6 +76,9 @@ fun MirrorScreen(
         val secs = (System.currentTimeMillis() - foregroundTime) / 1000
         "${secs / 3600}:${((secs % 3600) / 60).toString().padStart(2, '0')}"
     }
+
+    // Home screen — back button does nothing
+    BackHandler {}
 
     // Start GATT server (nav + gps + tpms); stop when screen leaves
     val context = LocalContext.current
@@ -346,7 +350,7 @@ private fun OdoClockCell(
             Icon(Icons.Default.ArrowForward, contentDescription = null,
                 tint = OdoInactive, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Icon(nextIcon, contentDescription = "+1h", tint = OdoInactive,
+            Icon(nextIcon, contentDescription = "+1h", tint = OdoNormal,
                 modifier = Modifier.size(36.dp))
         }
         Text(text = String.format("%02d:%02d", hour, minute), color = OdoNormal,
