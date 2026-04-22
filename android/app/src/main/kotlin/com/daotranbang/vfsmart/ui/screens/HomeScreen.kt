@@ -27,6 +27,7 @@ fun HomeScreen(
     onNavigateToControls: () -> Unit = {},
     onNavigateToDebug: () -> Unit = {},
     onNavigateToSetup: () -> Unit = {},
+    onNavigateToApps: () -> Unit = {},
     onNavigateToMirror: () -> Unit = {},
     modifier: Modifier = Modifier,
     statusViewModel: CarStatusViewModel = hiltViewModel(),
@@ -51,7 +52,8 @@ fun HomeScreen(
             controlViewModel    = controlViewModel,
             onNavigateToControls = onNavigateToControls,
             onNavigateToDebug   = onNavigateToDebug,
-            onNavigateToSetup   = onNavigateToSetup
+            onNavigateToSetup   = onNavigateToSetup,
+            onNavigateToApps    = onNavigateToApps
         )
 
         SmallFloatingActionButton(
@@ -79,8 +81,10 @@ private fun FullContent(
     onNavigateToControls: () -> Unit,
     onNavigateToDebug: () -> Unit,
     onNavigateToSetup: () -> Unit,
+    onNavigateToApps: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(operationState) {
         when (val state = operationState) {
@@ -108,6 +112,16 @@ private fun FullContent(
                 ),
                 actions = {
                     ConnectionIndicator(connectionState)
+                    IconButton(onClick = onNavigateToApps) {
+                        Icon(Icons.Default.Apps, contentDescription = "All Apps")
+                    }
+                    IconButton(onClick = {
+                        context.startActivity(
+                            android.content.Intent(android.provider.Settings.ACTION_SETTINGS)
+                        )
+                    }) {
+                        Icon(Icons.Default.PhoneAndroid, contentDescription = "Android Settings")
+                    }
                     IconButton(onClick = onNavigateToSetup) {
                         Icon(Icons.Default.Settings, contentDescription = "Setup")
                     }
@@ -120,7 +134,6 @@ private fun FullContent(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        val context     = LocalContext.current
         val isConnected = connectionState == WebSocketManager.ConnectionState.Connected
         val isLoading   = operationState is ControlViewModel.OperationState.Loading
         val enabled     = isConnected && !isLoading
