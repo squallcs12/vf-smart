@@ -351,9 +351,8 @@ private fun OdoClockCell(modifier: Modifier = Modifier) {
     cal.timeInMillis = nowMs
 
     val context = LocalContext.current
-    var weather       by remember { mutableStateOf<WeatherData?>(null) }
-    var location      by remember { mutableStateOf<android.location.Location?>(null) }
-    var lastFetchTime by remember { mutableStateOf(0L) }
+    var weather  by remember { mutableStateOf<WeatherData?>(null) }
+    var location by remember { mutableStateOf<android.location.Location?>(null) }
 
     val hasPerm = ContextCompat.checkSelfPermission(
         context, android.Manifest.permission.ACCESS_COARSE_LOCATION
@@ -381,14 +380,16 @@ private fun OdoClockCell(modifier: Modifier = Modifier) {
         }
     }
 
-    LaunchedEffect(location) {
-        val loc = location ?: return@LaunchedEffect
-        val elapsed  = System.currentTimeMillis() - lastFetchTime
-        val interval = if (weather != null) 30 * 60 * 1000L else 5 * 60 * 1000L
-        if (elapsed < interval) return@LaunchedEffect
-        lastFetchTime = System.currentTimeMillis()
-        val result = fetchWeather(loc.latitude, loc.longitude)
-        if (result != null) weather = result
+    // Fetch weather immediately, then every 30 minutes
+    LaunchedEffect(Unit) {
+        while (true) {
+            val loc = location
+            if (loc != null) {
+                val result = fetchWeather(loc.latitude, loc.longitude)
+                if (result != null) weather = result
+            }
+            delay(30 * 60 * 1000L)
+        }
     }
 
     val hour        = cal.get(java.util.Calendar.HOUR_OF_DAY)
