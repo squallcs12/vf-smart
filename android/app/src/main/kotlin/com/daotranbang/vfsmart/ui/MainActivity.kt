@@ -5,8 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -30,12 +28,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             VF3SmartTheme {
                 val navController = rememberNavController()
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    NavHost(
-                        navController = navController,
-                        startDestination = "mirror",
-                        modifier = Modifier.padding(innerPadding)
-                    ) {
+                NavHost(
+                    navController = navController,
+                    startDestination = "mirror",
+                    modifier = Modifier.fillMaxSize()
+                ) {
                         composable("setup") {
                             SetupScreen(
                                 onSetupComplete = {
@@ -104,7 +101,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
-                    }
                 }
             }
         }

@@ -44,30 +44,18 @@ fun HomeScreen(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        FullContent(
-            carStatus           = carStatus,
-            connectionState     = connectionState,
-            operationState      = operationState,
-            controlViewModel    = controlViewModel,
-            onNavigateToControls = onNavigateToControls,
-            onNavigateToDebug   = onNavigateToDebug,
-            onNavigateToSetup   = onNavigateToSetup,
-            onNavigateToApps    = onNavigateToApps
-        )
-
-        SmallFloatingActionButton(
-            onClick        = onNavigateToMirror,
-            modifier       = Modifier.align(Alignment.BottomEnd).padding(8.dp),
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        ) {
-            Icon(
-                imageVector        = Icons.Default.Fullscreen,
-                contentDescription = "Enter mirror mode",
-                modifier           = Modifier.size(18.dp)
-            )
-        }
-    }
+    FullContent(
+        carStatus            = carStatus,
+        connectionState      = connectionState,
+        operationState       = operationState,
+        controlViewModel     = controlViewModel,
+        onNavigateToControls = onNavigateToControls,
+        onNavigateToDebug    = onNavigateToDebug,
+        onNavigateToSetup    = onNavigateToSetup,
+        onNavigateToApps     = onNavigateToApps,
+        onNavigateToMirror   = onNavigateToMirror,
+        modifier             = modifier.fillMaxSize()
+    )
 }
 
 // ── Full mode: scrollable layout with header + quick controls ─────────────────
@@ -82,6 +70,7 @@ private fun FullContent(
     onNavigateToDebug: () -> Unit,
     onNavigateToSetup: () -> Unit,
     onNavigateToApps: () -> Unit,
+    onNavigateToMirror: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -112,6 +101,9 @@ private fun FullContent(
                 ),
                 actions = {
                     ConnectionIndicator(connectionState)
+                    IconButton(onClick = onNavigateToMirror) {
+                        Icon(Icons.Default.Fullscreen, contentDescription = "Mirror mode")
+                    }
                     IconButton(onClick = onNavigateToApps) {
                         Icon(Icons.Default.Apps, contentDescription = "All Apps")
                     }

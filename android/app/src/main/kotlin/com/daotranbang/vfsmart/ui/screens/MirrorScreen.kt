@@ -2,8 +2,10 @@ package com.daotranbang.vfsmart.ui.screens
 
 import android.app.Activity
 import android.content.Context
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -17,6 +19,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -24,9 +29,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.activity.compose.BackHandler
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -99,7 +101,11 @@ fun MirrorScreen(
         onDispose { controller.show(WindowInsetsCompat.Type.systemBars()) }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    @OptIn(ExperimentalFoundationApi::class)
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .combinedClickable(onDoubleClick = onNavigateBack) {}
+    ) {
         MirrorContent(
             carStatus       = carStatus,
             connectionState = connectionState,
@@ -109,15 +115,6 @@ fun MirrorScreen(
             speedLimit      = speedLimit,
             tripText        = tripText
         )
-
-        SmallFloatingActionButton(
-            onClick        = onNavigateBack,
-            modifier       = Modifier.align(Alignment.BottomEnd).padding(8.dp),
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-        ) {
-            Icon(Icons.Default.FullscreenExit, contentDescription = "Exit mirror mode",
-                modifier = Modifier.size(18.dp))
-        }
     }
 }
 
@@ -336,6 +333,10 @@ private fun OdoClockCell(
     val currentIcon = weatherIconFor(weather?.current, isNight)
     val nextIcon    = weatherIconFor(weather?.nextHour, nextIsNight)
 
+    val dayOfWeek = arrayOf("SUN","MON","TUE","WED","THU","FRI","SAT")[cal.get(java.util.Calendar.DAY_OF_WEEK) - 1]
+    val dayOfMonth = cal.get(java.util.Calendar.DAY_OF_MONTH)
+    val month = arrayOf("JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC")[cal.get(java.util.Calendar.MONTH)]
+
     Column(
         modifier = modifier.fillMaxSize().padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -356,7 +357,7 @@ private fun OdoClockCell(
         Text(text = String.format("%02d:%02d", hour, minute), color = OdoNormal,
             fontSize = 52.sp, fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center, letterSpacing = 2.sp)
-        Text(text = "CLOCK", color = OdoLabel, fontSize = 10.sp,
+        Text(text = "$dayOfWeek  $dayOfMonth $month", color = OdoLabel, fontSize = 10.sp,
             fontWeight = FontWeight.Medium, letterSpacing = 2.sp)
     }
 }
