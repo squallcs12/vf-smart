@@ -41,7 +41,7 @@ import com.daotranbang.vfsmart.data.model.CarStatus
 import com.daotranbang.vfsmart.data.model.TpmsData
 import com.daotranbang.vfsmart.data.model.TpmsTire
 import com.daotranbang.vfsmart.data.network.WebSocketManager
-import com.daotranbang.vfsmart.navigation.NavigationNotificationService
+import com.daotranbang.vfsmart.navigation.NavigationGattServer
 import com.daotranbang.vfsmart.navigation.NavigationState
 import com.daotranbang.vfsmart.viewmodel.CarStatusViewModel
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +66,7 @@ fun MirrorScreen(
 ) {
     val carStatus       by statusViewModel.carStatus.collectAsStateWithLifecycle()
     val connectionState by statusViewModel.connectionState.collectAsStateWithLifecycle()
-    val navigationState by NavigationNotificationService.navigationState.collectAsStateWithLifecycle()
+    val navigationState by NavigationGattServer.navigationState.collectAsStateWithLifecycle()
 
     // Trip clock: reset each time screen comes to foreground
     var foregroundTime by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -80,6 +80,14 @@ fun MirrorScreen(
         val h = secs / 3600
         val m = (secs % 3600) / 60
         "${h}:${m.toString().padStart(2, '0')}"
+    }
+
+    // Start GATT server while mirror screen is active; stop on exit
+    val context = LocalContext.current
+    val gattServer = remember { NavigationGattServer(context) }
+    DisposableEffect(Unit) {
+        gattServer.start()
+        onDispose { gattServer.stop() }
     }
 
     // Hide system bars; restore when leaving
