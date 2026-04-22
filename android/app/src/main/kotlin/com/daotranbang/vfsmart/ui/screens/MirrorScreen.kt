@@ -695,7 +695,7 @@ private fun parseKmlToFile(kmlStream: java.io.InputStream, outputFile: java.io.F
     var inCoordinates = false
     val nameBuilder   = StringBuilder()
     val coordBuilder  = StringBuilder()
-    var count         = 0
+    var count         = 0  // for logging only
 
     val writer = outputFile.bufferedWriter()
     try {
@@ -718,7 +718,7 @@ private fun parseKmlToFile(kmlStream: java.io.InputStream, outputFile: java.io.F
                         "name"        -> inName = false
                         "coordinates" -> {
                             inCoordinates = false
-                            if (inPlacemark && count < 500) {
+                            if (inPlacemark) {
                                 val name  = nameBuilder.toString().trim()
                                 val raw   = coordBuilder.toString().trim()
                                 val comma1 = raw.indexOf(',')
