@@ -62,6 +62,9 @@ class VF3GattServer(private val context: Context) {
         /** Tire pressure data — WRITE | WRITE_NO_RESPONSE */
         val TPMS_CHAR_UUID: UUID = UUID.fromString("A1B2C3D4-E5F6-7890-ABCD-EF1234567893")
 
+        /** Speed limit in km/h — WRITE | WRITE_NO_RESPONSE  e.g. "60"  "" = unknown */
+        val SPEED_LIMIT_CHAR_UUID: UUID = UUID.fromString("A1B2C3D4-E5F6-7890-ABCD-EF1234567894")
+
         private val _navigationState = MutableStateFlow(NavigationState())
         val navigationState: StateFlow<NavigationState> = _navigationState.asStateFlow()
 
@@ -70,6 +73,9 @@ class VF3GattServer(private val context: Context) {
 
         private val _tpmsState = MutableStateFlow<TpmsData?>(null)
         val tpmsState: StateFlow<TpmsData?> = _tpmsState.asStateFlow()
+
+        private val _speedLimitState = MutableStateFlow<Int?>(null)
+        val speedLimitState: StateFlow<Int?> = _speedLimitState.asStateFlow()
 
         private const val TAG = "VF3GattServer"
     }
@@ -104,6 +110,7 @@ class VF3GattServer(private val context: Context) {
         _navigationState.value = NavigationState()
         _gpsState.value = GpsState()
         _tpmsState.value = null
+        _speedLimitState.value = null
         Log.d(TAG, "Stopped")
     }
 
@@ -128,6 +135,7 @@ class VF3GattServer(private val context: Context) {
             it.addCharacteristic(writeChar(NAV_CHAR_UUID))
             it.addCharacteristic(writeChar(GPS_CHAR_UUID))
             it.addCharacteristic(writeChar(TPMS_CHAR_UUID))
+            it.addCharacteristic(writeChar(SPEED_LIMIT_CHAR_UUID))
         }
 
         server.addService(service)
@@ -187,9 +195,10 @@ class VF3GattServer(private val context: Context) {
             }
             val payload = value.toString(Charsets.UTF_8).trim()
             when (characteristic.uuid) {
-                NAV_CHAR_UUID  -> { Log.d(TAG, "Nav:  \"$payload\""); _navigationState.value = parseNav(payload) }
-                GPS_CHAR_UUID  -> { Log.d(TAG, "GPS:  \"$payload\""); _gpsState.value = parseGps(payload) }
-                TPMS_CHAR_UUID -> { Log.d(TAG, "TPMS: \"$payload\""); _tpmsState.value = parseTpms(payload) }
+                NAV_CHAR_UUID         -> { Log.d(TAG, "Nav:   \"$payload\""); _navigationState.value = parseNav(payload) }
+                GPS_CHAR_UUID         -> { Log.d(TAG, "GPS:   \"$payload\""); _gpsState.value = parseGps(payload) }
+                TPMS_CHAR_UUID        -> { Log.d(TAG, "TPMS:  \"$payload\""); _tpmsState.value = parseTpms(payload) }
+                SPEED_LIMIT_CHAR_UUID -> { Log.d(TAG, "Speed: \"$payload\""); _speedLimitState.value = payload.toIntOrNull() }
             }
         }
     }

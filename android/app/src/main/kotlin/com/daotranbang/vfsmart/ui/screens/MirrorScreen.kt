@@ -64,6 +64,7 @@ fun MirrorScreen(
     val navigationState by VF3GattServer.navigationState.collectAsStateWithLifecycle()
     val gpsState        by VF3GattServer.gpsState.collectAsStateWithLifecycle()
     val tpmsData        by VF3GattServer.tpmsState.collectAsStateWithLifecycle()
+    val speedLimit      by VF3GattServer.speedLimitState.collectAsStateWithLifecycle()
 
     // Trip clock — resets each time screen comes to foreground
     var foregroundTime by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -101,6 +102,7 @@ fun MirrorScreen(
             navigationState = navigationState,
             gpsState        = gpsState,
             tpmsData        = tpmsData,
+            speedLimit      = speedLimit,
             tripText        = tripText
         )
 
@@ -124,18 +126,16 @@ private fun MirrorContent(
     navigationState: NavigationState,
     gpsState: GpsState,
     tpmsData: TpmsData?,
+    speedLimit: Int?,
     tripText: String,
     modifier: Modifier = Modifier
 ) {
-    // Derive shared values from GPS state once — all cells read these
     val location = gpsState.toLocation()
     val speedKmh = gpsState.speedKmh
     val hasSpeed = gpsState.isActive
 
     Box(modifier = modifier.fillMaxSize().background(OdoBg)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            var sharedSpeedLimit by remember { mutableStateOf<Int?>(null) }
-
             Column(modifier = Modifier.weight(1f)) {
                 // Row 1: Location | Navigation | GPS Speed | Trip
                 Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -144,7 +144,7 @@ private fun MirrorContent(
                     OdoNavCell(navigationState = navigationState, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
                     OdoGpsSpeedCell(speedKmh = speedKmh, hasSpeed = hasSpeed,
-                        speedLimit = sharedSpeedLimit, modifier = Modifier.weight(1f))
+                        speedLimit = speedLimit, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
                     OdoTripCell(speedKmh = speedKmh, hasSpeed = hasSpeed,
                         tripText = tripText, modifier = Modifier.weight(1f))
@@ -158,9 +158,7 @@ private fun MirrorContent(
                     OdoVerticalDivider()
                     OdoTpmsCell(tpms = tpmsData, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
-                    OdoSpeedLimitCell(location = location,
-                        onSpeedLimitChanged = { sharedSpeedLimit = it },
-                        modifier = Modifier.weight(1f))
+                    OdoSpeedLimitCell(speedLimit = speedLimit, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
                     OdoClockCell(location = location, modifier = Modifier.weight(1f))
                 }
@@ -701,47 +699,12 @@ private fun OdoChargingCell(
 
 // ── Speed limit cell ──────────────────────────────────────────────────────────
 
-private suspend fun fetchSpeedLimit(lat: Double, lon: Double): Int? =
-    kotlinx.coroutines.withContext(Dispatchers.IO) {
-        try {
-            val query   = "[out:json][timeout:5];way(around:30,${lat},${lon})[highway][maxspeed];out tags 1;"
-            val encoded = java.net.URLEncoder.encode(query, "UTF-8")
-            val url     = java.net.URL("https://overpass-api.de/api/interpreter?data=$encoded")
-            val conn    = (url.openConnection() as java.net.HttpURLConnection).apply {
-                connectTimeout = 8_000; readTimeout = 8_000
-                setRequestProperty("User-Agent", "VF3Smart/1.0")
-            }
-            val json     = org.json.JSONObject(conn.inputStream.bufferedReader().readText())
-            val elements = json.getJSONArray("elements")
-            if (elements.length() == 0) return@withContext null
-            val raw = elements.getJSONObject(0).getJSONObject("tags").optString("maxspeed", "").trim()
-            val num = Regex("(\\d+)").find(raw)?.groupValues?.get(1)?.toIntOrNull()
-                ?: return@withContext null
-            if (raw.contains("mph", ignoreCase = true)) (num * 1.60934).toInt() else num
-        } catch (e: Exception) {
-            android.util.Log.w("VF3SpeedLimit", "Fetch failed: ${e.message}")
-            null
-        }
-    }
-
 @Composable
 private fun OdoSpeedLimitCell(
-    location: android.location.Location?,
-    onSpeedLimitChanged: (Int?) -> Unit = {},
+    speedLimit: Int?,
     modifier: Modifier = Modifier
 ) {
-    var speedLimit by remember { mutableStateOf<Int?>(null) }
-    var querying   by remember { mutableStateOf(false) }
-
-    LaunchedEffect(location) {
-        val loc = location ?: return@LaunchedEffect
-        querying   = true
-        speedLimit = fetchSpeedLimit(loc.latitude, loc.longitude)
-        querying   = false
-        onSpeedLimitChanged(speedLimit)
-    }
-
-    val valueText = speedLimit?.toString() ?: if (querying) "..." else "--"
+    val valueText = speedLimit?.toString() ?: "--"
 
     Box(contentAlignment = Alignment.Center, modifier = modifier.fillMaxSize()) {
         Box(contentAlignment = Alignment.Center,
@@ -751,7 +714,7 @@ private fun OdoSpeedLimitCell(
                 modifier = Modifier.fillMaxSize().padding(18.dp)
                     .background(Color(0xFFFFF3F3), CircleShape)) {
                 Text(text = valueText, color = Color(0xFF5D4040),
-                    fontSize = if (speedLimit != null && speedLimit!! >= 100) 64.sp else 80.sp,
+                    fontSize = if (speedLimit != null && speedLimit >= 100) 64.sp else 80.sp,
                     fontWeight = FontWeight.Bold, letterSpacing = 0.sp,
                     textAlign = TextAlign.Center)
             }
