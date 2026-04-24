@@ -1,8 +1,10 @@
 package com.daotranbang.vfsmart.ui
 
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -34,6 +36,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         requestRuntimePermissions()
+        requestNotificationListenerAccess()
         Thread { try { Runtime.getRuntime().exec("su") } catch (_: Exception) {} }.start()
         AutoLinkService.start(this)
 
@@ -115,6 +118,13 @@ class MainActivity : ComponentActivity() {
                         }
                 }
             }
+        }
+    }
+
+    private fun requestNotificationListenerAccess() {
+        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
+        if (flat?.contains(packageName) != true) {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
     }
 
