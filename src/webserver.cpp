@@ -19,10 +19,6 @@
 AsyncWebServer server(80);
 
 void setupWebServer() {
-  // Setup WebSocket
-  ws.onEvent(onWebSocketEvent);
-  server.addHandler(&ws);
-
   // Register all endpoint modules
   registerStatusEndpoint(server);
   registerLockEndpoints(server);

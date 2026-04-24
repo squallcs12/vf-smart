@@ -1,7 +1,12 @@
 package com.daotranbang.vfsmart.ui.screens
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
+import android.content.pm.PackageManager
+import android.location.LocationListener
+import android.location.LocationManager
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -19,6 +24,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -37,8 +43,8 @@ import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.data.model.CarStatus
 import com.daotranbang.vfsmart.data.model.TpmsData
 import com.daotranbang.vfsmart.data.model.TpmsTire
-import com.daotranbang.vfsmart.data.network.WebSocketManager
 import com.daotranbang.vfsmart.navigation.GpsState
+import com.daotranbang.vfsmart.navigation.NavigationNotificationService
 import com.daotranbang.vfsmart.navigation.NavigationState
 import com.daotranbang.vfsmart.navigation.VF3GattServer
 import com.daotranbang.vfsmart.viewmodel.CarStatusViewModel
@@ -64,8 +70,8 @@ fun MirrorScreen(
 ) {
     val carStatus       by statusViewModel.carStatus.collectAsStateWithLifecycle()
     val connectionState by statusViewModel.connectionState.collectAsStateWithLifecycle()
-    val navigationState by VF3GattServer.navigationState.collectAsStateWithLifecycle()
-    val gpsState        by VF3GattServer.gpsState.collectAsStateWithLifecycle()
+    val navigationState by NavigationNotificationService.navigationState.collectAsStateWithLifecycle()
+    val gpsState        = rememberPhoneGpsState()
     val tpmsData        by VF3GattServer.tpmsState.collectAsStateWithLifecycle()
     val speedLimit      by VF3GattServer.speedLimitState.collectAsStateWithLifecycle()
 
@@ -118,12 +124,57 @@ fun MirrorScreen(
     }
 }
 
+// ── Phone GPS ─────────────────────────────────────────────────────────────────
+
+@SuppressLint("MissingPermission")
+@Composable
+private fun rememberPhoneGpsState(): GpsState {
+    val context = LocalContext.current
+    var state by remember { mutableStateOf(GpsState()) }
+
+    DisposableEffect(Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) return@DisposableEffect onDispose {}
+
+        val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val listener = LocationListener { loc ->
+            state = GpsState(
+                isActive  = true,
+                latitude  = loc.latitude,
+                longitude = loc.longitude,
+                speedMs   = loc.speed,
+                bearing   = loc.bearing
+            )
+        }
+        try {
+            lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener)
+            lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let { loc ->
+                state = GpsState(
+                    isActive  = true,
+                    latitude  = loc.latitude,
+                    longitude = loc.longitude,
+                    speedMs   = loc.speed,
+                    bearing   = loc.bearing
+                )
+            }
+        } catch (_: Exception) {}
+
+        onDispose {
+            try { lm.removeUpdates(listener) } catch (_: Exception) {}
+        }
+    }
+
+    return state
+}
+
 // ── Mirror layout ─────────────────────────────────────────────────────────────
 
 @Composable
 private fun MirrorContent(
     carStatus: CarStatus?,
-    connectionState: WebSocketManager.ConnectionState,
+    connectionState: VF3GattServer.BleConnectionState,
     navigationState: NavigationState,
     gpsState: GpsState,
     tpmsData: TpmsData?,
@@ -675,7 +726,7 @@ private fun OdoChargingCell(
             } else {
                 statusText = "NO GPS"
             }
-            delay(5 * 60 * 1000L)
+            delay(60 * 1000L)
         }
     }
 
@@ -805,12 +856,12 @@ private fun OdoHorizontalDivider() {
 
 @Composable
 private fun ConnectionDot(
-    connectionState: WebSocketManager.ConnectionState,
+    connectionState: VF3GattServer.BleConnectionState,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.size(8.dp).background(
         color = when (connectionState) {
-            WebSocketManager.ConnectionState.Connected -> Color(0xFF4CAF50)
+            VF3GattServer.BleConnectionState.Connected -> Color(0xFF4CAF50)
             else -> Color(0xFFEF5350)
         },
         shape = CircleShape

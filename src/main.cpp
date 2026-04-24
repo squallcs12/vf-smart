@@ -7,7 +7,7 @@
 #include "controls.h"
 #include "time_sync.h"
 #include "storage.h"
-#include "websocket.h"
+#include "ble_client.h"
 #include "webserver.h"
 #include "discovery.h"
 #include "ota.h"
@@ -114,14 +114,17 @@ void setup() {
     // Setup onboarding web server
     setupOnboardingServer();
   }
+
+  // Initialize BLE client — works independently of WiFi mode
+  initBleClient();
 }
 
 void loop() {
+  // Handle BLE client (connect & write car status to phone GATT server)
+  handleBleClient();
+
   // Handle OTA updates
   handleOTA();
-
-  // Handle WebSocket
-  ws.cleanupClients();
 
   // Broadcast UDP discovery message
   handleDiscoveryBroadcast();
@@ -129,11 +132,8 @@ void loop() {
   // Decode TPMS RF packets
   handleTpms();
 
-  // Read all sensors and broadcast if any changed
-  bool sensorsChanged = readSensors();
-  if (sensorsChanged) {
-    broadcastStatus();
-  }
+  // Read all sensors
+  readSensors();
 
   // Execute control logic
   handleFactoryResetButton();  // Check hardware factory reset button (hold 10s)

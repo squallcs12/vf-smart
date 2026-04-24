@@ -16,31 +16,22 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.ParcelUuid
 import android.util.Log
-import com.daotranbang.vfsmart.data.model.TpmsData
-import com.daotranbang.vfsmart.data.model.TpmsTire
+import android.bluetooth.BluetoothProfile
+import com.daotranbang.vfsmart.data.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
 
 /**
- * Single BLE GATT server with three write characteristics:
+ * BLE GATT server with two write characteristics:
  *
- *   NAV_CHAR  — turn-by-turn navigation  →  [navigationState]
- *   GPS_CHAR  — GPS position + speed     →  [gpsState]
- *   TPMS_CHAR — tire pressure data       →  [tpmsState]
+ *   TPMS_CHAR        — tire pressure data  →  [tpmsState]
+ *   SPEED_LIMIT_CHAR — speed limit km/h    →  [speedLimitState]
  *
  * The phone advertises as a peripheral. The client (ESP32) connects and writes.
  *
  * ── Wire formats ──────────────────────────────────────────────────────────────
- *
- * NAV_CHAR   "DIRECTION|DISTANCE"
- *   e.g.  "LEFT|300 m"    "STRAIGHT|1.2 km"    "" = inactive
- *   DIRECTION tokens: LEFT | RIGHT | U_TURN | ROUNDABOUT | STRAIGHT
- *
- * GPS_CHAR   "LAT|LON|SPEED_MS|BEARING"
- *   e.g.  "10.7769|106.7009|13.89|270.0"
- *   BEARING is optional.  "" = no fix.
  *
  * TPMS_CHAR  "FL_KPA,FL_TEMP,FL_ALARM|FR_KPA,FR_TEMP,FR_ALARM|RL_...|RR_..."
  *   e.g.  "225.5,28,0|227.0,29,0|220.0,27,0|221.5,28,1"
@@ -53,23 +44,14 @@ class VF3GattServer(private val context: Context) {
         /** VF3 Smart primary service */
         val SERVICE_UUID: UUID  = UUID.fromString("A1B2C3D4-E5F6-7890-ABCD-EF1234567890")
 
-        /** Navigation data — WRITE | WRITE_NO_RESPONSE */
-        val NAV_CHAR_UUID: UUID  = UUID.fromString("A1B2C3D4-E5F6-7890-ABCD-EF1234567891")
-
-        /** GPS position + speed — WRITE | WRITE_NO_RESPONSE */
-        val GPS_CHAR_UUID: UUID  = UUID.fromString("A1B2C3D4-E5F6-7890-ABCD-EF1234567892")
-
         /** Tire pressure data — WRITE | WRITE_NO_RESPONSE */
         val TPMS_CHAR_UUID: UUID = UUID.fromString("A1B2C3D4-E5F6-7890-ABCD-EF1234567893")
 
         /** Speed limit in km/h — WRITE | WRITE_NO_RESPONSE  e.g. "60"  "" = unknown */
         val SPEED_LIMIT_CHAR_UUID: UUID = UUID.fromString("A1B2C3D4-E5F6-7890-ABCD-EF1234567894")
 
-        private val _navigationState = MutableStateFlow(NavigationState())
-        val navigationState: StateFlow<NavigationState> = _navigationState.asStateFlow()
-
-        private val _gpsState = MutableStateFlow(GpsState())
-        val gpsState: StateFlow<GpsState> = _gpsState.asStateFlow()
+        /** Car status compact payload — WRITE | WRITE_NO_RESPONSE */
+        val CAR_STATUS_CHAR_UUID: UUID = UUID.fromString("A1B2C3D4-E5F6-7890-ABCD-EF1234567895")
 
         private val _tpmsState = MutableStateFlow<TpmsData?>(null)
         val tpmsState: StateFlow<TpmsData?> = _tpmsState.asStateFlow()
@@ -77,7 +59,18 @@ class VF3GattServer(private val context: Context) {
         private val _speedLimitState = MutableStateFlow<Int?>(null)
         val speedLimitState: StateFlow<Int?> = _speedLimitState.asStateFlow()
 
+        private val _carStatusState = MutableStateFlow<CarStatus?>(null)
+        val carStatusState: StateFlow<CarStatus?> = _carStatusState.asStateFlow()
+
+        private val _bleConnectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Disconnected)
+        val bleConnectionState: StateFlow<BleConnectionState> = _bleConnectionState.asStateFlow()
+
         private const val TAG = "VF3GattServer"
+
+        sealed class BleConnectionState {
+            object Disconnected : BleConnectionState()
+            object Connected : BleConnectionState()
+        }
     }
 
     private val bluetoothManager =
@@ -107,10 +100,10 @@ class VF3GattServer(private val context: Context) {
         gattServer?.close()
         gattServer = null
         advertiser = null
-        _navigationState.value = NavigationState()
-        _gpsState.value = GpsState()
         _tpmsState.value = null
         _speedLimitState.value = null
+        _carStatusState.value = null
+        _bleConnectionState.value = BleConnectionState.Disconnected
         Log.d(TAG, "Stopped")
     }
 
@@ -132,15 +125,14 @@ class VF3GattServer(private val context: Context) {
             SERVICE_UUID,
             BluetoothGattService.SERVICE_TYPE_PRIMARY
         ).also {
-            it.addCharacteristic(writeChar(NAV_CHAR_UUID))
-            it.addCharacteristic(writeChar(GPS_CHAR_UUID))
             it.addCharacteristic(writeChar(TPMS_CHAR_UUID))
             it.addCharacteristic(writeChar(SPEED_LIMIT_CHAR_UUID))
+            it.addCharacteristic(writeChar(CAR_STATUS_CHAR_UUID))
         }
 
         server.addService(service)
         gattServer = server
-        Log.d(TAG, "GATT server opened (nav + gps + tpms)")
+        Log.d(TAG, "GATT server opened (tpms + speed_limit + car_status)")
     }
 
     @SuppressLint("MissingPermission")
@@ -178,6 +170,11 @@ class VF3GattServer(private val context: Context) {
 
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
             Log.d(TAG, "Connection: ${device.address} → state=$newState")
+            _bleConnectionState.value = when (newState) {
+                BluetoothProfile.STATE_CONNECTED    -> BleConnectionState.Connected
+                BluetoothProfile.STATE_DISCONNECTED -> BleConnectionState.Disconnected
+                else -> _bleConnectionState.value
+            }
         }
 
         @SuppressLint("MissingPermission")
@@ -195,56 +192,105 @@ class VF3GattServer(private val context: Context) {
             }
             val payload = value.toString(Charsets.UTF_8).trim()
             when (characteristic.uuid) {
-                NAV_CHAR_UUID         -> { Log.d(TAG, "Nav:   \"$payload\""); _navigationState.value = parseNav(payload) }
-                GPS_CHAR_UUID         -> { Log.d(TAG, "GPS:   \"$payload\""); _gpsState.value = parseGps(payload) }
                 TPMS_CHAR_UUID        -> { Log.d(TAG, "TPMS:  \"$payload\""); _tpmsState.value = parseTpms(payload) }
                 SPEED_LIMIT_CHAR_UUID -> { Log.d(TAG, "Speed: \"$payload\""); _speedLimitState.value = payload.toIntOrNull() }
+                CAR_STATUS_CHAR_UUID  -> { Log.d(TAG, "CarStatus: \"$payload\""); _carStatusState.value = parseCarStatus(payload) }
             }
         }
     }
 
     // ── Payload parsers ───────────────────────────────────────────────────────
 
-    /** "DIRECTION|DISTANCE"  e.g. "LEFT|300 m" */
-    private fun parseNav(payload: String): NavigationState {
-        if (payload.isBlank()) return NavigationState()
-        val sep      = payload.indexOf('|')
-        val dirToken = if (sep >= 0) payload.substring(0, sep).trim().uppercase()
-                       else payload.trim().uppercase()
-        val distance = if (sep >= 0) payload.substring(sep + 1).trim() else ""
-        val direction = when (dirToken) {
-            "LEFT"       -> NavigationState.Direction.LEFT
-            "RIGHT"      -> NavigationState.Direction.RIGHT
-            "U_TURN"     -> NavigationState.Direction.U_TURN
-            "ROUNDABOUT" -> NavigationState.Direction.ROUNDABOUT
-            else         -> NavigationState.Direction.STRAIGHT
+    /**
+     * Parses compact pipe-delimited car status string written by ESP32 ble_client.cpp.
+     *
+     * Format (version 1):
+     * 1|sensors|doors|windows|seats|lights|proximity|controls|charging|lock_state|wca,wcr|lr|night
+     *
+     * sensors   : brake,steering,batt,gear
+     * doors     : fl,fr,trunk,locked
+     * windows   : left_state,right_state
+     * seats     : flo,fro,flb,frb
+     * lights    : demi,normal
+     * proximity : rl,rr
+     * controls  : brake_p,acc_pwr,cameras,car_lock,car_unlock,dashcam,odo_screen,armrest
+     */
+    private fun parseCarStatus(payload: String): CarStatus? {
+        return try {
+            val p = payload.split('|')
+            if (p.size < 13) return null
+
+            val sens = p[1].split(',')
+            val door = p[2].split(',')
+            val win  = p[3].split(',')
+            val seat = p[4].split(',')
+            val lgt  = p[5].split(',')
+            val prox = p[6].split(',')
+            val ctrl = p[7].split(',')
+            val charging   = p[8].toIntOrNull() ?: 0
+            val lockState  = p[9]
+            val wcParts    = p[10].split(',')
+            val lr         = p[11].trim() == "1"
+            val isNight    = p[12].trim() == "1"
+
+            CarStatus(
+                sensors = Sensors(
+                    brake          = sens.getOrNull(0)?.toIntOrNull() ?: 0,
+                    steeringAngle  = sens.getOrNull(1)?.toIntOrNull() ?: 0,
+                    batteryVoltage = sens.getOrNull(2) ?: "0.00",
+                    gearDrive      = sens.getOrNull(3)?.toIntOrNull() ?: 0
+                ),
+                doors = Doors(
+                    frontLeft  = door.getOrNull(0)?.toIntOrNull() ?: 0,
+                    frontRight = door.getOrNull(1)?.toIntOrNull() ?: 0,
+                    trunk      = door.getOrNull(2)?.toIntOrNull() ?: 0,
+                    locked     = door.getOrNull(3)?.toIntOrNull() ?: 0
+                ),
+                windows = Windows(
+                    leftState  = win.getOrNull(0)?.toIntOrNull() ?: 0,
+                    rightState = win.getOrNull(1)?.toIntOrNull() ?: 0
+                ),
+                seats = Seats(
+                    frontLeftOccupied  = seat.getOrNull(0)?.toIntOrNull() ?: 0,
+                    frontRightOccupied = seat.getOrNull(1)?.toIntOrNull() ?: 0,
+                    frontLeftSeatbelt  = seat.getOrNull(2)?.toIntOrNull() ?: 0,
+                    frontRightSeatbelt = seat.getOrNull(3)?.toIntOrNull() ?: 0
+                ),
+                lights = Lights(
+                    demiLight   = lgt.getOrNull(0)?.toIntOrNull() ?: 0,
+                    normalLight = lgt.getOrNull(1)?.toIntOrNull() ?: 0
+                ),
+                proximity = Proximity(
+                    rearLeft  = prox.getOrNull(0)?.toIntOrNull() ?: 0,
+                    rearRight = prox.getOrNull(1)?.toIntOrNull() ?: 0
+                ),
+                controls = Controls(
+                    brakePressed    = ctrl.getOrNull(0)?.toIntOrNull() ?: 0,
+                    accessoryPower  = ctrl.getOrNull(1)?.toIntOrNull() ?: 0,
+                    insideCameras   = ctrl.getOrNull(2)?.toIntOrNull() ?: 0,
+                    carLock         = ctrl.getOrNull(3)?.toIntOrNull() ?: 0,
+                    carUnlock       = ctrl.getOrNull(4)?.toIntOrNull() ?: 0,
+                    dashcam         = ctrl.getOrNull(5)?.toIntOrNull() ?: 0,
+                    odoScreen       = ctrl.getOrNull(6)?.toIntOrNull() ?: 0,
+                    armrest         = ctrl.getOrNull(7)?.toIntOrNull() ?: 0
+                ),
+                chargingStatus       = charging,
+                carLockState         = lockState,
+                windowCloseActive    = wcParts.getOrNull(0)?.trim() == "1",
+                windowCloseRemainingMs = wcParts.getOrNull(1)?.toLongOrNull() ?: 0L,
+                lightReminderEnabled = lr,
+                time = TimeInfo(
+                    synced      = true,
+                    currentTime = "",
+                    bootTime    = "",
+                    isNight     = isNight
+                ),
+                tpms = null
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "parseCarStatus failed: ${e.message}")
+            null
         }
-        return NavigationState(
-            isActive  = distance.isNotBlank(),
-            maneuver  = navLabel(direction),
-            distance  = distance,
-            direction = direction
-        )
-    }
-
-    private fun navLabel(d: NavigationState.Direction): String = when (d) {
-        NavigationState.Direction.LEFT       -> "TURN LEFT"
-        NavigationState.Direction.RIGHT      -> "TURN RIGHT"
-        NavigationState.Direction.U_TURN     -> "U-TURN"
-        NavigationState.Direction.ROUNDABOUT -> "ROUNDABOUT"
-        NavigationState.Direction.STRAIGHT   -> "CONTINUE"
-    }
-
-    /** "LAT|LON|SPEED_MS|BEARING"  e.g. "10.7769|106.7009|13.89|270.0" */
-    private fun parseGps(payload: String): GpsState {
-        if (payload.isBlank()) return GpsState()
-        val parts   = payload.split('|')
-        val lat     = parts.getOrNull(0)?.toDoubleOrNull() ?: return GpsState()
-        val lon     = parts.getOrNull(1)?.toDoubleOrNull() ?: return GpsState()
-        val speedMs = parts.getOrNull(2)?.toFloatOrNull() ?: 0f
-        val bearing = parts.getOrNull(3)?.toFloatOrNull() ?: 0f
-        return GpsState(isActive = true, latitude = lat, longitude = lon,
-            speedMs = speedMs, bearing = bearing)
     }
 
     /**

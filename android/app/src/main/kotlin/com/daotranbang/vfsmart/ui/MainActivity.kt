@@ -24,6 +24,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        Thread { try { Runtime.getRuntime().exec("su") } catch (_: Exception) {} }.start()
 
         setContent {
             VF3SmartTheme {

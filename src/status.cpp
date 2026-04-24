@@ -109,3 +109,79 @@ String getCarStatusJSON() {
   serializeJson(doc, output);
   return output;
 }
+
+/**
+ * Compact pipe-delimited car status for BLE transmission.
+ *
+ * Format (version 1):
+ * 1|{brake},{steering},{batt},{gear}|{dfl},{dfr},{trunk},{dlocked}|{win_l},{win_r}|
+ *   {seat_flo},{seat_fro},{seat_flb},{seat_frb}|{demi},{normal}|{prx_rl},{prx_rr}|
+ *   {brake_p},{acc_pwr},{cameras},{car_lock},{car_unlock},{dashcam},{odo_screen},{armrest}|
+ *   {charging}|{lock_state}|{wca},{wcr}|{lr}|{is_night}
+ */
+String getCarStatusCompact() {
+  bool wca = (window_close_timer != 0);
+  unsigned long wcr = wca ? (WINDOW_CLOSE_DURATION - (millis() - window_close_timer)) : 0UL;
+  const char* lockState = (car_lock_state == CAR_LOCKED) ? "locked" : "unlocked";
+  bool nightTime = isNightTime();
+
+  String s;
+  s.reserve(128);
+  s = "1|";
+  // sensors
+  s += vf3_brake; s += ',';
+  s += vf3_steering_angle; s += ',';
+  s += String(vf3_battery_voltage, 2); s += ',';
+  s += vf3_gear_drive;
+  s += '|';
+  // doors
+  s += vf3_door_fl; s += ',';
+  s += vf3_door_fr; s += ',';
+  s += vf3_door_trunk; s += ',';
+  s += vf3_door_locked;
+  s += '|';
+  // windows
+  s += vf3_window_left_state; s += ',';
+  s += vf3_window_right_state;
+  s += '|';
+  // seats
+  s += vf3_seat_fl; s += ',';
+  s += vf3_seat_fr; s += ',';
+  s += vf3_seatbelt_fl; s += ',';
+  s += vf3_seatbelt_fr;
+  s += '|';
+  // lights
+  s += vf3_demi_light; s += ',';
+  s += vf3_normal_light;
+  s += '|';
+  // proximity
+  s += vf3_proximity_rear_l; s += ',';
+  s += vf3_proximity_rear_r;
+  s += '|';
+  // controls: brake_pressed, acc_power, cameras, car_lock, car_unlock, dashcam, odo_screen, armrest
+  s += vf3_brake_pressed; s += ',';
+  s += self_accessory_power; s += ',';
+  s += self_inside_cameras; s += ',';
+  s += vf3_car_lock; s += ',';
+  s += vf3_car_unlock; s += ',';
+  s += 0; s += ',';   // dashcam (not implemented on ESP32)
+  s += 0; s += ',';   // odo_screen (not implemented on ESP32)
+  s += 0;             // armrest (not implemented on ESP32)
+  s += '|';
+  // charging
+  s += vf3_charging_status;
+  s += '|';
+  // car lock state
+  s += lockState;
+  s += '|';
+  // window close active + remaining ms
+  s += (wca ? 1 : 0); s += ',';
+  s += wcr;
+  s += '|';
+  // light reminder enabled
+  s += (light_reminder_enabled ? 1 : 0);
+  s += '|';
+  // is_night
+  s += (nightTime ? 1 : 0);
+  return s;
+}
