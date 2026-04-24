@@ -5,7 +5,7 @@ import com.daotranbang.vfsmart.data.local.SecurePreferences
 import com.daotranbang.vfsmart.data.model.*
 import com.daotranbang.vfsmart.data.network.UdpDiscoveryService
 import com.daotranbang.vfsmart.data.network.VF3ApiService
-import com.daotranbang.vfsmart.data.network.WebSocketManager
+import com.daotranbang.vfsmart.navigation.VF3GattServer
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
@@ -21,7 +21,6 @@ import javax.inject.Singleton
 @Singleton
 class VF3Repository @Inject constructor(
     private val apiService: VF3ApiService,
-    private val webSocketManager: WebSocketManager,
     private val udpDiscoveryService: UdpDiscoveryService,
     private val securePreferences: SecurePreferences,
     private val ioDispatcher: CoroutineDispatcher
@@ -30,29 +29,10 @@ class VF3Repository @Inject constructor(
         private const val TAG = "VF3Repository"
     }
 
-    // Real-time status from WebSocket
-    val carStatus: StateFlow<CarStatus?> = webSocketManager.statusFlow
-    val connectionState: StateFlow<WebSocketManager.ConnectionState> =
-        webSocketManager.connectionState
-
-    /**
-     * Connect to WebSocket for real-time updates
-     */
-    fun connectWebSocket() {
-        val deviceIp = securePreferences.getDeviceIp()
-        if (deviceIp != null) {
-            webSocketManager.connect(deviceIp, autoReconnect = true)
-        } else {
-            Log.w(TAG, "Cannot connect WebSocket: device IP not configured")
-        }
-    }
-
-    /**
-     * Disconnect WebSocket
-     */
-    fun disconnectWebSocket() {
-        webSocketManager.disconnect()
-    }
+    // Real-time status from BLE
+    val carStatus: StateFlow<CarStatus?> = VF3GattServer.carStatusState
+    val connectionState: StateFlow<VF3GattServer.BleConnectionState> =
+        VF3GattServer.bleConnectionState
 
     /**
      * Discover VF3-Smart device on local network via UDP

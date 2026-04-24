@@ -8,8 +8,8 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.data.model.CarStatus
-import com.daotranbang.vfsmart.data.network.WebSocketManager
 import com.daotranbang.vfsmart.data.repository.VF3Repository
+import com.daotranbang.vfsmart.navigation.VF3GattServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,16 +29,12 @@ class StatusScreen(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var currentStatus: CarStatus? = null
-    private var connectionState: WebSocketManager.ConnectionState = WebSocketManager.ConnectionState.Disconnected
+    private var connectionState: VF3GattServer.BleConnectionState = VF3GattServer.BleConnectionState.Disconnected
 
     init {
-        // Observe lifecycle and connect/disconnect WebSocket
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onCreate(owner: LifecycleOwner) {
-                // Connect WebSocket for real-time updates
-                repository.connectWebSocket()
-
-                // Collect status updates and invalidate screen
+                // Collect BLE status updates and invalidate screen
                 scope.launch {
                     repository.carStatus.collectLatest { status ->
                         currentStatus = status
@@ -46,7 +42,7 @@ class StatusScreen(
                     }
                 }
 
-                // Collect connection state and invalidate screen
+                // Collect BLE connection state and invalidate screen
                 scope.launch {
                     repository.connectionState.collectLatest { state ->
                         connectionState = state
@@ -56,8 +52,6 @@ class StatusScreen(
             }
 
             override fun onDestroy(owner: LifecycleOwner) {
-                // Disconnect WebSocket when screen destroyed
-                repository.disconnectWebSocket()
                 scope.cancel()
             }
         })
@@ -74,7 +68,7 @@ class StatusScreen(
 
     private fun buildControlsTemplate(status: CarStatus): Template {
         val gridItemListBuilder = ItemList.Builder()
-        val isConnected = connectionState == WebSocketManager.ConnectionState.Connected
+        val isConnected = connectionState == VF3GattServer.BleConnectionState.Connected
 
         val accessoryPowerOn = status.controls.accessoryPower == 1
         val odoScreenOn = status.controls.odoScreen == 1
@@ -289,9 +283,8 @@ class StatusScreen(
         )
 
         val connectionText = when (connectionState) {
-            is WebSocketManager.ConnectionState.Connected -> "Connected"
-            is WebSocketManager.ConnectionState.Disconnected -> "Disconnected"
-            is WebSocketManager.ConnectionState.Error -> "Error"
+            VF3GattServer.BleConnectionState.Connected -> "Connected"
+            VF3GattServer.BleConnectionState.Disconnected -> "Disconnected"
         }
 
         return GridTemplate.Builder()
@@ -303,9 +296,8 @@ class StatusScreen(
 
     private fun buildLoadingTemplate(): Template {
         val connectionText = when (connectionState) {
-            is WebSocketManager.ConnectionState.Connected -> "Connected"
-            is WebSocketManager.ConnectionState.Disconnected -> "Disconnected. Connecting..."
-            is WebSocketManager.ConnectionState.Error -> "Waiting for ESP32..."
+            VF3GattServer.BleConnectionState.Connected -> "Connected"
+            VF3GattServer.BleConnectionState.Disconnected -> "Waiting for ESP32..."
         }
 
         return MessageTemplate.Builder(connectionText)

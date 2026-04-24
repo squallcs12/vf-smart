@@ -4,8 +4,8 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.daotranbang.vfsmart.data.model.CarStatus
-import com.daotranbang.vfsmart.data.network.WebSocketManager
 import com.daotranbang.vfsmart.data.repository.VF3Repository
+import com.daotranbang.vfsmart.navigation.VF3GattServer
 import com.daotranbang.vfsmart.util.VoiceWarningManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -34,25 +34,22 @@ class CarStatusViewModel @Inject constructor(
     // Track last light reminder time
     private var lastLightReminderTime = 0L
 
-    // Real-time car status from WebSocket
+    // Real-time car status from BLE
     val carStatus: StateFlow<CarStatus?> = repository.carStatus.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = null
     )
 
-    // WebSocket connection state
-    val connectionState: StateFlow<WebSocketManager.ConnectionState> =
+    // BLE connection state
+    val connectionState: StateFlow<VF3GattServer.BleConnectionState> =
         repository.connectionState.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = WebSocketManager.ConnectionState.Disconnected
+            initialValue = VF3GattServer.BleConnectionState.Disconnected
         )
 
     init {
-        // Connect WebSocket when ViewModel is created
-        connectWebSocket()
-
         // Monitor car status for voice warnings
         monitorCarStatusForWarnings()
     }
@@ -131,23 +128,8 @@ class CarStatusViewModel @Inject constructor(
         lastLightReminderTime = now
     }
 
-    /**
-     * Connect WebSocket for real-time updates
-     */
-    fun connectWebSocket() {
-        repository.connectWebSocket()
-    }
-
-    /**
-     * Disconnect WebSocket
-     */
-    fun disconnectWebSocket() {
-        repository.disconnectWebSocket()
-    }
-
     override fun onCleared() {
         super.onCleared()
-        disconnectWebSocket()
         voiceWarningManager.shutdown()
     }
 }

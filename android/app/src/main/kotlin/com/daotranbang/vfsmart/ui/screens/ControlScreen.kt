@@ -15,7 +15,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.data.model.CarStatus
-import com.daotranbang.vfsmart.data.network.WebSocketManager
+import com.daotranbang.vfsmart.navigation.VF3GattServer
 import com.daotranbang.vfsmart.ui.components.ControlButton
 import com.daotranbang.vfsmart.ui.components.OutlinedControlButton
 import com.daotranbang.vfsmart.ui.components.ToggleControlButton
@@ -37,7 +37,7 @@ fun ControlScreen(
     val connectionState by statusViewModel.connectionState.collectAsStateWithLifecycle()
     val operationState by controlViewModel.operationState.collectAsStateWithLifecycle()
 
-    val isConnected = connectionState == WebSocketManager.ConnectionState.Connected
+    val isConnected = connectionState == VF3GattServer.BleConnectionState.Connected
 
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(operationState) {
@@ -356,7 +356,7 @@ private fun getWindowStateText(state: Int): String = when (state) {
 
 @Composable
 private fun ConnectionStatusIndicator(
-    connectionState: WebSocketManager.ConnectionState,
+    connectionState: VF3GattServer.BleConnectionState,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -365,7 +365,7 @@ private fun ConnectionStatusIndicator(
         verticalAlignment = Alignment.CenterVertically
     ) {
         when (connectionState) {
-            WebSocketManager.ConnectionState.Connected -> {
+            VF3GattServer.BleConnectionState.Connected -> {
                 Icon(
                     Icons.Default.CheckCircle,
                     contentDescription = "Connected",
@@ -373,18 +373,10 @@ private fun ConnectionStatusIndicator(
                     modifier = Modifier.size(20.dp)
                 )
             }
-            WebSocketManager.ConnectionState.Disconnected -> {
+            VF3GattServer.BleConnectionState.Disconnected -> {
                 Icon(
                     Icons.Default.Cancel,
                     contentDescription = "Disconnected",
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            is WebSocketManager.ConnectionState.Error -> {
-                Icon(
-                    Icons.Default.Error,
-                    contentDescription = "Error",
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(20.dp)
                 )
@@ -395,7 +387,7 @@ private fun ConnectionStatusIndicator(
 
 @Composable
 private fun DisconnectedWarningBanner(
-    connectionState: WebSocketManager.ConnectionState,
+    connectionState: VF3GattServer.BleConnectionState,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -412,11 +404,7 @@ private fun DisconnectedWarningBanner(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = if (connectionState is WebSocketManager.ConnectionState.Error) {
-                    Icons.Default.Error
-                } else {
-                    Icons.Default.CloudOff
-                },
+                imageVector = Icons.Default.CloudOff,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onErrorContainer,
                 modifier = Modifier.size(24.dp)
@@ -428,10 +416,7 @@ private fun DisconnectedWarningBanner(
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
                 Text(
-                    text = when (connectionState) {
-                        is WebSocketManager.ConnectionState.Error -> connectionState.message
-                        else -> "All controls are disabled. Reconnecting..."
-                    },
+                    text = "All controls are disabled. Waiting for ESP32 via Bluetooth...",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
                 )

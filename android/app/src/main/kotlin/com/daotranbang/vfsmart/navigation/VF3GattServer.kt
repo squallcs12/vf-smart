@@ -8,6 +8,7 @@ import android.bluetooth.BluetoothGattServer
 import android.bluetooth.BluetoothGattServerCallback
 import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
@@ -16,42 +17,67 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.ParcelUuid
 import android.util.Log
-import android.bluetooth.BluetoothProfile
-import com.daotranbang.vfsmart.data.model.*
+import com.daotranbang.vfsmart.data.model.CarStatus
+import com.daotranbang.vfsmart.data.model.Controls
+import com.daotranbang.vfsmart.data.model.Doors
+import com.daotranbang.vfsmart.data.model.Lights
+import com.daotranbang.vfsmart.data.model.Proximity
+import com.daotranbang.vfsmart.data.model.Seats
+import com.daotranbang.vfsmart.data.model.Sensors
+import com.daotranbang.vfsmart.data.model.TimeInfo
+import com.daotranbang.vfsmart.data.model.TpmsData
+import com.daotranbang.vfsmart.data.model.TpmsTire
+import com.daotranbang.vfsmart.data.model.Windows
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
 
 /**
- * BLE GATT server with two write characteristics:
+ * BLE GATT server with three write characteristics:
  *
- *   TPMS_CHAR        — tire pressure data  →  [tpmsState]
- *   SPEED_LIMIT_CHAR — speed limit km/h    →  [speedLimitState]
+ *   TPMS_CHAR        — tire pressure data        →  [tpmsState]
+ *   SPEED_LIMIT_CHAR — speed limit km/h          →  [speedLimitState]
+ *   CAR_STATUS_CHAR  — delta car status updates  →  [carStatusState]
  *
  * The phone advertises as a peripheral. The client (ESP32) connects and writes.
  *
  * ── Wire formats ──────────────────────────────────────────────────────────────
  *
  * TPMS_CHAR  "FL_KPA,FL_TEMP,FL_ALARM|FR_KPA,FR_TEMP,FR_ALARM|RL_...|RR_..."
- *   e.g.  "225.5,28,0|227.0,29,0|220.0,27,0|221.5,28,1"
- *   Each field: pressure (kPa float), temperature (°C int), alarm (0/1).
- *   "" = no TPMS data.
+ *
+ * CAR_STATUS_CHAR — delta protocol:
+ *   Full (on connect, 60 s heartbeat):
+ *     "F|S:<s>|D:<d>|W:<w>|E:<e>|L:<l>|P:<p>|C:<c>|X:<x>"
+ *   Delta (only changed groups):
+ *     "U|S:<s>|L:<l>|..."
+ *
+ *   Group formats:
+ *     S  brake,steering,voltage,gear
+ *     D  fl,fr,trunk,locked
+ *     W  left_state,right_state
+ *     E  seat_flo,seat_fro,seatbelt_flo,seatbelt_fro
+ *     L  demi,normal
+ *     P  rear_l,rear_r
+ *     C  brake_pressed,acc_power,cameras,car_lock,car_unlock
+ *     X  charging,lock_state(0/1),wca,wcr_secs,lr,is_night
  */
 class VF3GattServer(private val context: Context) {
 
     companion object {
         /** VF3 Smart primary service */
-        val SERVICE_UUID: UUID  = UUID.fromString("A1B2C3D4-E5F6-7890-ABCD-EF1234567890")
+        val SERVICE_UUID: UUID = UUID.fromString("A1B2C3D4-E5F6-7890-ABCD-EF1234567890")
 
         /** Tire pressure data — WRITE | WRITE_NO_RESPONSE */
         val TPMS_CHAR_UUID: UUID = UUID.fromString("A1B2C3D4-E5F6-7890-ABCD-EF1234567893")
 
-        /** Speed limit in km/h — WRITE | WRITE_NO_RESPONSE  e.g. "60"  "" = unknown */
+        /** Speed limit in km/h — WRITE | WRITE_NO_RESPONSE */
         val SPEED_LIMIT_CHAR_UUID: UUID = UUID.fromString("A1B2C3D4-E5F6-7890-ABCD-EF1234567894")
 
-        /** Car status compact payload — WRITE | WRITE_NO_RESPONSE */
+        /** Car status delta updates — WRITE | WRITE_NO_RESPONSE */
         val CAR_STATUS_CHAR_UUID: UUID = UUID.fromString("A1B2C3D4-E5F6-7890-ABCD-EF1234567895")
+
+        // ── Public state flows ─────────────────────────────────────────────────
 
         private val _tpmsState = MutableStateFlow<TpmsData?>(null)
         val tpmsState: StateFlow<TpmsData?> = _tpmsState.asStateFlow()
@@ -67,6 +93,7 @@ class VF3GattServer(private val context: Context) {
 
         private const val TAG = "VF3GattServer"
 
+        // ── BLE connection state ───────────────────────────────────────────────
         sealed class BleConnectionState {
             object Disconnected : BleConnectionState()
             object Connected : BleConnectionState()
@@ -173,7 +200,7 @@ class VF3GattServer(private val context: Context) {
             _bleConnectionState.value = when (newState) {
                 BluetoothProfile.STATE_CONNECTED    -> BleConnectionState.Connected
                 BluetoothProfile.STATE_DISCONNECTED -> BleConnectionState.Disconnected
-                else -> _bleConnectionState.value
+                else                                -> _bleConnectionState.value
             }
         }
 
@@ -194,104 +221,122 @@ class VF3GattServer(private val context: Context) {
             when (characteristic.uuid) {
                 TPMS_CHAR_UUID        -> { Log.d(TAG, "TPMS:  \"$payload\""); _tpmsState.value = parseTpms(payload) }
                 SPEED_LIMIT_CHAR_UUID -> { Log.d(TAG, "Speed: \"$payload\""); _speedLimitState.value = payload.toIntOrNull() }
-                CAR_STATUS_CHAR_UUID  -> { Log.d(TAG, "CarStatus: \"$payload\""); _carStatusState.value = parseCarStatus(payload) }
+                CAR_STATUS_CHAR_UUID  -> { Log.d(TAG, "Status len=${payload.length}"); applyCarStatusPayload(payload) }
             }
         }
     }
 
-    // ── Payload parsers ───────────────────────────────────────────────────────
+    // ── Car status delta parser ───────────────────────────────────────────────
 
     /**
-     * Parses compact pipe-delimited car status string written by ESP32 ble_client.cpp.
-     *
-     * Format (version 1):
-     * 1|sensors|doors|windows|seats|lights|proximity|controls|charging|lock_state|wca,wcr|lr|night
-     *
-     * sensors   : brake,steering,batt,gear
-     * doors     : fl,fr,trunk,locked
-     * windows   : left_state,right_state
-     * seats     : flo,fro,flb,frb
-     * lights    : demi,normal
-     * proximity : rl,rr
-     * controls  : brake_p,acc_pwr,cameras,car_lock,car_unlock,dashcam,odo_screen,armrest
+     * Applies a full ("F|...") or delta ("U|...") car status payload,
+     * merging only the changed groups into [_carStatusState].
      */
-    private fun parseCarStatus(payload: String): CarStatus? {
-        return try {
-            val p = payload.split('|')
-            if (p.size < 13) return null
+    private fun applyCarStatusPayload(payload: String) {
+        if (payload.isEmpty()) return
+        val parts = payload.split('|')
+        if (parts.isEmpty()) return
 
-            val sens = p[1].split(',')
-            val door = p[2].split(',')
-            val win  = p[3].split(',')
-            val seat = p[4].split(',')
-            val lgt  = p[5].split(',')
-            val prox = p[6].split(',')
-            val ctrl = p[7].split(',')
-            val charging   = p[8].toIntOrNull() ?: 0
-            val lockState  = p[9]
-            val wcParts    = p[10].split(',')
-            val lr         = p[11].trim() == "1"
-            val isNight    = p[12].trim() == "1"
+        val cur = _carStatusState.value
 
-            CarStatus(
-                sensors = Sensors(
-                    brake          = sens.getOrNull(0)?.toIntOrNull() ?: 0,
-                    steeringAngle  = sens.getOrNull(1)?.toIntOrNull() ?: 0,
-                    batteryVoltage = sens.getOrNull(2) ?: "0.00",
-                    gearDrive      = sens.getOrNull(3)?.toIntOrNull() ?: 0
-                ),
-                doors = Doors(
-                    frontLeft  = door.getOrNull(0)?.toIntOrNull() ?: 0,
-                    frontRight = door.getOrNull(1)?.toIntOrNull() ?: 0,
-                    trunk      = door.getOrNull(2)?.toIntOrNull() ?: 0,
-                    locked     = door.getOrNull(3)?.toIntOrNull() ?: 0
-                ),
-                windows = Windows(
-                    leftState  = win.getOrNull(0)?.toIntOrNull() ?: 0,
-                    rightState = win.getOrNull(1)?.toIntOrNull() ?: 0
-                ),
-                seats = Seats(
-                    frontLeftOccupied  = seat.getOrNull(0)?.toIntOrNull() ?: 0,
-                    frontRightOccupied = seat.getOrNull(1)?.toIntOrNull() ?: 0,
-                    frontLeftSeatbelt  = seat.getOrNull(2)?.toIntOrNull() ?: 0,
-                    frontRightSeatbelt = seat.getOrNull(3)?.toIntOrNull() ?: 0
-                ),
-                lights = Lights(
-                    demiLight   = lgt.getOrNull(0)?.toIntOrNull() ?: 0,
-                    normalLight = lgt.getOrNull(1)?.toIntOrNull() ?: 0
-                ),
-                proximity = Proximity(
-                    rearLeft  = prox.getOrNull(0)?.toIntOrNull() ?: 0,
-                    rearRight = prox.getOrNull(1)?.toIntOrNull() ?: 0
-                ),
-                controls = Controls(
-                    brakePressed    = ctrl.getOrNull(0)?.toIntOrNull() ?: 0,
-                    accessoryPower  = ctrl.getOrNull(1)?.toIntOrNull() ?: 0,
-                    insideCameras   = ctrl.getOrNull(2)?.toIntOrNull() ?: 0,
-                    carLock         = ctrl.getOrNull(3)?.toIntOrNull() ?: 0,
-                    carUnlock       = ctrl.getOrNull(4)?.toIntOrNull() ?: 0,
-                    dashcam         = ctrl.getOrNull(5)?.toIntOrNull() ?: 0,
-                    odoScreen       = ctrl.getOrNull(6)?.toIntOrNull() ?: 0,
-                    armrest         = ctrl.getOrNull(7)?.toIntOrNull() ?: 0
-                ),
-                chargingStatus       = charging,
-                carLockState         = lockState,
-                windowCloseActive    = wcParts.getOrNull(0)?.trim() == "1",
-                windowCloseRemainingMs = wcParts.getOrNull(1)?.toLongOrNull() ?: 0L,
-                lightReminderEnabled = lr,
-                time = TimeInfo(
-                    synced      = true,
-                    currentTime = "",
-                    bootTime    = "",
-                    isNight     = isNight
-                ),
-                tpms = null
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "parseCarStatus failed: ${e.message}")
-            null
+        var sensors   = cur?.sensors   ?: Sensors(0, 0, "0.00", 0)
+        var doors     = cur?.doors     ?: Doors(0, 0, 0, 0)
+        var windows   = cur?.windows   ?: Windows(0, 0)
+        var seats     = cur?.seats     ?: Seats(0, 0, 0, 0)
+        var lights    = cur?.lights    ?: Lights(0, 0)
+        var proximity = cur?.proximity ?: Proximity(0, 0)
+        var controls  = cur?.controls  ?: Controls(0, 0, 0, 0, 0, 0, 0, 0)
+        var chargingStatus         = cur?.chargingStatus         ?: 0
+        var carLockState           = cur?.carLockState           ?: "unlocked"
+        var windowCloseActive      = cur?.windowCloseActive      ?: false
+        var windowCloseRemainingMs = cur?.windowCloseRemainingMs ?: 0L
+        var lightReminderEnabled   = cur?.lightReminderEnabled   ?: true
+        var isNight                = cur?.time?.isNight          ?: false
+        val tpms                   = cur?.tpms // preserved — arrives via TPMS_CHAR
+
+        for (i in 1 until parts.size) {
+            val entry = parts[i]
+            val colon = entry.indexOf(':')
+            if (colon < 0) continue
+            val grp = entry.substring(0, colon)
+            val v   = entry.substring(colon + 1).split(',')
+
+            when (grp) {
+                "S" -> sensors = Sensors(
+                    brake          = v.getOrNull(0)?.toIntOrNull()   ?: sensors.brake,
+                    steeringAngle  = v.getOrNull(1)?.toIntOrNull()   ?: sensors.steeringAngle,
+                    batteryVoltage = v.getOrNull(2)                  ?: sensors.batteryVoltage,
+                    gearDrive      = v.getOrNull(3)?.toIntOrNull()   ?: sensors.gearDrive
+                )
+                "D" -> doors = Doors(
+                    frontLeft  = v.getOrNull(0)?.toIntOrNull() ?: doors.frontLeft,
+                    frontRight = v.getOrNull(1)?.toIntOrNull() ?: doors.frontRight,
+                    trunk      = v.getOrNull(2)?.toIntOrNull() ?: doors.trunk,
+                    locked     = v.getOrNull(3)?.toIntOrNull() ?: doors.locked
+                )
+                "W" -> windows = Windows(
+                    leftState  = v.getOrNull(0)?.toIntOrNull() ?: windows.leftState,
+                    rightState = v.getOrNull(1)?.toIntOrNull() ?: windows.rightState
+                )
+                "E" -> seats = Seats(
+                    frontLeftOccupied  = v.getOrNull(0)?.toIntOrNull() ?: seats.frontLeftOccupied,
+                    frontRightOccupied = v.getOrNull(1)?.toIntOrNull() ?: seats.frontRightOccupied,
+                    frontLeftSeatbelt  = v.getOrNull(2)?.toIntOrNull() ?: seats.frontLeftSeatbelt,
+                    frontRightSeatbelt = v.getOrNull(3)?.toIntOrNull() ?: seats.frontRightSeatbelt
+                )
+                "L" -> lights = Lights(
+                    demiLight   = v.getOrNull(0)?.toIntOrNull() ?: lights.demiLight,
+                    normalLight = v.getOrNull(1)?.toIntOrNull() ?: lights.normalLight
+                )
+                "P" -> proximity = Proximity(
+                    rearLeft  = v.getOrNull(0)?.toIntOrNull() ?: proximity.rearLeft,
+                    rearRight = v.getOrNull(1)?.toIntOrNull() ?: proximity.rearRight
+                )
+                "C" -> controls = Controls(
+                    brakePressed   = v.getOrNull(0)?.toIntOrNull() ?: controls.brakePressed,
+                    accessoryPower = v.getOrNull(1)?.toIntOrNull() ?: controls.accessoryPower,
+                    insideCameras  = v.getOrNull(2)?.toIntOrNull() ?: controls.insideCameras,
+                    carLock        = v.getOrNull(3)?.toIntOrNull() ?: controls.carLock,
+                    carUnlock      = v.getOrNull(4)?.toIntOrNull() ?: controls.carUnlock,
+                    dashcam        = controls.dashcam,
+                    odoScreen      = controls.odoScreen,
+                    armrest        = controls.armrest
+                )
+                "X" -> {
+                    chargingStatus         = v.getOrNull(0)?.toIntOrNull() ?: chargingStatus
+                    carLockState           = if ((v.getOrNull(1)?.toIntOrNull() ?: 0) == 1) "locked" else "unlocked"
+                    windowCloseActive      = (v.getOrNull(2)?.toIntOrNull() ?: 0) == 1
+                    windowCloseRemainingMs = (v.getOrNull(3)?.toLongOrNull() ?: 0L) * 1000L
+                    lightReminderEnabled   = (v.getOrNull(4)?.toIntOrNull() ?: 1) == 1
+                    isNight                = (v.getOrNull(5)?.toIntOrNull() ?: 0) == 1
+                }
+            }
         }
+
+        _carStatusState.value = CarStatus(
+            sensors                = sensors,
+            doors                  = doors,
+            windows                = windows,
+            seats                  = seats,
+            lights                 = lights,
+            proximity              = proximity,
+            controls               = controls,
+            chargingStatus         = chargingStatus,
+            carLockState           = carLockState,
+            windowCloseActive      = windowCloseActive,
+            windowCloseRemainingMs = windowCloseRemainingMs,
+            lightReminderEnabled   = lightReminderEnabled,
+            time                   = TimeInfo(
+                synced      = true,
+                currentTime = "",
+                bootTime    = "",
+                isNight     = isNight
+            ),
+            tpms = tpms
+        )
     }
+
+    // ── TPMS payload parser ───────────────────────────────────────────────────
 
     /**
      * "FL_KPA,FL_TEMP,FL_ALARM|FR_...|RL_...|RR_..."

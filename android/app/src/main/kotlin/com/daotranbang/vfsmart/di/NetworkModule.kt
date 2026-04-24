@@ -8,7 +8,6 @@ import com.daotranbang.vfsmart.data.network.AuthInterceptor
 import com.daotranbang.vfsmart.data.network.DynamicBaseUrlInterceptor
 import com.daotranbang.vfsmart.data.network.UdpDiscoveryService
 import com.daotranbang.vfsmart.data.network.VF3ApiService
-import com.daotranbang.vfsmart.data.network.WebSocketManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -99,15 +98,6 @@ object NetworkModule {
     @Singleton
     fun provideVF3ApiService(retrofit: Retrofit): VF3ApiService {
         return retrofit.create(VF3ApiService::class.java)
-    }
-
-    @Provides
-    @Singleton
-    fun provideWebSocketManager(
-        okHttpClient: OkHttpClient,
-        gson: Gson
-    ): WebSocketManager {
-        return WebSocketManager(okHttpClient, gson)
     }
 
     @Provides

@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daotranbang.vfsmart.data.model.CarStatus
-import com.daotranbang.vfsmart.data.network.WebSocketManager
+import com.daotranbang.vfsmart.navigation.VF3GattServer
 import com.daotranbang.vfsmart.ui.components.ControlButton
 import com.daotranbang.vfsmart.ui.components.StatusCard
 import com.daotranbang.vfsmart.viewmodel.CarStatusViewModel
@@ -63,7 +63,7 @@ fun HomeScreen(
 @Composable
 private fun FullContent(
     carStatus: CarStatus?,
-    connectionState: WebSocketManager.ConnectionState,
+    connectionState: VF3GattServer.BleConnectionState,
     operationState: ControlViewModel.OperationState,
     controlViewModel: ControlViewModel,
     onNavigateToControls: () -> Unit,
@@ -126,7 +126,7 @@ private fun FullContent(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        val isConnected = connectionState == WebSocketManager.ConnectionState.Connected
+        val isConnected = connectionState == VF3GattServer.BleConnectionState.Connected
         val isLoading   = operationState is ControlViewModel.OperationState.Loading
         val enabled     = isConnected && !isLoading
 
@@ -338,19 +338,17 @@ private fun QuickActionsCard(
 
 @Composable
 private fun ConnectionIndicator(
-    connectionState: WebSocketManager.ConnectionState,
+    connectionState: VF3GattServer.BleConnectionState,
     modifier: Modifier = Modifier
 ) {
     Row(modifier = modifier.padding(end = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically) {
         val (icon, label, color) = when (connectionState) {
-            WebSocketManager.ConnectionState.Connected ->
+            VF3GattServer.BleConnectionState.Connected ->
                 Triple(Icons.Default.CheckCircle, "Live", MaterialTheme.colorScheme.primary)
-            WebSocketManager.ConnectionState.Disconnected ->
+            VF3GattServer.BleConnectionState.Disconnected ->
                 Triple(Icons.Default.Cancel, "Offline", MaterialTheme.colorScheme.error)
-            is WebSocketManager.ConnectionState.Error ->
-                Triple(Icons.Default.Error, "Error", MaterialTheme.colorScheme.error)
         }
         Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
         Text(label, style = MaterialTheme.typography.labelSmall, color = color)
@@ -359,7 +357,7 @@ private fun ConnectionIndicator(
 
 @Composable
 private fun DisconnectedBanner(
-    connectionState: WebSocketManager.ConnectionState,
+    connectionState: VF3GattServer.BleConnectionState,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -370,8 +368,7 @@ private fun DisconnectedBanner(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                if (connectionState is WebSocketManager.ConnectionState.Error)
-                    Icons.Default.Error else Icons.Default.CloudOff,
+                Icons.Default.CloudOff,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onErrorContainer,
                 modifier = Modifier.size(20.dp)
@@ -380,10 +377,7 @@ private fun DisconnectedBanner(
                 Text("Not Connected", style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onErrorContainer)
                 Text(
-                    text = when (connectionState) {
-                        is WebSocketManager.ConnectionState.Error -> connectionState.message
-                        else -> "Controls disabled. Reconnecting..."
-                    },
+                    text = "Controls disabled. Waiting for ESP32 via Bluetooth...",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
                 )

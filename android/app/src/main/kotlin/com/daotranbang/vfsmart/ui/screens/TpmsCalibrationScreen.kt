@@ -26,7 +26,6 @@ import com.daotranbang.vfsmart.data.model.CarStatus
 import com.daotranbang.vfsmart.data.model.TpmsSensorAssignments
 import com.daotranbang.vfsmart.data.model.TpmsSensorInfo
 import com.daotranbang.vfsmart.data.model.TpmsTire
-import com.daotranbang.vfsmart.data.network.WebSocketManager
 import com.daotranbang.vfsmart.viewmodel.CarStatusViewModel
 import com.daotranbang.vfsmart.viewmodel.TpmsCalibrationViewModel
 

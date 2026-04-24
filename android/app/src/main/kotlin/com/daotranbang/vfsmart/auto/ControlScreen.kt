@@ -32,21 +32,16 @@ class ControlScreen(
         // Observe lifecycle and connect/disconnect WebSocket
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onCreate(owner: LifecycleOwner) {
-                // Connect WebSocket for real-time updates
-                repository.connectWebSocket()
-
-                // Collect status updates and invalidate screen
+                // Collect BLE status updates and invalidate screen
                 scope.launch {
                     repository.carStatus.collectLatest { status ->
                         currentStatus = status
-                        invalidate() // Refresh UI
+                        invalidate()
                     }
                 }
             }
 
             override fun onDestroy(owner: LifecycleOwner) {
-                // Disconnect WebSocket when screen destroyed
-                repository.disconnectWebSocket()
                 scope.cancel()
             }
         })
