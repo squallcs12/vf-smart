@@ -273,12 +273,15 @@ private fun OdoLocationCell(
     var street   by remember { mutableStateOf<String?>(null) }
     var district by remember { mutableStateOf<String?>(null) }
     var province by remember { mutableStateOf<String?>(null) }
+    var lastGeocoded by remember { mutableStateOf<android.location.Location?>(null) }
 
     LaunchedEffect(location) {
         val loc = location ?: return@LaunchedEffect
+        val last = lastGeocoded
+        if (last != null && last.distanceTo(loc) < 200f) return@LaunchedEffect
+        lastGeocoded = loc
         kotlinx.coroutines.withContext(Dispatchers.IO) {
             try {
-                if (!android.location.Geocoder.isPresent()) return@withContext
                 @Suppress("DEPRECATION")
                 val addresses = android.location.Geocoder(context, java.util.Locale.getDefault())
                     .getFromLocation(loc.latitude, loc.longitude, 1)
