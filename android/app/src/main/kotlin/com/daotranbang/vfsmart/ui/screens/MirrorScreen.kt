@@ -53,7 +53,7 @@ import kotlinx.coroutines.delay
 
 // ── ODO colour palette ────────────────────────────────────────────────────────
 private val OdoBg       = Color(0xFF0A0A0A)
-private val OdoDivider  = Color(0xFF3A3A3A)
+private val OdoDivider  = Color.Transparent
 private val OdoLabel    = Color(0xFF909090)
 private val OdoInactive = Color(0xFF686868)
 private val OdoNormal   = Color(0xFFF0F0F0)
