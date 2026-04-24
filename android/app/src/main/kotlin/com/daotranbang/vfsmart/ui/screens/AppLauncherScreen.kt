@@ -17,6 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
+import androidx.compose.ui.res.stringResource
+import com.daotranbang.vfsmart.R
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,10 +80,11 @@ fun AppLauncherScreen(onNavigateBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Apps") },
+                title = { Text(stringResource(R.string.apps_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack,
+                            contentDescription = stringResource(R.string.back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -96,7 +99,7 @@ fun AppLauncherScreen(onNavigateBack: () -> Unit) {
             OutlinedTextField(
                 value         = query,
                 onValueChange = { query = it },
-                placeholder   = { Text("Search apps…") },
+                placeholder   = { Text(stringResource(R.string.apps_search)) },
                 leadingIcon   = { Icon(Icons.Default.Search, contentDescription = null) },
                 singleLine    = true,
                 modifier      = Modifier

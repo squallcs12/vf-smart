@@ -11,6 +11,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.*
+import androidx.compose.ui.res.stringResource
+import com.daotranbang.vfsmart.R
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,16 +62,19 @@ fun TpmsCalibrationScreen(
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
-            title = { Text("Reset All Assignments?") },
-            text  = { Text("This clears all 4 sensor mappings. The next 4 unique sensors received will be auto-assigned as FL → FR → RL → RR.\n\nTrigger each sensor by slightly inflating/deflating the tire.") },
+            title = { Text(stringResource(R.string.tpms_reset_dialog_title)) },
+            text  = { Text(stringResource(R.string.tpms_reset_dialog_text)) },
             confirmButton = {
                 TextButton(onClick = {
                     showResetDialog = false
                     viewModel.reset()
-                }) { Text("Reset", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.tpms_reset_confirm),
+                    color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
             }
         )
     }
@@ -78,10 +83,11 @@ fun TpmsCalibrationScreen(
         topBar = {
             @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
-                title = { Text("TPMS Calibration") },
+                title = { Text(stringResource(R.string.tpms_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack,
+                            contentDescription = stringResource(R.string.back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -90,7 +96,8 @@ fun TpmsCalibrationScreen(
                 ),
                 actions = {
                     IconButton(onClick = { viewModel.load() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        Icon(Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.refresh))
                     }
                 }
             )
@@ -115,8 +122,7 @@ fun TpmsCalibrationScreen(
                 )
             ) {
                 Text(
-                    text = "Sensor IDs are auto-learned when a tire transmits. " +
-                           "Use Swap to fix incorrect assignments after tire rotation.",
+                    text = stringResource(R.string.tpms_info),
                     modifier = Modifier.padding(12.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
@@ -146,7 +152,7 @@ fun TpmsCalibrationScreen(
                     contentColor = MaterialTheme.colorScheme.error
                 )
             ) {
-                Text("Reset All & Re-learn")
+                Text(stringResource(R.string.tpms_reset_relearn))
             }
         }
     }
@@ -257,7 +263,7 @@ private fun TireBox(
 
             // Sensor ID
             Text(
-                text = if (learned) sensorInfo!!.id else "Not learned",
+                text = if (learned) sensorInfo!!.id else stringResource(R.string.tpms_not_learned),
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
                 color = if (learned)
@@ -288,7 +294,7 @@ private fun TireBox(
                 )
             } else {
                 Text(
-                    text = if (learned) "Waiting…" else "--",
+                    text = if (learned) stringResource(R.string.tpms_waiting) else "--",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

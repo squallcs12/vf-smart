@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -29,6 +30,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -305,7 +307,7 @@ private fun OdoLocationCell(
             tint = OdoInactive, modifier = Modifier.size(32.dp))
         Spacer(Modifier.height(8.dp))
         Text(
-            text = province?.uppercase() ?: if (!hasData) "NO GPS" else "--",
+            text = province?.uppercase() ?: if (!hasData) stringResource(R.string.odo_no_gps) else "--",
             color = OdoLabel, fontSize = 10.sp, fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center, letterSpacing = 2.sp, maxLines = 1,
             overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp)
@@ -396,9 +398,10 @@ private fun OdoClockCell(
     val currentIcon = weatherIconFor(weather?.current, isNight)
     val nextIcon    = weatherIconFor(weather?.nextHour, nextIsNight)
 
-    val dayOfWeek = arrayOf("SUN","MON","TUE","WED","THU","FRI","SAT")[cal.get(java.util.Calendar.DAY_OF_WEEK) - 1]
+    val daysOfWeek = androidx.compose.ui.res.stringArrayResource(R.array.odo_days_of_week)
+    val dayOfWeek  = daysOfWeek[cal.get(java.util.Calendar.DAY_OF_WEEK) - 1]
     val dayOfMonth = cal.get(java.util.Calendar.DAY_OF_MONTH)
-    val month = arrayOf("JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC")[cal.get(java.util.Calendar.MONTH)]
+    val month      = cal.get(java.util.Calendar.MONTH) + 1
 
     Column(
         modifier = modifier.fillMaxSize().padding(vertical = 12.dp),
@@ -420,7 +423,8 @@ private fun OdoClockCell(
         Text(text = String.format("%02d:%02d", hour, minute), color = OdoNormal,
             fontSize = 52.sp, fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center, letterSpacing = 2.sp)
-        Text(text = "$dayOfWeek  $dayOfMonth $month", color = OdoLabel, fontSize = 10.sp,
+        Text(text = stringResource(R.string.odo_date_format, dayOfWeek, dayOfMonth, month),
+            color = OdoLabel, fontSize = 10.sp,
             fontWeight = FontWeight.Medium, letterSpacing = 2.sp)
     }
 }
@@ -500,10 +504,10 @@ private fun OdoTripCell(
             Text(text = "$countdownSecs", color = OdoWarning, fontSize = 28.sp,
                 fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
             Spacer(Modifier.height(6.dp))
-            Text(text = "STOPPED", color = OdoLabel, fontSize = 10.sp,
+            Text(text = stringResource(R.string.odo_stopped), color = OdoLabel, fontSize = 10.sp,
                 fontWeight = FontWeight.Medium, letterSpacing = 2.sp)
         } else {
-            Text(text = "TRIP", color = OdoLabel, fontSize = 10.sp,
+            Text(text = stringResource(R.string.odo_trip_label), color = OdoLabel, fontSize = 10.sp,
                 fontWeight = FontWeight.Medium, letterSpacing = 2.sp)
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -526,26 +530,42 @@ private fun OdoNavCell(
     navigationState: NavigationState,
     modifier: Modifier = Modifier
 ) {
-    val icon = when (navigationState.direction) {
-        NavigationState.Direction.LEFT       -> Icons.Default.ArrowBack
-        NavigationState.Direction.RIGHT      -> Icons.Default.ArrowForward
-        NavigationState.Direction.U_TURN     -> Icons.Default.ArrowDownward
-        NavigationState.Direction.ROUNDABOUT -> Icons.Default.Loop
-        NavigationState.Direction.STRAIGHT   -> Icons.Default.ArrowUpward
+    // Arrow rotation: 0° = up (straight). Positive = clockwise (right). Negative = counter-clockwise (left).
+    val (icon, rotation) = when (navigationState.direction) {
+        NavigationState.Direction.STRAIGHT        -> Icons.Default.ArrowUpward  to 0f
+        NavigationState.Direction.SLIGHT_LEFT     -> Icons.Default.ArrowUpward  to -45f
+        NavigationState.Direction.LEFT            -> Icons.Default.ArrowUpward  to -90f
+        NavigationState.Direction.SHARP_LEFT      -> Icons.Default.ArrowUpward  to -135f
+        NavigationState.Direction.U_TURN          -> Icons.Default.ArrowUpward  to 180f
+        NavigationState.Direction.SHARP_RIGHT     -> Icons.Default.ArrowUpward  to 135f
+        NavigationState.Direction.RIGHT           -> Icons.Default.ArrowUpward  to 90f
+        NavigationState.Direction.SLIGHT_RIGHT    -> Icons.Default.ArrowUpward  to 45f
+        NavigationState.Direction.KEEP_LEFT       -> Icons.Default.ArrowUpward  to -30f
+        NavigationState.Direction.KEEP_RIGHT      -> Icons.Default.ArrowUpward  to 30f
+        NavigationState.Direction.FORK_LEFT       -> Icons.Default.ArrowUpward  to -60f
+        NavigationState.Direction.FORK_RIGHT      -> Icons.Default.ArrowUpward  to 60f
+        NavigationState.Direction.RAMP_LEFT       -> Icons.Default.ArrowUpward  to -60f
+        NavigationState.Direction.RAMP_RIGHT      -> Icons.Default.ArrowUpward  to 60f
+        NavigationState.Direction.MERGE           -> Icons.Default.CallMerge    to 0f
+        NavigationState.Direction.ROUNDABOUT      -> Icons.Default.Loop         to 0f
+        NavigationState.Direction.EXIT_ROUNDABOUT -> Icons.Default.Loop         to 0f
+        NavigationState.Direction.FERRY           -> Icons.Default.ArrowUpward  to 0f
+        NavigationState.Direction.DESTINATION     -> Icons.Default.Place        to 0f
     }
     val color = if (navigationState.isActive) OdoNormal else OdoInactive
 
     Column(modifier = modifier.fillMaxHeight(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center) {
-        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(40.dp))
+        Icon(icon, contentDescription = null, tint = color,
+            modifier = Modifier.size(40.dp).graphicsLayer { rotationZ = rotation })
         Spacer(Modifier.height(10.dp))
         Text(text = if (navigationState.isActive) navigationState.distance else "--",
             color = color, fontSize = 28.sp, fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center, letterSpacing = 1.sp)
         Spacer(Modifier.height(6.dp))
         Text(
-            text = if (navigationState.isActive) navigationState.maneuver else "NO NAVIGATION",
+            text = if (navigationState.isActive) navigationState.maneuver else stringResource(R.string.odo_no_navigation),
             color = OdoLabel, fontSize = 10.sp, fontWeight = FontWeight.Medium,
             letterSpacing = 2.sp, textAlign = TextAlign.Center
         )

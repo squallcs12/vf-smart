@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -22,9 +23,6 @@ import com.daotranbang.vfsmart.ui.components.ToggleControlButton
 import com.daotranbang.vfsmart.viewmodel.CarStatusViewModel
 import com.daotranbang.vfsmart.viewmodel.ControlViewModel
 
-/**
- * Control screen with detailed controls for all car functions
- */
 @Composable
 fun ControlScreen(
     onNavigateBack: () -> Unit,
@@ -58,10 +56,11 @@ fun ControlScreen(
         topBar = {
             @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
-                title = { Text("Controls") },
+                title = { Text(stringResource(R.string.controls_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack,
+                            contentDescription = stringResource(R.string.back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -69,7 +68,6 @@ fun ControlScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ),
                 actions = {
-                    // Connection indicator
                     ConnectionStatusIndicator(connectionState)
                 }
             )
@@ -87,14 +85,13 @@ fun ControlScreen(
             val isLoading = operationState is ControlViewModel.OperationState.Loading
             val enabled = isConnected && !isLoading
 
-            // Disconnected banner
             if (!isConnected) {
                 DisconnectedWarningBanner(connectionState)
             }
 
             // Security section
             ControlSection(
-                title = "Security",
+                title = stringResource(R.string.section_security),
                 icon = Icons.Default.Lock
             ) {
                 Row(
@@ -102,25 +99,24 @@ fun ControlScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     ControlButton(
-                        text = "Lock",
+                        text = stringResource(R.string.action_lock),
                         onClick = { controlViewModel.lockCar() },
                         modifier = Modifier.weight(1f),
                         enabled = enabled,
                         icon = { Icon(Icons.Default.Lock, contentDescription = null) }
                     )
-
                     OutlinedControlButton(
-                        text = "Unlock",
+                        text = stringResource(R.string.action_unlock),
                         onClick = { controlViewModel.unlockCar() },
                         modifier = Modifier.weight(1f),
                         enabled = enabled,
                         icon = { Icon(Icons.Default.LockOpen, contentDescription = null) }
                     )
                 }
-
                 if (carStatus != null) {
                     Text(
-                        text = "Current state: ${carStatus!!.carLockState.uppercase()}",
+                        text = stringResource(R.string.current_lock_state,
+                            carStatus!!.carLockState.uppercase()),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
@@ -130,7 +126,7 @@ fun ControlScreen(
 
             // Windows section
             ControlSection(
-                title = "Windows",
+                title = stringResource(R.string.section_windows),
                 icon = Icons.Default.Window
             ) {
                 Row(
@@ -138,15 +134,14 @@ fun ControlScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     ControlButton(
-                        text = "Close Left",
+                        text = stringResource(R.string.btn_close_left),
                         onClick = { controlViewModel.closeLeftWindow() },
                         modifier = Modifier.weight(1f),
                         enabled = enabled,
                         icon = { Icon(painterResource(id = R.drawable.ic_window_left_up), contentDescription = null) }
                     )
-
                     ControlButton(
-                        text = "Close Right",
+                        text = stringResource(R.string.btn_close_right),
                         onClick = { controlViewModel.closeRightWindow() },
                         modifier = Modifier.weight(1f),
                         enabled = enabled,
@@ -158,36 +153,34 @@ fun ControlScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     ControlButton(
-                        text = "Open Left",
+                        text = stringResource(R.string.btn_open_left),
                         onClick = { controlViewModel.openLeftWindow() },
                         modifier = Modifier.weight(1f),
                         enabled = enabled,
                         icon = { Icon(painterResource(id = R.drawable.ic_window_left_down), contentDescription = null) }
                     )
-
                     ControlButton(
-                        text = "Open Right",
+                        text = stringResource(R.string.btn_open_right),
                         onClick = { controlViewModel.openRightWindow() },
                         modifier = Modifier.weight(1f),
                         enabled = enabled,
                         icon = { Icon(painterResource(id = R.drawable.ic_window_right_down), contentDescription = null) }
                     )
                 }
-
                 if (carStatus != null) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "Left: ${getWindowStateText(carStatus!!.windows.leftState)}",
+                            text = stringResource(R.string.window_left_state,
+                                windowStateText(carStatus!!.windows.leftState)),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Right: ${getWindowStateText(carStatus!!.windows.rightState)}",
+                            text = stringResource(R.string.window_right_state,
+                                windowStateText(carStatus!!.windows.rightState)),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -197,20 +190,19 @@ fun ControlScreen(
 
             // Accessories section
             ControlSection(
-                title = "Accessories",
+                title = stringResource(R.string.section_accessories),
                 icon = Icons.Default.PowerSettingsNew
             ) {
                 val accessoryPowerOn = carStatus?.controls?.accessoryPower == 1
                 ToggleControlButton(
-                    text = "Accessory Power",
+                    text = stringResource(R.string.accessory_power),
                     isOn = accessoryPowerOn,
                     onToggle = { controlViewModel.toggleAccessoryPower() },
                     enabled = enabled
                 )
-
                 val camerasOn = carStatus?.controls?.insideCameras == 1
                 ToggleControlButton(
-                    text = "Inside Cameras",
+                    text = stringResource(R.string.inside_cameras),
                     isOn = camerasOn,
                     onToggle = { controlViewModel.toggleInsideCameras() },
                     enabled = enabled
@@ -219,17 +211,15 @@ fun ControlScreen(
 
             // Audio section
             ControlSection(
-                title = "Audio / Buzzer",
+                title = stringResource(R.string.section_audio),
                 icon = Icons.Default.Notifications
             ) {
                 var buzzerDuration by remember { mutableStateOf(500) }
-
                 Text(
-                    text = "Beep Duration: ${buzzerDuration}ms",
+                    text = stringResource(R.string.beep_duration_label, buzzerDuration),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-
                 Slider(
                     value = buzzerDuration.toFloat(),
                     onValueChange = { buzzerDuration = it.toInt() },
@@ -237,9 +227,8 @@ fun ControlScreen(
                     steps = 18,
                     modifier = Modifier.fillMaxWidth()
                 )
-
                 ControlButton(
-                    text = "Beep Horn",
+                    text = stringResource(R.string.btn_beep_horn),
                     onClick = { controlViewModel.beepHorn(buzzerDuration) },
                     enabled = enabled,
                     icon = { Icon(Icons.Default.VolumeUp, contentDescription = null) }
@@ -248,23 +237,21 @@ fun ControlScreen(
 
             // Charging section
             ControlSection(
-                title = "Charging",
+                title = stringResource(R.string.section_charging),
                 icon = Icons.Default.BatteryChargingFull
             ) {
                 ControlButton(
-                    text = "Unlock Charger Port",
+                    text = stringResource(R.string.btn_unlock_charger),
                     onClick = { controlViewModel.unlockCharger() },
                     enabled = enabled,
                     icon = { Icon(Icons.Default.Lock, contentDescription = null) }
                 )
-
                 if (carStatus != null) {
                     Text(
-                        text = if (carStatus!!.chargingStatus == 1) {
-                            "Status: Currently charging"
-                        } else {
-                            "Status: Not charging"
-                        },
+                        text = if (carStatus!!.chargingStatus == 1)
+                            stringResource(R.string.status_charging)
+                        else
+                            stringResource(R.string.status_not_charging),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
@@ -274,19 +261,18 @@ fun ControlScreen(
 
             // Settings section
             ControlSection(
-                title = "Settings",
+                title = stringResource(R.string.section_settings),
                 icon = Icons.Default.Settings
             ) {
                 val lightReminderEnabled = carStatus?.lightReminderEnabled == true
                 ToggleControlButton(
-                    text = "Light Reminder",
+                    text = stringResource(R.string.light_reminder),
                     isOn = lightReminderEnabled,
                     onToggle = { controlViewModel.toggleLightReminder() },
                     enabled = enabled
                 )
-
                 Text(
-                    text = "Reminds you to turn on headlights at night when in Drive mode",
+                    text = stringResource(R.string.light_reminder_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.padding(top = 4.dp)
@@ -301,7 +287,7 @@ fun ControlScreen(
                 Icon(Icons.Default.Settings, contentDescription = null,
                     modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("TPMS Calibration")
+                Text(stringResource(R.string.tpms_calibration))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -330,28 +316,21 @@ private fun ControlSection(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Icon(icon, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary)
+                Text(text = title, style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-
             content()
         }
     }
 }
 
-private fun getWindowStateText(state: Int): String = when (state) {
-    0 -> "Unknown"
-    1 -> "Closed"
-    2 -> "Open"
-    else -> "Unknown"
+@Composable
+private fun windowStateText(state: Int): String = when (state) {
+    1    -> stringResource(R.string.window_state_closed)
+    2    -> stringResource(R.string.window_state_open)
+    else -> stringResource(R.string.window_state_unknown)
 }
 
 @Composable
@@ -365,22 +344,16 @@ private fun ConnectionStatusIndicator(
         verticalAlignment = Alignment.CenterVertically
     ) {
         when (connectionState) {
-            VF3GattServer.BleConnectionState.Connected -> {
-                Icon(
-                    Icons.Default.CheckCircle,
-                    contentDescription = "Connected",
+            VF3GattServer.BleConnectionState.Connected ->
+                Icon(Icons.Default.CheckCircle,
+                    contentDescription = stringResource(R.string.connected),
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            VF3GattServer.BleConnectionState.Disconnected -> {
-                Icon(
-                    Icons.Default.Cancel,
-                    contentDescription = "Disconnected",
+                    modifier = Modifier.size(20.dp))
+            VF3GattServer.BleConnectionState.Disconnected ->
+                Icon(Icons.Default.Cancel,
+                    contentDescription = stringResource(R.string.offline),
                     tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+                    modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -392,34 +365,23 @@ private fun DisconnectedWarningBanner(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.CloudOff,
-                contentDescription = null,
+            Icon(Icons.Default.CloudOff, contentDescription = null,
                 tint = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.size(24.dp)
-            )
+                modifier = Modifier.size(24.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Device Disconnected",
+                Text(stringResource(R.string.device_disconnected_title),
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-                Text(
-                    text = "All controls are disabled. Waiting for ESP32 via Bluetooth...",
+                    color = MaterialTheme.colorScheme.onErrorContainer)
+                Text(stringResource(R.string.device_disconnected_desc),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
-                )
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f))
             }
         }
     }

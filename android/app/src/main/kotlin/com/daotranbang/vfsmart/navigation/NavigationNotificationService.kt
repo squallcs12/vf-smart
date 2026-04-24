@@ -54,23 +54,30 @@ class NavigationNotificationService : NotificationListenerService() {
 
         val extras = sbn.notification.extras
         // Maps stores these as CharSequence — getString() always returns null
-        val distance = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
-            ?.takeIf { it.isNotBlank() }
-        val streetText = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+        val titleText  = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim() ?: ""
+        val bodyText   = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim() ?: ""
+        val subText    = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()?.trim() ?: ""
+        val tickerText = sbn.notification.tickerText?.toString()?.trim() ?: ""
 
-        // Direction comes from the large icon (turn arrow bitmap).
-        // Fall back to parsing the street text if icon analysis fails.
+        // EXTRA_TITLE is usually the distance ("300 m") but some Maps versions
+        // put the maneuver there. Pick whichever field looks like a distance.
+        val distance = listOf(titleText, bodyText, subText)
+            .firstOrNull { it.matches(Regex("""^\d.*""")) }
+            ?.takeIf { it.isNotBlank() }
+
+        // Try all text fields for maneuver keywords; ticker often has the full instruction.
+        val allText = "$tickerText $titleText $subText $bodyText"
         val direction = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             directionFromIcon(sbn.notification.getLargeIcon())
-        } else null) ?: parseDirectionFromText(streetText)
+        } else null) ?: NavDirectionParser.parse(allText)
 
-        Log.w(TAG, "Maps nav — distance=$distance street=$streetText direction=$direction")
+        Log.w(TAG, "Maps nav — title=$titleText body=$bodyText sub=$subText ticker=$tickerText direction=$direction")
 
         if (distance == null) return
 
         _navigationState.value = NavigationState(
             isActive = true,
-            maneuver = directionLabel(direction),
+            maneuver = NavDirectionParser.label(direction),
             distance = distance,
             direction = direction
         )
@@ -136,24 +143,4 @@ class NavigationNotificationService : NotificationListenerService() {
         return bmp
     }
 
-    // ── Text fallback ─────────────────────────────────────────────────────────
-
-    private fun parseDirectionFromText(text: String): NavigationState.Direction {
-        val lower = text.lowercase()
-        return when {
-            "u-turn" in lower || "uturn" in lower          -> NavigationState.Direction.U_TURN
-            "left" in lower                                 -> NavigationState.Direction.LEFT
-            "right" in lower                                -> NavigationState.Direction.RIGHT
-            "roundabout" in lower || "rotary" in lower      -> NavigationState.Direction.ROUNDABOUT
-            else                                            -> NavigationState.Direction.STRAIGHT
-        }
-    }
-
-    private fun directionLabel(direction: NavigationState.Direction): String = when (direction) {
-        NavigationState.Direction.LEFT       -> "TURN LEFT"
-        NavigationState.Direction.RIGHT      -> "TURN RIGHT"
-        NavigationState.Direction.U_TURN     -> "U-TURN"
-        NavigationState.Direction.ROUNDABOUT -> "ROUNDABOUT"
-        NavigationState.Direction.STRAIGHT   -> "CONTINUE"
-    }
 }

@@ -1,5 +1,158 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">VF3 Smart</string>
-    <string name="autolink_accessibility_description">Automatically connects to AutoLink Pro OBD device and returns to VF3 Smart</string>
+    <string name="autolink_accessibility_description">Tự động kết nối thiết bị AutoLink Pro OBD và trở về VF3 Smart</string>
+
+    <!-- Common -->
+    <string name="back">Quay lại</string>
+    <string name="try_again">Thử lại</string>
+    <string name="cancel">Hủy</string>
+    <string name="refresh">Làm mới</string>
+
+    <!-- Connection states -->
+    <string name="connected">Kết nối</string>
+    <string name="offline">Ngoại tuyến</string>
+    <string name="not_connected_title">Chưa kết nối</string>
+    <string name="not_connected_desc">Điều khiển bị vô hiệu. Đang chờ kết nối Bluetooth…</string>
+    <string name="device_disconnected_title">Thiết bị mất kết nối</string>
+    <string name="device_disconnected_desc">Tất cả điều khiển bị vô hiệu. Đang chờ kết nối Bluetooth…</string>
+
+    <!-- Navigation access banner -->
+    <string name="nav_access_title">Cần quyền thông báo</string>
+    <string name="nav_access_desc">Cấp quyền thông báo để hiển thị chỉ đường</string>
+    <string name="nav_access_grant">Cấp quyền</string>
+
+    <!-- TopAppBar actions (contentDescription) -->
+    <string name="mirror_mode_cd">Chế độ gương</string>
+    <string name="all_apps_cd">Ứng dụng</string>
+    <string name="android_settings_cd">Cài đặt Android</string>
+    <string name="setup_cd">Cài đặt</string>
+    <string name="debug_cd">Debug</string>
+
+    <!-- HomeScreen status cards -->
+    <string name="card_car_lock">Khóa xe</string>
+    <string name="car_locked">Đã khóa</string>
+    <string name="car_unlocked">Chưa khóa</string>
+    <string name="card_windows">Cửa sổ</string>
+    <string name="windows_open">Đang mở</string>
+    <string name="windows_closed">Đã đóng</string>
+    <string name="card_charging">Sạc pin</string>
+    <string name="charging_active">Đang sạc</string>
+    <string name="not_charging">Không sạc</string>
+    <string name="card_lights">Đèn xe</string>
+    <string name="lights_on">Bật</string>
+    <string name="lights_off">Tắt</string>
+    <string name="card_gear">Số</string>
+    <string name="gear_drive">Lái</string>
+    <string name="gear_park">Đỗ</string>
+    <string name="card_doors">Cửa xe</string>
+    <string name="doors_open">Đang mở</string>
+    <string name="doors_closed">Đã đóng</string>
+
+    <!-- HomeScreen quick actions -->
+    <string name="quick_actions">Thao tác nhanh</string>
+    <string name="action_lock">Khóa</string>
+    <string name="action_unlock">Mở khóa</string>
+    <string name="action_beep">Còi</string>
+    <string name="action_close_windows">Đóng kính</string>
+    <string name="action_closing_windows">Đang đóng (%ds)</string>
+    <string name="more_controls">Điều khiển thêm</string>
+
+    <!-- ControlScreen -->
+    <string name="controls_title">Điều khiển</string>
+    <string name="section_security">Bảo mật</string>
+    <string name="current_lock_state">Trạng thái: %s</string>
+    <string name="section_windows">Cửa sổ</string>
+    <string name="btn_close_left">Đóng trái</string>
+    <string name="btn_close_right">Đóng phải</string>
+    <string name="btn_open_left">Mở trái</string>
+    <string name="btn_open_right">Mở phải</string>
+    <string name="window_left_state">Trái: %s</string>
+    <string name="window_right_state">Phải: %s</string>
+    <string name="window_state_unknown">Không rõ</string>
+    <string name="window_state_closed">Đã đóng</string>
+    <string name="window_state_open">Đang mở</string>
+    <string name="section_accessories">Phụ kiện</string>
+    <string name="accessory_power">Nguồn phụ</string>
+    <string name="inside_cameras">Camera trong</string>
+    <string name="section_audio">Âm thanh / Còi</string>
+    <string name="beep_duration_label">Thời gian còi: %dms</string>
+    <string name="btn_beep_horn">Bóp còi</string>
+    <string name="section_charging">Sạc pin</string>
+    <string name="btn_unlock_charger">Mở cổng sạc</string>
+    <string name="status_charging">Trạng thái: Đang sạc</string>
+    <string name="status_not_charging">Trạng thái: Không sạc</string>
+    <string name="section_settings">Cài đặt</string>
+    <string name="light_reminder">Nhắc đèn</string>
+    <string name="light_reminder_desc">Nhắc bật đèn vào ban đêm khi đang lái xe</string>
+    <string name="tpms_calibration">Hiệu chỉnh TPMS</string>
+
+    <!-- SetupScreen -->
+    <string name="setup_title">Cài đặt VF3 Smart</string>
+    <string name="setup_welcome">Chào mừng đến VF3 Smart</string>
+    <string name="setup_find_desc">Hãy tìm thiết bị VF3-Smart trên mạng</string>
+    <string name="setup_step1">Bước 1: Tìm thiết bị</string>
+    <string name="setup_searching">Đang tìm thiết bị VF3-Smart…</string>
+    <string name="setup_searching_hint">Quá trình có thể mất đến 30 giây</string>
+    <string name="setup_device_found">✓ Đã tìm thấy thiết bị!</string>
+    <string name="setup_discovery_failed">Không tìm thấy thiết bị</string>
+    <string name="setup_hide_manual">Ẩn nhập thủ công</string>
+    <string name="setup_enter_ip">Nhập IP thủ công</string>
+    <string name="setup_ip_label">Địa chỉ IP thiết bị</string>
+    <string name="setup_step2">Bước 2: Nhập API Key</string>
+    <string name="setup_api_key_desc">Nhập API Key đã cài đặt trên ESP32 (tối thiểu 8 ký tự).</string>
+    <string name="setup_api_key_label">API Key</string>
+    <string name="setup_hide_api_key">Ẩn API Key</string>
+    <string name="setup_show_api_key">Hiện API Key</string>
+    <string name="setup_api_key_too_short">API Key phải có ít nhất 8 ký tự</string>
+    <string name="setup_save">Lưu và tiếp tục</string>
+    <string name="setup_saving">Đang lưu cài đặt…</string>
+    <string name="setup_connecting">Đang kết nối…</string>
+    <string name="setup_saved">✓ Đã lưu cài đặt! Đang chuyển hướng…</string>
+
+    <!-- DebugScreen -->
+    <string name="debug_title">Menu Debug</string>
+    <string name="debug_mode_title">Chế độ Debug</string>
+    <string name="debug_mode_desc">Chỉ dùng để kiểm tra</string>
+    <string name="debug_voice_warnings">Cảnh báo giọng nói</string>
+    <string name="debug_voice_warnings_desc">Kiểm tra cảnh báo giọng nói tiếng Việt</string>
+    <string name="debug_test_window">Kiểm tra cảnh báo cửa sổ</string>
+    <string name="debug_test_light">Kiểm tra nhắc đèn</string>
+    <string name="debug_info">Thông tin</string>
+    <string name="debug_tts_engine">Động cơ TTS:</string>
+    <string name="debug_tts_value">Tiếng Việt (vi-VN)</string>
+
+    <!-- AppLauncherScreen -->
+    <string name="apps_title">Ứng dụng</string>
+    <string name="apps_search">Tìm ứng dụng…</string>
+
+    <!-- TpmsCalibrationScreen -->
+    <string name="tpms_title">Hiệu chỉnh TPMS</string>
+    <string name="tpms_info">ID cảm biến được tự học khi lốp truyền tín hiệu. Dùng Hoán đổi để sửa vị trí sai sau khi đảo lốp.</string>
+    <string name="tpms_reset_dialog_title">Đặt lại tất cả?</string>
+    <string name="tpms_reset_dialog_text">Xóa mapping của cả 4 cảm biến. 4 cảm biến tiếp theo nhận được sẽ tự gán theo thứ tự TT → TP → ST → SP.\n\nKích hoạt từng cảm biến bằng cách bơm/xả nhẹ lốp.</string>
+    <string name="tpms_reset_confirm">Đặt lại</string>
+    <string name="tpms_reset_relearn">Đặt lại &amp; Học lại</string>
+    <string name="tpms_not_learned">Chưa học</string>
+    <string name="tpms_waiting">Đang chờ…</string>
+
+    <!-- MirrorScreen ODO labels -->
+    <string name="odo_no_navigation">KHÔNG CÓ CHỈ ĐƯỜNG</string>
+    <string name="odo_no_gps">KHÔNG CÓ GPS</string>
+    <string name="odo_trip_label">CHUYẾN ĐI</string>
+    <string name="odo_stopped">DỪNG</string>
+    <string name="odo_date_format">%1$s ngày %2$d/%3$d</string>
+    <string-array name="odo_days_of_week">
+        <item>CN</item>
+        <item>T2</item>
+        <item>T3</item>
+        <item>T4</item>
+        <item>T5</item>
+        <item>T6</item>
+        <item>T7</item>
+    </string-array>
+
+    <!-- AutoLinkService notification -->
+    <string name="autolink_channel_name">Màn hình AutoLink</string>
+    <string name="autolink_notif_text">Đang theo dõi AutoLink Pro</string>
 </resources>

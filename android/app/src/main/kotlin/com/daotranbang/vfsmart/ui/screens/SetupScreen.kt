@@ -12,19 +12,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.ui.components.ControlButton
 import com.daotranbang.vfsmart.ui.components.OutlinedControlButton
 import com.daotranbang.vfsmart.viewmodel.SetupViewModel
 
-/**
- * Setup screen for device discovery and configuration
- */
 @Composable
 fun SetupScreen(
     onSetupComplete: () -> Unit,
@@ -39,14 +38,12 @@ fun SetupScreen(
     var apiKeyVisible by remember { mutableStateOf(false) }
     var showManualEntry by remember { mutableStateOf(false) }
 
-    // Auto-navigate on successful setup
     LaunchedEffect(configurationState) {
         if (configurationState is SetupViewModel.ConfigurationState.Success) {
             onSetupComplete()
         }
     }
 
-    // Auto-start device discovery when screen loads
     LaunchedEffect(Unit) {
         if (discoveryState is SetupViewModel.DiscoveryState.Idle) {
             viewModel.discoverDevice()
@@ -57,7 +54,7 @@ fun SetupScreen(
         topBar = {
             @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
-                title = { Text("VF3 Smart Setup") },
+                title = { Text(stringResource(R.string.setup_title)) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -73,15 +70,13 @@ fun SetupScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Welcome text
             Text(
-                text = "Welcome to VF3 Smart",
+                text = stringResource(R.string.setup_welcome),
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
-
             Text(
-                text = "Let's find your VF3-Smart device on the network",
+                text = stringResource(R.string.setup_find_desc),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
@@ -100,7 +95,7 @@ fun SetupScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "Step 1: Find Device",
+                        text = stringResource(R.string.setup_step1),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -114,15 +109,11 @@ fun SetupScreen(
                             ) {
                                 CircularProgressIndicator()
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "Searching for your VF3-Smart device...",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                Text(
-                                    text = "This may take up to 30 seconds",
+                                Text(text = stringResource(R.string.setup_searching),
+                                    style = MaterialTheme.typography.bodyMedium)
+                                Text(text = stringResource(R.string.setup_searching_hint),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                )
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
                             }
                         }
 
@@ -131,24 +122,16 @@ fun SetupScreen(
                                 color = MaterialTheme.colorScheme.primaryContainer,
                                 shape = MaterialTheme.shapes.medium
                             ) {
-                                Column(
-                                    modifier = Modifier.padding(12.dp)
-                                ) {
-                                    Text(
-                                        text = "✓ Device Found!",
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(text = stringResource(R.string.setup_device_found),
                                         style = MaterialTheme.typography.titleSmall,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                    Text(
-                                        text = "IP: ${state.deviceInfo.ip}",
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                    Text(text = "IP: ${state.deviceInfo.ip}",
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                    Text(
-                                        text = "MAC: ${state.deviceInfo.mac}",
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                    Text(text = "MAC: ${state.deviceInfo.mac}",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                                    )
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
                                 }
                             }
                             manualIp = state.deviceInfo.ip
@@ -159,47 +142,41 @@ fun SetupScreen(
                                 color = MaterialTheme.colorScheme.errorContainer,
                                 shape = MaterialTheme.shapes.medium
                             ) {
-                                Column(
-                                    modifier = Modifier.padding(12.dp)
-                                ) {
-                                    Text(
-                                        text = "Discovery failed",
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(text = stringResource(R.string.setup_discovery_failed),
                                         style = MaterialTheme.typography.titleSmall,
-                                        color = MaterialTheme.colorScheme.onErrorContainer
-                                    )
-                                    Text(
-                                        text = state.message,
+                                        color = MaterialTheme.colorScheme.onErrorContainer)
+                                    Text(text = state.message,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onErrorContainer
-                                    )
+                                        color = MaterialTheme.colorScheme.onErrorContainer)
                                 }
                             }
-
                             OutlinedControlButton(
-                                text = "Try Again",
+                                text = stringResource(R.string.try_again),
                                 onClick = { viewModel.discoverDevice() }
                             )
                         }
                     }
 
-                    // Manual entry toggle
                     TextButton(
                         onClick = { showManualEntry = !showManualEntry },
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     ) {
                         Text(
-                            text = if (showManualEntry) "Hide manual entry" else "Enter IP manually"
+                            text = if (showManualEntry)
+                                stringResource(R.string.setup_hide_manual)
+                            else
+                                stringResource(R.string.setup_enter_ip)
                         )
                     }
                 }
             }
 
-            // Manual IP entry
             if (showManualEntry || discoveryState is SetupViewModel.DiscoveryState.Error) {
                 OutlinedTextField(
                     value = manualIp,
                     onValueChange = { manualIp = it },
-                    label = { Text("Device IP Address") },
+                    label = { Text(stringResource(R.string.setup_ip_label)) },
                     placeholder = { Text("192.168.4.1") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
@@ -218,54 +195,42 @@ fun SetupScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = "Step 2: Enter API Key",
+                    Text(text = stringResource(R.string.setup_step2),
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Text(
-                        text = "Enter the API key you configured during ESP32 onboarding (minimum 8 characters).",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(text = stringResource(R.string.setup_api_key_desc),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
                     OutlinedTextField(
                         value = apiKey,
                         onValueChange = { apiKey = it },
-                        label = { Text("API Key") },
+                        label = { Text(stringResource(R.string.setup_api_key_label)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        visualTransformation = if (apiKeyVisible) {
+                        visualTransformation = if (apiKeyVisible)
                             VisualTransformation.None
-                        } else {
-                            PasswordVisualTransformation()
-                        },
+                        else
+                            PasswordVisualTransformation(),
                         trailingIcon = {
                             IconButton(onClick = { apiKeyVisible = !apiKeyVisible }) {
                                 Icon(
-                                    imageVector = if (apiKeyVisible) {
+                                    imageVector = if (apiKeyVisible)
                                         Icons.Default.VisibilityOff
-                                    } else {
-                                        Icons.Default.Visibility
-                                    },
-                                    contentDescription = if (apiKeyVisible) {
-                                        "Hide API key"
-                                    } else {
-                                        "Show API key"
-                                    }
+                                    else
+                                        Icons.Default.Visibility,
+                                    contentDescription = if (apiKeyVisible)
+                                        stringResource(R.string.setup_hide_api_key)
+                                    else
+                                        stringResource(R.string.setup_show_api_key)
                                 )
                             }
                         },
                         isError = apiKey.isNotEmpty() && apiKey.length < 8
                     )
-
                     if (apiKey.isNotEmpty() && apiKey.length < 8) {
-                        Text(
-                            text = "API key must be at least 8 characters",
+                        Text(text = stringResource(R.string.setup_api_key_too_short),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
+                            color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
@@ -274,14 +239,11 @@ fun SetupScreen(
             when (val state = configurationState) {
                 is SetupViewModel.ConfigurationState.Idle -> {
                     ControlButton(
-                        text = "Save and Continue",
-                        onClick = {
-                            viewModel.saveConfiguration(manualIp, apiKey)
-                        },
+                        text = stringResource(R.string.setup_save),
+                        onClick = { viewModel.saveConfiguration(manualIp, apiKey) },
                         enabled = manualIp.isNotBlank() && apiKey.length >= 8
                     )
                 }
-
                 is SetupViewModel.ConfigurationState.Saving -> {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -289,28 +251,21 @@ fun SetupScreen(
                     ) {
                         CircularProgressIndicator()
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Saving configuration...",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Text(text = stringResource(R.string.setup_saving),
+                            style = MaterialTheme.typography.bodyMedium)
                     }
                 }
-
                 is SetupViewModel.ConfigurationState.Testing -> {
-                    // This state is now skipped in ViewModel but kept here for completeness
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         CircularProgressIndicator()
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Connecting...",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Text(text = stringResource(R.string.setup_connecting),
+                            style = MaterialTheme.typography.bodyMedium)
                     }
                 }
-
                 is SetupViewModel.ConfigurationState.Error -> {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Surface(
@@ -318,36 +273,28 @@ fun SetupScreen(
                             shape = MaterialTheme.shapes.medium,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                text = state.message,
+                            Text(text = state.message,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.padding(12.dp)
-                            )
+                                modifier = Modifier.padding(12.dp))
                         }
-
                         ControlButton(
-                            text = "Try Again",
-                            onClick = {
-                                viewModel.saveConfiguration(manualIp, apiKey)
-                            },
+                            text = stringResource(R.string.try_again),
+                            onClick = { viewModel.saveConfiguration(manualIp, apiKey) },
                             enabled = manualIp.isNotBlank() && apiKey.length >= 8
                         )
                     }
                 }
-
                 is SetupViewModel.ConfigurationState.Success -> {
                     Surface(
                         color = MaterialTheme.colorScheme.primaryContainer,
                         shape = MaterialTheme.shapes.medium,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            text = "✓ Configuration saved! Redirecting...",
+                        Text(text = stringResource(R.string.setup_saved),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(12.dp)
-                        )
+                            modifier = Modifier.padding(12.dp))
                     }
                 }
             }

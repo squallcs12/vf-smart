@@ -3,6 +3,14 @@
 This file covers the Android companion app for VF3 Smart (Kotlin/Compose).
 ESP32 firmware and REST API docs are in the root `CLAUDE.md`.
 
+## UI Language
+
+**All UI strings are Vietnamese** (default locale). Use Android string resources:
+- All visible text goes in `app/src/main/res/values/strings.xml` with Vietnamese values
+- Kotlin/Compose files use `stringResource(R.string.xxx)` — never hardcode display text
+- Non-Composable code (Services, ViewModels) uses `getString(R.string.xxx)` via Context
+- `NavDirectionParser.label()` returns hardcoded Vietnamese strings (no Context available)
+
 ## Google Assistant Integration (Android Auto)
 
 The VF3 Smart system supports Google Assistant voice control through the Android Auto mobile app. The integration architecture is:

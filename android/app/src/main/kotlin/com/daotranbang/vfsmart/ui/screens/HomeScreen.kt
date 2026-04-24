@@ -12,9 +12,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.data.model.CarStatus
 import com.daotranbang.vfsmart.navigation.VF3GattServer
 import com.daotranbang.vfsmart.ui.components.ControlButton
@@ -94,7 +96,7 @@ private fun FullContent(
         topBar = {
             @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
-                title = { Text("VF3 Smart") },
+                title = { Text(stringResource(R.string.app_name)) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor    = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -102,23 +104,28 @@ private fun FullContent(
                 actions = {
                     ConnectionIndicator(connectionState)
                     IconButton(onClick = onNavigateToMirror) {
-                        Icon(Icons.Default.Fullscreen, contentDescription = "Mirror mode")
+                        Icon(Icons.Default.Fullscreen,
+                            contentDescription = stringResource(R.string.mirror_mode_cd))
                     }
                     IconButton(onClick = onNavigateToApps) {
-                        Icon(Icons.Default.Apps, contentDescription = "All Apps")
+                        Icon(Icons.Default.Apps,
+                            contentDescription = stringResource(R.string.all_apps_cd))
                     }
                     IconButton(onClick = {
                         context.startActivity(
                             android.content.Intent(android.provider.Settings.ACTION_SETTINGS)
                         )
                     }) {
-                        Icon(Icons.Default.PhoneAndroid, contentDescription = "Android Settings")
+                        Icon(Icons.Default.PhoneAndroid,
+                            contentDescription = stringResource(R.string.android_settings_cd))
                     }
                     IconButton(onClick = onNavigateToSetup) {
-                        Icon(Icons.Default.Settings, contentDescription = "Setup")
+                        Icon(Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.setup_cd))
                     }
                     IconButton(onClick = onNavigateToDebug) {
-                        Icon(Icons.Default.BugReport, contentDescription = "Debug",
+                        Icon(Icons.Default.BugReport,
+                            contentDescription = stringResource(R.string.debug_cd),
                             tint = MaterialTheme.colorScheme.error)
                     }
                 }
@@ -163,10 +170,9 @@ private fun FullContent(
             ) {
                 Icon(Icons.Default.ArrowForward, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("More Controls")
+                Text(stringResource(R.string.more_controls))
             }
 
-            // Extra space so FAB doesn't overlap last item
             Spacer(Modifier.height(56.dp))
         }
     }
@@ -196,8 +202,10 @@ private fun StatusGrid(
     val cards: List<@Composable RowScope.() -> Unit> = listOf(
         {
             StatusCard(
-                title = "Car Lock",
-                value = if (carStatus == null) "--" else if (isLocked) "Locked" else "Unlocked",
+                title = stringResource(R.string.card_car_lock),
+                value = if (carStatus == null) "--"
+                        else if (isLocked) stringResource(R.string.car_locked)
+                        else stringResource(R.string.car_unlocked),
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 icon = {
                     Icon(if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
@@ -208,8 +216,10 @@ private fun StatusGrid(
         },
         {
             StatusCard(
-                title = "Windows",
-                value = if (carStatus == null) "--" else if (windowsOpen) "Open" else "Closed",
+                title = stringResource(R.string.card_windows),
+                value = if (carStatus == null) "--"
+                        else if (windowsOpen) stringResource(R.string.windows_open)
+                        else stringResource(R.string.windows_closed),
                 isWarning = windowsOpen && isLocked,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 icon = {
@@ -221,8 +231,10 @@ private fun StatusGrid(
         },
         {
             StatusCard(
-                title = "Charging",
-                value = if (carStatus == null) "--" else if (isCharging) "Charging" else "Not Charging",
+                title = stringResource(R.string.card_charging),
+                value = if (carStatus == null) "--"
+                        else if (isCharging) stringResource(R.string.charging_active)
+                        else stringResource(R.string.not_charging),
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 icon = {
                     Icon(Icons.Default.BatteryChargingFull, contentDescription = null,
@@ -237,8 +249,10 @@ private fun StatusGrid(
         },
         {
             StatusCard(
-                title = "Lights",
-                value = if (carStatus == null) "--" else if (lightsOn) "On" else "Off",
+                title = stringResource(R.string.card_lights),
+                value = if (carStatus == null) "--"
+                        else if (lightsOn) stringResource(R.string.lights_on)
+                        else stringResource(R.string.lights_off),
                 isWarning = isNight && !lightsOn,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 icon = {
@@ -254,8 +268,10 @@ private fun StatusGrid(
         },
         {
             StatusCard(
-                title = "Gear",
-                value = if (carStatus == null) "--" else if (inDrive) "Drive" else "Park",
+                title = stringResource(R.string.card_gear),
+                value = if (carStatus == null) "--"
+                        else if (inDrive) stringResource(R.string.gear_drive)
+                        else stringResource(R.string.gear_park),
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 icon = {
                     Icon(Icons.Default.DirectionsCar, contentDescription = null,
@@ -266,8 +282,10 @@ private fun StatusGrid(
         },
         {
             StatusCard(
-                title = "Doors",
-                value = if (carStatus == null) "--" else if (doorsOpen) "Open" else "Closed",
+                title = stringResource(R.string.card_doors),
+                value = if (carStatus == null) "--"
+                        else if (doorsOpen) stringResource(R.string.doors_open)
+                        else stringResource(R.string.doors_closed),
                 isWarning = doorsOpen,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 icon = {
@@ -308,24 +326,27 @@ private fun QuickActionsCard(
         colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Quick Actions", style = MaterialTheme.typography.titleSmall,
+            Text(stringResource(R.string.quick_actions),
+                style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ControlButton(text = "Lock", onClick = onLock,
+                ControlButton(text = stringResource(R.string.action_lock), onClick = onLock,
                     modifier = Modifier.weight(1f), enabled = enabled,
                     icon = { Icon(Icons.Default.Lock, contentDescription = null) })
-                ControlButton(text = "Unlock", onClick = onUnlock,
+                ControlButton(text = stringResource(R.string.action_unlock), onClick = onUnlock,
                     modifier = Modifier.weight(1f), enabled = enabled,
                     containerColor = MaterialTheme.colorScheme.secondary,
                     icon = { Icon(Icons.Default.LockOpen, contentDescription = null) })
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ControlButton(text = "Beep", onClick = onBeep,
+                ControlButton(text = stringResource(R.string.action_beep), onClick = onBeep,
                     modifier = Modifier.weight(1f), enabled = enabled,
                     containerColor = MaterialTheme.colorScheme.tertiary,
                     icon = { Icon(Icons.Default.Notifications, contentDescription = null) })
                 val windowLabel = if (carStatus?.windowCloseActive == true)
-                    "Closing (${carStatus.windowCloseRemainingMs / 1000}s)" else "Close Windows"
+                    stringResource(R.string.action_closing_windows, carStatus.windowCloseRemainingMs / 1000)
+                else
+                    stringResource(R.string.action_close_windows)
                 ControlButton(text = windowLabel, onClick = onCloseWindows,
                     modifier = Modifier.weight(1f), enabled = enabled,
                     icon = { Icon(Icons.Default.Close, contentDescription = null) })
@@ -346,9 +367,13 @@ private fun ConnectionIndicator(
         verticalAlignment = Alignment.CenterVertically) {
         val (icon, label, color) = when (connectionState) {
             VF3GattServer.BleConnectionState.Connected ->
-                Triple(Icons.Default.CheckCircle, "Live", MaterialTheme.colorScheme.primary)
+                Triple(Icons.Default.CheckCircle,
+                    stringResource(R.string.connected),
+                    MaterialTheme.colorScheme.primary)
             VF3GattServer.BleConnectionState.Disconnected ->
-                Triple(Icons.Default.Cancel, "Offline", MaterialTheme.colorScheme.error)
+                Triple(Icons.Default.Cancel,
+                    stringResource(R.string.offline),
+                    MaterialTheme.colorScheme.error)
         }
         Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
         Text(label, style = MaterialTheme.typography.labelSmall, color = color)
@@ -367,20 +392,16 @@ private fun DisconnectedBanner(
         Row(modifier = Modifier.fillMaxWidth().padding(10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Default.CloudOff,
-                contentDescription = null,
+            Icon(Icons.Default.CloudOff, contentDescription = null,
                 tint = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.size(20.dp)
-            )
+                modifier = Modifier.size(20.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Not Connected", style = MaterialTheme.typography.labelMedium,
+                Text(stringResource(R.string.not_connected_title),
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onErrorContainer)
-                Text(
-                    text = "Controls disabled. Waiting for ESP32 via Bluetooth...",
+                Text(stringResource(R.string.not_connected_desc),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
-                )
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f))
             }
         }
     }
@@ -404,17 +425,19 @@ private fun NotificationAccessBanner(modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Notifications, contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(20.dp))
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(20.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Navigation Access Required", style = MaterialTheme.typography.labelMedium,
+                Text(stringResource(R.string.nav_access_title),
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSecondaryContainer)
-                Text("Grant notification access to show turn-by-turn directions",
+                Text(stringResource(R.string.nav_access_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f))
             }
             TextButton(onClick = {
                 context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-            }) { Text("Grant") }
+            }) { Text(stringResource(R.string.nav_access_grant)) }
         }
     }
 }

@@ -187,12 +187,14 @@ class AutoLinkService : Service() {
     private fun buildNotification(): Notification {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             getSystemService(NotificationManager::class.java).createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "AutoLink Monitor", NotificationManager.IMPORTANCE_LOW)
+                NotificationChannel(CHANNEL_ID,
+                    getString(R.string.autolink_channel_name),
+                    NotificationManager.IMPORTANCE_LOW)
             )
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("VF3 Smart")
-            .setContentText("AutoLink Pro monitor active")
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(getString(R.string.autolink_notif_text))
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .build()

@@ -7,6 +7,16 @@ data class NavigationState(
     val direction: Direction = Direction.STRAIGHT
 ) {
     enum class Direction {
-        LEFT, RIGHT, STRAIGHT, U_TURN, ROUNDABOUT
+        STRAIGHT,
+        SLIGHT_LEFT, LEFT, SHARP_LEFT,
+        SLIGHT_RIGHT, RIGHT, SHARP_RIGHT,
+        U_TURN,
+        KEEP_LEFT, KEEP_RIGHT,
+        FORK_LEFT, FORK_RIGHT,
+        RAMP_LEFT, RAMP_RIGHT,
+        MERGE,
+        ROUNDABOUT, EXIT_ROUNDABOUT,
+        FERRY,
+        DESTINATION
     }
 }
