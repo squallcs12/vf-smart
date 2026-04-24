@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">VF3 Smart</string>
+    <string name="autolink_accessibility_description">Automatically connects to AutoLink Pro OBD device and returns to VF3 Smart</string>
 </resources>

@@ -5,6 +5,11 @@
     <!-- Launcher: start on boot -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- AutoLink foreground service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Wake screen to allow AutoLink accessibility interaction -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <!-- Network permissions for API and WebSocket -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -60,6 +65,24 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <!-- AutoLink Pro monitor service -->
+        <service
+            android:name=".autolink.AutoLinkService"
+            android:exported="false" />
+
+        <!-- AutoLink Pro UI automation (requires user to enable in Settings > Accessibility) -->
+        <service
+            android:name=".autolink.AutoLinkAccessibilityService"
+            android:exported="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/autolink_accessibility_config" />
+        </service>
 
         <!-- Boot receiver: relaunch after device restart -->
         <receiver

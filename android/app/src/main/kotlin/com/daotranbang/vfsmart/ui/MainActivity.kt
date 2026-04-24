@@ -17,6 +17,7 @@ import com.daotranbang.vfsmart.ui.screens.MirrorScreen
 import com.daotranbang.vfsmart.ui.screens.SetupScreen
 import com.daotranbang.vfsmart.ui.screens.TpmsCalibrationScreen
 import com.daotranbang.vfsmart.ui.theme.VF3SmartTheme
+import com.daotranbang.vfsmart.autolink.AutoLinkService
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -25,6 +26,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         Thread { try { Runtime.getRuntime().exec("su") } catch (_: Exception) {} }.start()
+        AutoLinkService.start(this)
 
         setContent {
             VF3SmartTheme {

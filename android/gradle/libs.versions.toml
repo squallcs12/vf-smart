@@ -10,6 +10,7 @@ ksp = "2.3.2"
 car-app = "1.7.0"
 lifecycle = "2.8.7"
 androidx-core = "1.15.0"
+androidx-media = "1.7.0"
 androidx-activity = "1.9.3"
 security-crypto = "1.1.0-alpha06"
 coroutines = "1.10.1"
@@ -51,6 +52,7 @@ hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", ve
 
 # Security
 androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "security-crypto" }
+androidx-media = { module = "androidx.media:media", version.ref = "androidx-media" }
 
 # Coroutines
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
