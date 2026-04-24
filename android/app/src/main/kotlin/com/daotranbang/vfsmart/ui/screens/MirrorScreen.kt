@@ -37,7 +37,9 @@ import androidx.compose.ui.unit.sp
 import androidx.activity.compose.BackHandler
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.data.model.CarStatus
@@ -88,12 +90,19 @@ fun MirrorScreen(
     // Home screen — back button does nothing
     BackHandler {}
 
-    // Start GATT server (nav + gps + tpms); stop when screen leaves
+    // Start GATT server; retry on every resume so it starts after permission grant
     val context = LocalContext.current
     val gattServer = remember { VF3GattServer(context) }
-    DisposableEffect(Unit) {
-        gattServer.start()
-        onDispose { gattServer.stop() }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) gattServer.start()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            gattServer.stop()
+        }
     }
 
     // Hide system bars; restore on exit

@@ -15,6 +15,7 @@ import android.bluetooth.le.AdvertiseSettings
 import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.ParcelUuid
 import android.util.Log
 import com.daotranbang.vfsmart.data.model.CarStatus
@@ -64,6 +65,12 @@ import java.util.UUID
  */
 class VF3GattServer(private val context: Context) {
 
+    // ── BLE connection state ───────────────────────────────────────────────
+    sealed class BleConnectionState {
+        object Disconnected : BleConnectionState()
+        object Connected : BleConnectionState()
+    }
+
     companion object {
         /** VF3 Smart primary service */
         val SERVICE_UUID: UUID = UUID.fromString("A1B2C3D4-E5F6-7890-ABCD-EF1234567890")
@@ -92,12 +99,6 @@ class VF3GattServer(private val context: Context) {
         val bleConnectionState: StateFlow<BleConnectionState> = _bleConnectionState.asStateFlow()
 
         private const val TAG = "VF3GattServer"
-
-        // ── BLE connection state ───────────────────────────────────────────────
-        sealed class BleConnectionState {
-            object Disconnected : BleConnectionState()
-            object Connected : BleConnectionState()
-        }
     }
 
     private val bluetoothManager =
@@ -111,6 +112,13 @@ class VF3GattServer(private val context: Context) {
 
     @SuppressLint("MissingPermission")
     fun start() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            context.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.w(TAG, "BLUETOOTH_CONNECT not granted — skipping start")
+            return
+        }
         val bt = adapter ?: run { Log.e(TAG, "No Bluetooth adapter"); return }
         if (!bt.isEnabled) { Log.w(TAG, "Bluetooth disabled"); return }
         if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {

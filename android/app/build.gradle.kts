@@ -14,7 +14,7 @@ android {
     defaultConfig {
         applicationId = "com.daotranbang.vfsmart"
         minSdk = 23
-        targetSdk = 23
+        targetSdk = 33
         versionCode = 1
         versionName = "1.0.0"
 

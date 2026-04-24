@@ -24,6 +24,8 @@ import com.daotranbang.vfsmart.ui.MainActivity
 
 class AutoLinkService : Service() {
 
+    private val wifiManager get() = applicationContext.getSystemService(WifiManager::class.java)
+
     private lateinit var triggerReceiver: BroadcastReceiver
     private lateinit var networkCallback: ConnectivityManager.NetworkCallback
     private var lastAutoLinkNetwork: Network? = null
