@@ -90,12 +90,17 @@ class AutoLinkService : Service() {
         AutoLinkAccessibilityService.wakeLock = wl
     }
 
-    private fun launchAutoLink() {
+    private fun isAutoLinkConnected(): Boolean =
+        lastAutoLinkNetwork != null ||
+                currentSsid()?.startsWith("DIRECT-", ignoreCase = true) == true
+
+    private fun launchAutoLink(skipCheck: Boolean = false) {
         val now = System.currentTimeMillis()
         if (now - lastLaunchTime < DEBOUNCE_MS) return
+        if (!skipCheck && isAutoLinkConnected()) return
 
         val launchIntent = packageManager.getLaunchIntentForPackage(AUTOLINK_PACKAGE)
-            ?.apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+            ?.apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK }
             ?: return
 
         lastLaunchTime = now
@@ -192,7 +197,9 @@ class AutoLinkService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_LAUNCH_AUTOLINK) launchAutoLink()
+        if (intent?.action == ACTION_LAUNCH_AUTOLINK) {
+            launchAutoLink(skipCheck = intent.getBooleanExtra(EXTRA_SKIP_CHECK, false))
+        }
         return START_STICKY
     }
 
@@ -216,10 +223,12 @@ class AutoLinkService : Service() {
         private const val WAKE_TIMEOUT_MS = 35_000L
         private const val SCAN_TIMEOUT_MS = 60_000L
         const val ACTION_LAUNCH_AUTOLINK = "com.daotranbang.vfsmart.LAUNCH_AUTOLINK"
+        const val EXTRA_SKIP_CHECK = "skip_check"
 
-        fun triggerLaunch(context: Context) {
+        fun triggerLaunch(context: Context, skipCheck: Boolean = false) {
             context.startService(Intent(context, AutoLinkService::class.java).apply {
                 action = ACTION_LAUNCH_AUTOLINK
+                putExtra(EXTRA_SKIP_CHECK, skipCheck)
             })
         }
 

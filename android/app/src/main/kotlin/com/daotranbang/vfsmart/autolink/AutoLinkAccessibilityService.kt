@@ -100,7 +100,7 @@ class AutoLinkAccessibilityService : AccessibilityService() {
                         2 -> {
                             handler.removeCallbacks(singleClickRunnable)
                             clickCount = 0
-                            AutoLinkService.triggerLaunch(this)
+                            AutoLinkService.triggerLaunch(this, skipCheck = true)
                         }
                     }
                 }
