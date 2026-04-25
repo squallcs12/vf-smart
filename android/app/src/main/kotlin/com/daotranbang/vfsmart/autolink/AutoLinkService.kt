@@ -18,7 +18,10 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.util.Log
+import androidx.car.app.connection.CarConnection
 import androidx.core.app.NotificationCompat
+import androidx.lifecycle.Observer
 import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.ui.MainActivity
 
@@ -26,35 +29,56 @@ class AutoLinkService : Service() {
 
     private val wifiManager get() = applicationContext.getSystemService(WifiManager::class.java)
 
-    private lateinit var triggerReceiver: BroadcastReceiver
     private lateinit var networkCallback: ConnectivityManager.NetworkCallback
     private var lastAutoLinkNetwork: Network? = null
     private var lastLaunchTime = 0L
     private var wifiScanReceiver: BroadcastReceiver? = null
     private val handler = Handler(Looper.getMainLooper())
+    private lateinit var carConnection: CarConnection
+    private val carConnectionObserver = Observer<Int> { type ->
+        val label = when (type) {
+            CarConnection.CONNECTION_TYPE_PROJECTION -> "PROJECTION (Android Auto)"
+            CarConnection.CONNECTION_TYPE_NATIVE     -> "NATIVE (Automotive OS)"
+            else                                     -> "NOT_CONNECTED"
+        }
+        Log.i(TAG, "CarConnection state → $label")
+        if (type == CarConnection.CONNECTION_TYPE_PROJECTION) {
+            Log.i(TAG, "Android Auto connected — triggering AutoLink")
+            launchAutoLink()
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         startForeground(NOTIFICATION_ID, buildNotification())
-        registerTriggerReceiver()
+        registerCarConnectionObserver()
+        registerCarModeReceiver()
         registerNetworkCallback()
     }
 
-    private fun registerTriggerReceiver() {
-        triggerReceiver = object : BroadcastReceiver() {
+    private fun registerCarConnectionObserver() {
+        carConnection = CarConnection(this)
+        carConnection.type.observeForever(carConnectionObserver)
+        Log.d(TAG, "CarConnection observer registered")
+    }
+
+    private fun registerCarModeReceiver() {
+        // Fallback for older Android Auto versions that fire car mode broadcast
+        val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                if (intent.action == UiModeManager.ACTION_ENTER_CAR_MODE) launchAutoLink()
+                if (intent.action == UiModeManager.ACTION_ENTER_CAR_MODE) {
+                    Log.i(TAG, "ACTION_ENTER_CAR_MODE received — triggering AutoLink")
+                    launchAutoLink()
+                }
             }
         }
-        registerReceiver(triggerReceiver, IntentFilter().apply {
-            addAction(UiModeManager.ACTION_ENTER_CAR_MODE)
-        })
+        registerReceiver(receiver, IntentFilter(UiModeManager.ACTION_ENTER_CAR_MODE))
     }
 
     private fun registerNetworkCallback() {
         networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-                if (currentSsid()?.startsWith("DIRECT-", ignoreCase = true) == true) {
+                if (currentSsid() == AUTOLINK_SSID) {
                     lastAutoLinkNetwork = network
                 }
             }
@@ -94,49 +118,75 @@ class AutoLinkService : Service() {
 
     private fun isAutoLinkConnected(): Boolean =
         lastAutoLinkNetwork != null ||
-                currentSsid()?.startsWith("DIRECT-", ignoreCase = true) == true
+                currentSsid() == AUTOLINK_SSID
 
     private fun launchAutoLink(skipCheck: Boolean = false) {
         val now = System.currentTimeMillis()
-        if (now - lastLaunchTime < DEBOUNCE_MS) return
-        if (!skipCheck && isAutoLinkConnected()) return
+        Log.d(TAG, "launchAutoLink called — skipCheck=$skipCheck")
 
-        val launchIntent = packageManager.getLaunchIntentForPackage(AUTOLINK_PACKAGE)
-            ?.apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK }
-            ?: return
+        if (now - lastLaunchTime < DEBOUNCE_MS) {
+            Log.d(TAG, "launchAutoLink debounced — ${DEBOUNCE_MS - (now - lastLaunchTime)}ms remaining")
+            return
+        }
+        val ssid = currentSsid()
+        Log.d(TAG, "current SSID=$ssid lastAutoLinkNetwork=$lastAutoLinkNetwork")
+        if (!skipCheck && isAutoLinkConnected()) {
+            Log.d(TAG, "launchAutoLink skipped — already on $AUTOLINK_SSID")
+            return
+        }
 
-        lastLaunchTime = now
-        enableWifiAndFindDevice {
-            wakeScreen()
-            startActivity(launchIntent)
-            val accessibility = AutoLinkAccessibilityService.instance
-            if (accessibility != null) {
-                accessibility.startConnecting()
-            } else {
-                handler.postDelayed({
-                    startActivity(Intent(this, MainActivity::class.java).apply {
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    })
-                }, RETURN_DELAY_MS)
+        Log.i(TAG, "scanning WiFi for $AUTOLINK_SSID before launching (wifiEnabled=${wifiManager.isWifiEnabled})")
+        scanForAutoLinkSsid(
+            onFound = {
+                Log.i(TAG, "$AUTOLINK_SSID visible — launching AutoLink Pro")
+                lastLaunchTime = System.currentTimeMillis()
+                val launchIntent = Intent().apply {
+                    setClassName(AUTOLINK_PACKAGE, AUTOLINK_MAIN_ACTIVITY)
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                }
+                wakeScreen()
+                startActivity(launchIntent)
+                val accessibility = AutoLinkAccessibilityService.instance
+                Log.d(TAG, "accessibility instance=$accessibility")
+                if (accessibility != null) {
+                    accessibility.startConnecting()
+                } else {
+                    Log.w(TAG, "accessibility not available — returning to MainActivity after delay")
+                    handler.postDelayed({
+                        startActivity(Intent(this, MainActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        })
+                    }, RETURN_DELAY_MS)
+                }
+            },
+            onNotFound = {
+                Log.w(TAG, "$AUTOLINK_SSID not found in scan — skipping launch")
             }
-        }
+        )
     }
 
-    private fun enableWifiAndFindDevice(onFound: () -> Unit) {
+    private fun scanForAutoLinkSsid(onFound: () -> Unit, onNotFound: () -> Unit) {
         stopWifiScan()
-        if (wifiManager.isWifiEnabled) {
-            startWifiScan(onFound)
-        } else {
+        if (!wifiManager.isWifiEnabled) {
+            Log.d(TAG, "WiFi disabled — enabling via root then polling")
             enableWifiViaRoot()
-            pollUntilWifiEnabled(onFound)
+            pollUntilWifiEnabled(onFound, onNotFound)
+        } else {
+            Log.d(TAG, "WiFi enabled — starting scan")
+            startWifiScan(onFound, onNotFound)
         }
     }
 
-    private fun pollUntilWifiEnabled(onFound: () -> Unit, attempt: Int = 0) {
+    private fun pollUntilWifiEnabled(onFound: () -> Unit, onNotFound: () -> Unit, attempt: Int = 0) {
         if (wifiManager.isWifiEnabled) {
-            startWifiScan(onFound)
+            Log.d(TAG, "WiFi enabled after $attempt polls — starting scan")
+            startWifiScan(onFound, onNotFound)
         } else if (attempt < 10) {
-            handler.postDelayed({ pollUntilWifiEnabled(onFound, attempt + 1) }, 1000)
+            Log.d(TAG, "WiFi not yet enabled — poll attempt $attempt/10")
+            handler.postDelayed({ pollUntilWifiEnabled(onFound, onNotFound, attempt + 1) }, 1000)
+        } else {
+            Log.e(TAG, "WiFi failed to enable after 10 attempts — aborting")
+            onNotFound()
         }
     }
 
@@ -154,27 +204,39 @@ class AutoLinkService : Service() {
     }
 
     @Suppress("DEPRECATION", "MissingPermission")
-    private fun startWifiScan(onFound: () -> Unit) {
-        val scanTimeout = Runnable { stopWifiScan() }
-        handler.postDelayed(scanTimeout, SCAN_TIMEOUT_MS)
+    private fun startWifiScan(onFound: () -> Unit, onNotFound: () -> Unit) {
+        val deadline = System.currentTimeMillis() + SCAN_WINDOW_MS
+        var attempt = 0
 
-        wifiScanReceiver = object : BroadcastReceiver() {
-            @Suppress("DEPRECATION", "MissingPermission")
-            override fun onReceive(context: Context, intent: Intent) {
-                val found = wifiManager.scanResults.any {
-                    it.SSID.startsWith("direct-connect-", ignoreCase = true)
-                }
-                if (found) {
-                    handler.removeCallbacks(scanTimeout)
+        fun scheduleScan() {
+            attempt++
+            Log.d(TAG, "WiFi scan attempt $attempt — looking for $AUTOLINK_SSID")
+
+            wifiScanReceiver = object : BroadcastReceiver() {
+                @Suppress("DEPRECATION", "MissingPermission")
+                override fun onReceive(context: Context, intent: Intent) {
                     stopWifiScan()
-                    onFound()
-                } else {
-                    wifiManager.startScan()
+                    val results = wifiManager.scanResults
+                    val found = results.any { it.SSID == AUTOLINK_SSID }
+                    Log.d(TAG, "scan #$attempt: ${results.size} networks, $AUTOLINK_SSID found=$found")
+                    when {
+                        found -> onFound()
+                        System.currentTimeMillis() < deadline -> {
+                            Log.d(TAG, "not found — next scan in ${SCAN_INTERVAL_MS / 1000}s")
+                            handler.postDelayed({ scheduleScan() }, SCAN_INTERVAL_MS)
+                        }
+                        else -> {
+                            Log.w(TAG, "$AUTOLINK_SSID not found after ${SCAN_WINDOW_MS / 60_000}min — giving up")
+                            onNotFound()
+                        }
+                    }
                 }
             }
+            registerReceiver(wifiScanReceiver, IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION))
+            wifiManager.startScan()
         }
-        registerReceiver(wifiScanReceiver, IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION))
-        wifiManager.startScan()
+
+        scheduleScan()
     }
 
     private fun stopWifiScan() {
@@ -209,7 +271,7 @@ class AutoLinkService : Service() {
 
     override fun onDestroy() {
         stopWifiScan()
-        unregisterReceiver(triggerReceiver)
+        carConnection.type.removeObserver(carConnectionObserver)
         getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(networkCallback)
         handler.removeCallbacksAndMessages(null)
         super.onDestroy()
@@ -218,14 +280,17 @@ class AutoLinkService : Service() {
     override fun onBind(intent: Intent?) = null
 
     companion object {
-        private const val TAG = "AutoLinkService"
+        private const val TAG = "AutoLinkSvc"
         private const val CHANNEL_ID = "autolink_monitor"
         private const val NOTIFICATION_ID = 2001
-        private const val AUTOLINK_PACKAGE = "com.link.autolink.pro"
+        private const val AUTOLINK_PACKAGE       = "com.link.autolink.pro"
+        private const val AUTOLINK_MAIN_ACTIVITY = "com.link.autolink.activity.MainActivity"
+        private const val AUTOLINK_SSID           = "DIRECT-phonelink-112391"
         private const val RETURN_DELAY_MS = 2000L
         private const val DEBOUNCE_MS = 5000L
         private const val WAKE_TIMEOUT_MS = 35_000L
-        private const val SCAN_TIMEOUT_MS = 60_000L
+        private const val SCAN_INTERVAL_MS = 30_000L
+        private const val SCAN_WINDOW_MS   = 30 * 60_000L
         const val ACTION_LAUNCH_AUTOLINK = "com.daotranbang.vfsmart.LAUNCH_AUTOLINK"
         const val EXTRA_SKIP_CHECK = "skip_check"
 

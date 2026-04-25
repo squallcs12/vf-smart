@@ -30,15 +30,14 @@ class MainActivity : ComponentActivity() {
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { /* results ignored — features degrade gracefully when denied */ }
+    ) { AutoLinkService.start(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        requestRuntimePermissions()
-        requestNotificationListenerAccess()
         Thread { try { Runtime.getRuntime().exec("su") } catch (_: Exception) {} }.start()
-        AutoLinkService.start(this)
+        requestNotificationListenerAccess()
+        requestRuntimePermissions()
 
         setContent {
             VF3SmartTheme {
@@ -141,6 +140,10 @@ class MainActivity : ComponentActivity() {
             }
         }.filter { checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
 
-        if (perms.isNotEmpty()) permissionLauncher.launch(perms.toTypedArray())
+        if (perms.isNotEmpty()) {
+            permissionLauncher.launch(perms.toTypedArray())
+        } else {
+            AutoLinkService.start(this)
+        }
     }
 }

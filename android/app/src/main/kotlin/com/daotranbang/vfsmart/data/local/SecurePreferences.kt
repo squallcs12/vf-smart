@@ -35,7 +35,9 @@ class SecurePreferences private constructor(context: Context) {
         private const val KEY_API_KEY = "api_key"
         private const val KEY_DEVICE_NAME = "device_name"
         private const val KEY_MAC_ADDRESS = "mac_address"
-        private const val KEY_IS_CONFIGURED = "is_configured"
+        private const val KEY_IS_CONFIGURED  = "is_configured"
+        private const val KEY_AUTOLINK_SSID  = "autolink_ssid"
+        const val DEFAULT_AUTOLINK_SSID      = "DIRECT-phonelink-112391"
 
         @Volatile
         private var INSTANCE: SecurePreferences? = null
