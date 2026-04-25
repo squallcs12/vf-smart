@@ -7,7 +7,7 @@ import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.daotranbang.vfsmart.R
-import com.daotranbang.vfsmart.data.model.CarStatus
+import com.daotranbang.vfsmart.data.model.*
 import com.daotranbang.vfsmart.data.repository.VF3Repository
 import com.daotranbang.vfsmart.navigation.VF3GattServer
 import kotlinx.coroutines.CoroutineScope
@@ -58,13 +58,25 @@ class StatusScreen(
     }
 
     override fun onGetTemplate(): Template {
-        val status = currentStatus
-        return if (status == null) {
-            buildLoadingTemplate()
-        } else {
-            buildControlsTemplate(status)
-        }
+        return buildControlsTemplate(currentStatus ?: defaultCarStatus())
     }
+
+    private fun defaultCarStatus() = CarStatus(
+        sensors = Sensors(brake = 0, steeringAngle = 0, batteryVoltage = "0.0", gearDrive = 0),
+        doors = Doors(frontLeft = 0, frontRight = 0, trunk = 0, locked = 0),
+        windows = Windows(leftState = 0, rightState = 0),
+        seats = Seats(frontLeftOccupied = 0, frontRightOccupied = 0, frontLeftSeatbelt = 0, frontRightSeatbelt = 0),
+        lights = Lights(demiLight = 0, normalLight = 0),
+        proximity = Proximity(rearLeft = 0, rearRight = 0),
+        controls = Controls(brakePressed = 0, accessoryPower = 0, insideCameras = 0, carLock = 0, carUnlock = 0, dashcam = 0, odoScreen = 0, armrest = 0),
+        chargingStatus = 0,
+        carLockState = "",
+        windowCloseActive = false,
+        windowCloseRemainingMs = 0,
+        lightReminderEnabled = false,
+        time = null,
+        tpms = null
+    )
 
     private fun buildControlsTemplate(status: CarStatus): Template {
         val gridItemListBuilder = ItemList.Builder()
@@ -291,19 +303,6 @@ class StatusScreen(
             .setHeaderAction(Action.APP_ICON)
             .setSingleList(gridItemListBuilder.build())
             .setTitle(connectionText)
-            .build()
-    }
-
-    private fun buildLoadingTemplate(): Template {
-        val connectionText = when (connectionState) {
-            VF3GattServer.BleConnectionState.Connected -> "Connected"
-            VF3GattServer.BleConnectionState.Disconnected -> "Waiting for ESP32..."
-        }
-
-        return MessageTemplate.Builder(connectionText)
-            .setTitle("VF3 Smart")
-            .setHeaderAction(Action.APP_ICON)
-            .setLoading(true)
             .build()
     }
 }
