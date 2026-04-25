@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
+import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -24,7 +25,56 @@ class AutoLinkAccessibilityService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private val audioManager get() = getSystemService(AudioManager::class.java)
 
-    private val timeoutRunnable = Runnable { state = State.IDLE }
+    private val timeoutRunnable = Runnable {
+        Log.w(TAG, "startConnecting timed out — no device or 'Start now' found")
+        state = State.IDLE
+    }
+
+    private val pollForDeviceRunnable = object : Runnable {
+        override fun run() {
+            if (state != State.FINDING_DEVICE) return
+            val node = rootInActiveWindow
+                ?.findAccessibilityNodeInfosByText("DIRECT-phonelink-112391")
+                ?.firstOrNull()
+            if (node != null) {
+                Log.d(TAG, "device node found — clicking DIRECT-phonelink-112391")
+                state = State.FINDING_START_NOW
+                clickNodeOrParent(node)
+                @Suppress("DEPRECATION") node.recycle()
+                handler.post(pollForStartNowRunnable)
+            } else {
+                Log.v(TAG, "device node not yet visible — retrying in ${POLL_INTERVAL_MS}ms")
+                handler.postDelayed(this, POLL_INTERVAL_MS)
+            }
+        }
+    }
+
+    private val pollForStartNowRunnable = object : Runnable {
+        override fun run() {
+            if (state != State.FINDING_START_NOW) return
+            val root = rootInActiveWindow
+            val node = (root?.findAccessibilityNodeInfosByText("Bắt đầu ngay")?.firstOrNull()
+                ?: root?.findAccessibilityNodeInfosByText("Start now")?.firstOrNull())
+            if (node != null) {
+                Log.d(TAG, "'Bắt đầu ngay' found — clicking and returning to MainActivity")
+                clickNodeOrParent(node)
+                @Suppress("DEPRECATION") node.recycle()
+                handler.removeCallbacks(timeoutRunnable)
+                state = State.IDLE
+                handler.postDelayed({
+                    Log.i(TAG, "AutoLink connection complete — Android Auto started successfully")
+                    startActivity(Intent(this@AutoLinkAccessibilityService, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    })
+                    releaseWakeLock()
+                }, 1000)
+            } else {
+                Log.v(TAG, "'Bắt đầu ngay' not yet visible — retrying in ${POLL_INTERVAL_MS}ms")
+                handler.postDelayed(this, POLL_INTERVAL_MS)
+            }
+            @Suppress("DEPRECATION") root?.recycle()
+        }
+    }
 
     private val singleClickRunnable = Runnable {
         val now = SystemClock.uptimeMillis()
@@ -47,39 +97,7 @@ class AutoLinkAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        if (state == State.IDLE) return
-        if (event.packageName != AUTOLINK_PACKAGE) return
-
-        val root = rootInActiveWindow ?: return
-
-        when (state) {
-            State.FINDING_DEVICE -> {
-                val node = root.findAccessibilityNodeInfosByText("direct-connect-").firstOrNull()
-                if (node != null) {
-                    clickNodeOrParent(node)
-                    @Suppress("DEPRECATION") node.recycle()
-                    state = State.FINDING_START_NOW
-                }
-            }
-            State.FINDING_START_NOW -> {
-                val node = root.findAccessibilityNodeInfosByText("start now").firstOrNull()
-                if (node != null) {
-                    clickNodeOrParent(node)
-                    @Suppress("DEPRECATION") node.recycle()
-                    handler.removeCallbacks(timeoutRunnable)
-                    state = State.IDLE
-                    handler.postDelayed({
-                        startActivity(Intent(this, MainActivity::class.java).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                        })
-                        releaseWakeLock()
-                    }, 1000)
-                }
-            }
-            State.IDLE -> {}
-        }
-
-        @Suppress("DEPRECATION") root.recycle()
+        // Both FINDING_DEVICE and FINDING_START_NOW are handled by their poll runnables.
     }
 
     private fun clickNodeOrParent(node: AccessibilityNodeInfo) {
@@ -112,9 +130,12 @@ class AutoLinkAccessibilityService : AccessibilityService() {
     }
 
     fun startConnecting() {
+        Log.d(TAG, "startConnecting — polling for DIRECT-phonelink-112391")
         state = State.FINDING_DEVICE
         handler.removeCallbacks(timeoutRunnable)
+        handler.removeCallbacks(pollForDeviceRunnable)
         handler.postDelayed(timeoutRunnable, TIMEOUT_MS)
+        handler.post(pollForDeviceRunnable)
     }
 
     private fun releaseWakeLock() {
@@ -126,6 +147,8 @@ class AutoLinkAccessibilityService : AccessibilityService() {
         state = State.IDLE
         clickCount = 0
         handler.removeCallbacksAndMessages(null)
+        handler.removeCallbacks(pollForDeviceRunnable)
+        handler.removeCallbacks(pollForStartNowRunnable)
         releaseWakeLock()
     }
 
@@ -136,11 +159,13 @@ class AutoLinkAccessibilityService : AccessibilityService() {
     }
 
     companion object {
+        private const val TAG = "AutoLinkA11y"
         const val AUTOLINK_PACKAGE = "com.link.autolink.pro"
         var instance: AutoLinkAccessibilityService? = null
         var wakeLock: PowerManager.WakeLock? = null
         private const val TIMEOUT_MS = 30_000L
         private const val DOUBLE_CLICK_MS = 1000L
+        private const val POLL_INTERVAL_MS = 500L
 
         fun enableViaRoot(context: Context) {
             if (instance != null) return
