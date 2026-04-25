@@ -22,6 +22,8 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.net.Uri
+import android.provider.Settings
 import android.util.Log
 import androidx.car.app.connection.CarConnection
 import androidx.core.app.NotificationCompat
@@ -117,6 +119,26 @@ class AutoLinkService : Service() {
         } catch (_: Exception) {}
     }
 
+    private var savedBrightness = -1
+
+    private fun dimScreen() {
+        if (!Settings.System.canWrite(this)) {
+            promptWriteSettings()
+            return
+        }
+        savedBrightness = Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, 128)
+        Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, 5)
+        Log.i(TAG, "Screen dimmed to 5 (saved=$savedBrightness)")
+    }
+
+    private fun restoreBrightness() {
+        if (savedBrightness < 0) return
+        if (!Settings.System.canWrite(this)) return
+        Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, savedBrightness)
+        Log.i(TAG, "Screen brightness restored to $savedBrightness")
+        savedBrightness = -1
+    }
+
     private val carConnectionObserver = Observer<Int> { type ->
         val label = when (type) {
             CarConnection.CONNECTION_TYPE_PROJECTION -> "PROJECTION (Android Auto)"
@@ -124,19 +146,56 @@ class AutoLinkService : Service() {
             else                                     -> "NOT_CONNECTED"
         }
         Log.i(TAG, "CarConnection state → $label")
-        if (type == CarConnection.CONNECTION_TYPE_PROJECTION) {
-            Log.i(TAG, "Android Auto connected — triggering AutoLink")
-            launchAutoLink()
+        when (type) {
+            CarConnection.CONNECTION_TYPE_PROJECTION -> {
+                Log.i(TAG, "Android Auto connected — dimming screen, triggering AutoLink")
+                dimScreen()
+                launchAutoLink()
+            }
+            else -> {
+                Log.i(TAG, "Android Auto disconnected — restoring brightness")
+                restoreBrightness()
+            }
         }
     }
 
     override fun onCreate() {
         super.onCreate()
         startForeground(NOTIFICATION_ID, buildNotification())
+        grantWriteSettingsViaRoot()
         setupMediaSessionMonitor()
         registerCarConnectionObserver()
         registerCarModeReceiver()
         registerNetworkCallback()
+    }
+
+    private fun grantWriteSettingsViaRoot() {
+        if (Settings.System.canWrite(this)) return
+        Thread {
+            try {
+                val process = Runtime.getRuntime().exec("su")
+                val writer = process.outputStream.bufferedWriter()
+                writer.write("appops set $packageName WRITE_SETTINGS allow\n")
+                writer.flush()
+                writer.close()
+                process.waitFor()
+                if (Settings.System.canWrite(this)) {
+                    Log.i(TAG, "WRITE_SETTINGS granted via root")
+                } else {
+                    Log.w(TAG, "Root ran but WRITE_SETTINGS still not granted")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Root grant failed: ${e.message}")
+            }
+        }.start()
+    }
+
+    private fun promptWriteSettings() {
+        Log.i(TAG, "Prompting user to grant WRITE_SETTINGS")
+        startActivity(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS).apply {
+            data = Uri.parse("package:$packageName")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        })
     }
 
     private fun registerCarConnectionObserver() {

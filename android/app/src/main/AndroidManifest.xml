@@ -11,6 +11,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Wake screen to allow AutoLink accessibility interaction -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Dim/restore screen brightness when Android Auto connects/disconnects -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions" />
 
     <!-- Network permissions for API and WebSocket -->
     <uses-permission android:name="android.permission.INTERNET" />

@@ -294,6 +294,20 @@ class StatusScreen(
                 .build()
         )
 
+        // 10. ODO Config
+        gridItemListBuilder.addItem(
+            GridItem.Builder()
+                .setTitle("ODO Config")
+                .setText("Cấu hình ODO")
+                .setImage(
+                    CarIcon.Builder(
+                        IconCompat.createWithResource(carContext, R.drawable.ic_odo_screen)
+                    ).setTint(CarColor.BLUE).build()
+                )
+                .setOnClickListener { screenManager.push(OdoConfigScreen(carContext, repository)) }
+                .build()
+        )
+
         val connectionText = when (connectionState) {
             VF3GattServer.BleConnectionState.Connected -> "Connected"
             VF3GattServer.BleConnectionState.Disconnected -> "Disconnected"
