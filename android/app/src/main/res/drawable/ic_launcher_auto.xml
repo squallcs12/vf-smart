@@ -6,6 +6,12 @@
         </shape>
     </item>
     <item
-        android:drawable="@drawable/ic_vf3_top"
-        android:gravity="center"/>
+        android:left="10dp"
+        android:right="10dp"
+        android:top="6dp"
+        android:bottom="6dp">
+        <bitmap
+            android:src="@drawable/ic_vf3_top"
+            android:gravity="fill"/>
+    </item>
 </layer-list>
