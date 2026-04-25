@@ -6,9 +6,13 @@ import android.app.NotificationManager
 import android.app.Service
 import android.app.UiModeManager
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.session.MediaController
+import android.media.session.MediaSessionManager
+import android.media.session.PlaybackState
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -23,6 +27,7 @@ import androidx.car.app.connection.CarConnection
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.Observer
 import com.daotranbang.vfsmart.R
+import com.daotranbang.vfsmart.navigation.NavigationNotificationService
 import com.daotranbang.vfsmart.ui.MainActivity
 
 class AutoLinkService : Service() {
@@ -35,6 +40,83 @@ class AutoLinkService : Service() {
     private var wifiScanReceiver: BroadcastReceiver? = null
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var carConnection: CarConnection
+
+    // MediaController monitoring for double-press detection
+    private val trackedControllers = mutableMapOf<MediaController, MediaController.Callback>()
+    private var lastPausedTime = 0L
+    private val sessionsChangedListener =
+        MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
+            updateTrackedControllers(controllers)
+        }
+
+    private fun buildControllerCallback(pkg: String) = object : MediaController.Callback() {
+        override fun onPlaybackStateChanged(state: PlaybackState?) {
+            val s = state?.state ?: return
+            val now = System.currentTimeMillis()
+            Log.d(TAG, "[$pkg] playback state=$s lastPaused=${now - lastPausedTime}ms ago")
+            when (s) {
+                PlaybackState.STATE_PAUSED -> lastPausedTime = now
+                PlaybackState.STATE_PLAYING -> {
+                    if (lastPausedTime > 0 && now - lastPausedTime < DOUBLE_PRESS_WINDOW_MS) {
+                        Log.i(TAG, "double-press detected via [$pkg] — triggering AutoLink")
+                        lastPausedTime = 0
+                        // Pause music again so it doesn't keep playing after the trigger
+                        trackedControllers.keys
+                            .firstOrNull { it.packageName == pkg }
+                            ?.transportControls?.pause()
+                        triggerLaunch(this@AutoLinkService, skipCheck = true)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun updateTrackedControllers(controllers: List<MediaController>?) {
+        val incoming = controllers ?: emptyList()
+
+        // Unregister controllers that are no longer active
+        val toRemove = trackedControllers.keys.filter { old ->
+            incoming.none { it.sessionToken == old.sessionToken }
+        }
+        toRemove.forEach { c ->
+            c.unregisterCallback(trackedControllers.getValue(c))
+            trackedControllers.remove(c)
+            Log.d(TAG, "stopped tracking [${c.packageName}]")
+        }
+
+        // Register newly appeared controllers
+        incoming.forEach { c ->
+            if (trackedControllers.none { it.key.sessionToken == c.sessionToken }) {
+                val cb = buildControllerCallback(c.packageName)
+                c.registerCallback(cb)
+                trackedControllers[c] = cb
+                Log.d(TAG, "tracking [${c.packageName}] state=${c.playbackState?.state}")
+            }
+        }
+    }
+
+    private fun setupMediaSessionMonitor() {
+        val mgr = getSystemService(MediaSessionManager::class.java)
+        val nlsComponent = ComponentName(this, NavigationNotificationService::class.java)
+        try {
+            val initial = mgr.getActiveSessions(nlsComponent)
+            updateTrackedControllers(initial)
+            mgr.addOnActiveSessionsChangedListener(sessionsChangedListener, nlsComponent, handler)
+            Log.d(TAG, "MediaSession monitor active — tracking ${initial.size} sessions")
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Notification listener not granted — cannot monitor media sessions", e)
+        }
+    }
+
+    private fun teardownMediaSessionMonitor() {
+        for ((c, cb) in trackedControllers) c.unregisterCallback(cb)
+        trackedControllers.clear()
+        try {
+            getSystemService(MediaSessionManager::class.java)
+                .removeOnActiveSessionsChangedListener(sessionsChangedListener)
+        } catch (_: Exception) {}
+    }
+
     private val carConnectionObserver = Observer<Int> { type ->
         val label = when (type) {
             CarConnection.CONNECTION_TYPE_PROJECTION -> "PROJECTION (Android Auto)"
@@ -51,6 +133,7 @@ class AutoLinkService : Service() {
     override fun onCreate() {
         super.onCreate()
         startForeground(NOTIFICATION_ID, buildNotification())
+        setupMediaSessionMonitor()
         registerCarConnectionObserver()
         registerCarModeReceiver()
         registerNetworkCallback()
@@ -63,7 +146,6 @@ class AutoLinkService : Service() {
     }
 
     private fun registerCarModeReceiver() {
-        // Fallback for older Android Auto versions that fire car mode broadcast
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 if (intent.action == UiModeManager.ACTION_ENTER_CAR_MODE) {
@@ -117,8 +199,7 @@ class AutoLinkService : Service() {
     }
 
     private fun isAutoLinkConnected(): Boolean =
-        lastAutoLinkNetwork != null ||
-                currentSsid() == AUTOLINK_SSID
+        lastAutoLinkNetwork != null || currentSsid() == AUTOLINK_SSID
 
     private fun launchAutoLink(skipCheck: Boolean = false) {
         val now = System.currentTimeMillis()
@@ -270,6 +351,7 @@ class AutoLinkService : Service() {
     }
 
     override fun onDestroy() {
+        teardownMediaSessionMonitor()
         stopWifiScan()
         carConnection.type.removeObserver(carConnectionObserver)
         getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(networkCallback)
@@ -291,6 +373,7 @@ class AutoLinkService : Service() {
         private const val WAKE_TIMEOUT_MS = 35_000L
         private const val SCAN_INTERVAL_MS = 30_000L
         private const val SCAN_WINDOW_MS   = 30 * 60_000L
+        private const val DOUBLE_PRESS_WINDOW_MS = 1000L
         const val ACTION_LAUNCH_AUTOLINK = "com.daotranbang.vfsmart.LAUNCH_AUTOLINK"
         const val EXTRA_SKIP_CHECK = "skip_check"
 

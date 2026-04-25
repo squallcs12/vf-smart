@@ -4,11 +4,9 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
-import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
-import android.os.SystemClock
 import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
@@ -20,10 +18,7 @@ class AutoLinkAccessibilityService : AccessibilityService() {
     private enum class State { IDLE, FINDING_DEVICE, FINDING_START_NOW }
 
     private var state = State.IDLE
-    private var clickCount = 0
-    private var lastClickKeyCode = 0
     private val handler = Handler(Looper.getMainLooper())
-    private val audioManager get() = getSystemService(AudioManager::class.java)
 
     private val timeoutRunnable = Runnable {
         Log.w(TAG, "startConnecting timed out — no device or 'Start now' found")
@@ -76,12 +71,6 @@ class AutoLinkAccessibilityService : AccessibilityService() {
         }
     }
 
-    private val singleClickRunnable = Runnable {
-        val now = SystemClock.uptimeMillis()
-        audioManager.dispatchMediaKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, lastClickKeyCode, 0))
-        audioManager.dispatchMediaKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, lastClickKeyCode, 0))
-        clickCount = 0
-    }
 
     override fun onServiceConnected() {
         instance = this
@@ -106,28 +95,7 @@ class AutoLinkAccessibilityService : AccessibilityService() {
         }
     }
 
-    override fun onKeyEvent(event: KeyEvent): Boolean {
-        when (event.keyCode) {
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
-            KeyEvent.KEYCODE_MEDIA_PLAY,
-            KeyEvent.KEYCODE_MEDIA_STOP -> {
-                if (event.action == KeyEvent.ACTION_DOWN) {
-                    clickCount++
-                    lastClickKeyCode = event.keyCode
-                    when (clickCount) {
-                        1 -> handler.postDelayed(singleClickRunnable, DOUBLE_CLICK_MS)
-                        2 -> {
-                            handler.removeCallbacks(singleClickRunnable)
-                            clickCount = 0
-                            AutoLinkService.triggerLaunch(this, skipCheck = true)
-                        }
-                    }
-                }
-                return true // always consume; single click re-dispatched after timeout
-            }
-        }
-        return false
-    }
+    override fun onKeyEvent(event: KeyEvent): Boolean = false
 
     fun startConnecting() {
         Log.d(TAG, "startConnecting — polling for DIRECT-phonelink-112391")
@@ -145,7 +113,6 @@ class AutoLinkAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {
         state = State.IDLE
-        clickCount = 0
         handler.removeCallbacksAndMessages(null)
         handler.removeCallbacks(pollForDeviceRunnable)
         handler.removeCallbacks(pollForStartNowRunnable)
@@ -164,7 +131,6 @@ class AutoLinkAccessibilityService : AccessibilityService() {
         var instance: AutoLinkAccessibilityService? = null
         var wakeLock: PowerManager.WakeLock? = null
         private const val TIMEOUT_MS = 30_000L
-        private const val DOUBLE_CLICK_MS = 1000L
         private const val POLL_INTERVAL_MS = 500L
 
         fun enableViaRoot(context: Context) {
