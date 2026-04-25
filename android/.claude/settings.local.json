@@ -18,7 +18,18 @@
       "Bash(./gradlew clean *)",
       "Bash(convert /home/bang/Downloads/Gemini_Generated_Image_wyz8enwyz8enwyz8.png -fuzz 15% -transparent '#00cc00' -resize 512x512 /home/bang/Downloads/ic_launcher_512.png)",
       "Bash(pip3 show *)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(git *)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Read(//mnt/c/Users/**)",
+      "PowerShell(Get-ChildItem *)",
+      "Bash(adb -s emulator-5554 shell getprop ro.product.model)",
+      "Bash(adb -s R3CN203BDKN shell getprop ro.product.model)",
+      "PowerShell(adb *)",
+      "PowerShell(Start-Process \"C:\\\\Users\\\\daotr\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\extras\\\\google\\\\auto\\\\desktop-head-unit.exe\")",
+      "Bash(adb -s R3CN203BDKN logcat -s VF3Auto:D AutoLinkA11y:D --line-buffered)",
+      "Bash(kill %1)"
     ]
   }
 }
