@@ -14,7 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.daotranbang.vfsmart.ui.screens.AppLauncherScreen
 import com.daotranbang.vfsmart.ui.screens.ControlScreen
 import com.daotranbang.vfsmart.ui.screens.DebugScreen
 import com.daotranbang.vfsmart.ui.screens.HomeScreen
@@ -62,19 +61,12 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToControls = { navController.navigate("controls") },
                                 onNavigateToDebug    = { navController.navigate("debug") },
                                 onNavigateToSetup    = { navController.navigate("setup") },
-                                onNavigateToApps     = { navController.navigate("apps") },
                                 onNavigateToMirror   = {
                                     navController.navigate("mirror") {
                                         popUpTo("mirror") { inclusive = false }
                                         launchSingleTop = true
                                     }
                                 }
-                            )
-                        }
-
-                        composable("apps") {
-                            AppLauncherScreen(
-                                onNavigateBack = { navController.popBackStack() }
                             )
                         }
 

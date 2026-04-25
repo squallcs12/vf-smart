@@ -24,8 +24,6 @@
 
     <!-- TopAppBar actions (contentDescription) -->
     <string name="mirror_mode_cd">Chế độ gương</string>
-    <string name="all_apps_cd">Ứng dụng</string>
-    <string name="android_settings_cd">Cài đặt Android</string>
     <string name="setup_cd">Cài đặt</string>
     <string name="debug_cd">Debug</string>
 
@@ -121,10 +119,6 @@
     <string name="debug_info">Thông tin</string>
     <string name="debug_tts_engine">Động cơ TTS:</string>
     <string name="debug_tts_value">Tiếng Việt (vi-VN)</string>
-
-    <!-- AppLauncherScreen -->
-    <string name="apps_title">Ứng dụng</string>
-    <string name="apps_search">Tìm ứng dụng…</string>
 
     <!-- TpmsCalibrationScreen -->
     <string name="tpms_title">Hiệu chỉnh TPMS</string>

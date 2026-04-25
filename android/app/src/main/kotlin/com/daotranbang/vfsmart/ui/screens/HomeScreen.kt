@@ -29,7 +29,6 @@ fun HomeScreen(
     onNavigateToControls: () -> Unit = {},
     onNavigateToDebug: () -> Unit = {},
     onNavigateToSetup: () -> Unit = {},
-    onNavigateToApps: () -> Unit = {},
     onNavigateToMirror: () -> Unit = {},
     modifier: Modifier = Modifier,
     statusViewModel: CarStatusViewModel = hiltViewModel(),
@@ -54,7 +53,6 @@ fun HomeScreen(
         onNavigateToControls = onNavigateToControls,
         onNavigateToDebug    = onNavigateToDebug,
         onNavigateToSetup    = onNavigateToSetup,
-        onNavigateToApps     = onNavigateToApps,
         onNavigateToMirror   = onNavigateToMirror,
         modifier             = modifier.fillMaxSize()
     )
@@ -71,7 +69,6 @@ private fun FullContent(
     onNavigateToControls: () -> Unit,
     onNavigateToDebug: () -> Unit,
     onNavigateToSetup: () -> Unit,
-    onNavigateToApps: () -> Unit,
     onNavigateToMirror: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -106,18 +103,6 @@ private fun FullContent(
                     IconButton(onClick = onNavigateToMirror) {
                         Icon(Icons.Default.Fullscreen,
                             contentDescription = stringResource(R.string.mirror_mode_cd))
-                    }
-                    IconButton(onClick = onNavigateToApps) {
-                        Icon(Icons.Default.Apps,
-                            contentDescription = stringResource(R.string.all_apps_cd))
-                    }
-                    IconButton(onClick = {
-                        context.startActivity(
-                            android.content.Intent(android.provider.Settings.ACTION_SETTINGS)
-                        )
-                    }) {
-                        Icon(Icons.Default.PhoneAndroid,
-                            contentDescription = stringResource(R.string.android_settings_cd))
                     }
                     IconButton(onClick = onNavigateToSetup) {
                         Icon(Icons.Default.Settings,
