@@ -39,6 +39,7 @@ class AutoLinkService : Service() {
     private lateinit var networkCallback: ConnectivityManager.NetworkCallback
     private var lastAutoLinkNetwork: Network? = null
     private var lastLaunchTime = 0L
+    private var autoRetryCount = 0
     private var wifiScanReceiver: BroadcastReceiver? = null
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var carConnection: CarConnection
@@ -260,9 +261,29 @@ class AutoLinkService : Service() {
     private fun isAutoLinkConnected(): Boolean =
         lastAutoLinkNetwork != null || currentSsid() == AUTOLINK_SSID
 
-    private fun launchAutoLink(skipCheck: Boolean = false) {
+    private fun scheduleConnectionCheck(attempt: Int = 0) {
+        handler.postDelayed({
+            if (currentSsid() == AUTOLINK_SSID) {
+                Log.i(TAG, "AutoLink connection verified ✓ (check ${attempt + 1})")
+                autoRetryCount = 0
+            } else if (attempt < 4) {
+                Log.v(TAG, "connection check ${attempt + 1}/5 — ssid=${currentSsid()}")
+                scheduleConnectionCheck(attempt + 1)
+            } else if (autoRetryCount < MAX_AUTO_RETRIES) {
+                Log.w(TAG, "AutoLink not connected after 10s (ssid=${currentSsid()}) — retrying once")
+                autoRetryCount++
+                triggerLaunch(this@AutoLinkService, skipCheck = true, isRetry = true)
+            } else {
+                Log.e(TAG, "AutoLink connection failed after retry — giving up")
+                autoRetryCount = 0
+            }
+        }, CONNECTION_CHECK_INTERVAL_MS)
+    }
+
+    private fun launchAutoLink(skipCheck: Boolean = false, isRetry: Boolean = false) {
         val now = System.currentTimeMillis()
-        Log.d(TAG, "launchAutoLink called — skipCheck=$skipCheck")
+        Log.d(TAG, "launchAutoLink called — skipCheck=$skipCheck isRetry=$isRetry")
+        if (!isRetry) autoRetryCount = 0
 
         if (now - lastLaunchTime < DEBOUNCE_MS) {
             Log.d(TAG, "launchAutoLink debounced — ${DEBOUNCE_MS - (now - lastLaunchTime)}ms remaining")
@@ -289,7 +310,7 @@ class AutoLinkService : Service() {
                 val accessibility = AutoLinkAccessibilityService.instance
                 Log.d(TAG, "accessibility instance=$accessibility")
                 if (accessibility != null) {
-                    accessibility.startConnecting()
+                    accessibility.startConnecting(onStartNowClicked = { scheduleConnectionCheck() })
                 } else {
                     Log.w(TAG, "accessibility not available — returning to MainActivity after delay")
                     handler.postDelayed({
@@ -404,7 +425,10 @@ class AutoLinkService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_LAUNCH_AUTOLINK) {
-            launchAutoLink(skipCheck = intent.getBooleanExtra(EXTRA_SKIP_CHECK, false))
+            launchAutoLink(
+                skipCheck = intent.getBooleanExtra(EXTRA_SKIP_CHECK, false),
+                isRetry = intent.getBooleanExtra(EXTRA_IS_RETRY, false)
+            )
         }
         return START_STICKY
     }
@@ -435,11 +459,15 @@ class AutoLinkService : Service() {
         private const val DOUBLE_PRESS_WINDOW_MS = 1000L
         const val ACTION_LAUNCH_AUTOLINK = "com.daotranbang.vfsmart.LAUNCH_AUTOLINK"
         const val EXTRA_SKIP_CHECK = "skip_check"
+        const val EXTRA_IS_RETRY = "is_retry"
+        private const val MAX_AUTO_RETRIES = 1
+        private const val CONNECTION_CHECK_INTERVAL_MS = 2_000L
 
-        fun triggerLaunch(context: Context, skipCheck: Boolean = false) {
+        fun triggerLaunch(context: Context, skipCheck: Boolean = false, isRetry: Boolean = false) {
             context.startService(Intent(context, AutoLinkService::class.java).apply {
                 action = ACTION_LAUNCH_AUTOLINK
                 putExtra(EXTRA_SKIP_CHECK, skipCheck)
+                putExtra(EXTRA_IS_RETRY, isRetry)
             })
         }
 

@@ -19,6 +19,7 @@ class AutoLinkAccessibilityService : AccessibilityService() {
 
     private var state = State.IDLE
     private val handler = Handler(Looper.getMainLooper())
+    private var onStartNowClicked: (() -> Unit)? = null
 
     private val timeoutRunnable = Runnable {
         Log.w(TAG, "startConnecting timed out — no device or 'Start now' found")
@@ -60,6 +61,8 @@ class AutoLinkAccessibilityService : AccessibilityService() {
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
                     })
                     releaseWakeLock()
+                    onStartNowClicked?.invoke()
+                    onStartNowClicked = null
                 }, 1000)
             } else {
                 Log.v(TAG, "'Bắt đầu ngay' not yet visible — retrying in ${POLL_INTERVAL_MS}ms")
@@ -112,7 +115,8 @@ class AutoLinkAccessibilityService : AccessibilityService() {
 
     override fun onKeyEvent(event: KeyEvent): Boolean = false
 
-    fun startConnecting() {
+    fun startConnecting(onStartNowClicked: (() -> Unit)? = null) {
+        this.onStartNowClicked = onStartNowClicked
         Log.d(TAG, "startConnecting — polling for DIRECT-phonelink-112391")
         state = State.FINDING_DEVICE
         handler.removeCallbacks(timeoutRunnable)
@@ -132,6 +136,7 @@ class AutoLinkAccessibilityService : AccessibilityService() {
         handler.removeCallbacks(pollForDeviceRunnable)
         handler.removeCallbacks(pollForStartNowRunnable)
         releaseWakeLock()
+        onStartNowClicked = null
     }
 
     override fun onDestroy() {
