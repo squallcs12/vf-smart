@@ -270,7 +270,7 @@ class AutoLinkService : Service() {
                 Log.v(TAG, "connection check ${attempt + 1}/5 — ssid=${currentSsid()}")
                 scheduleConnectionCheck(attempt + 1)
             } else if (autoRetryCount < MAX_AUTO_RETRIES) {
-                Log.w(TAG, "AutoLink not connected after 10s (ssid=${currentSsid()}) — retrying once")
+                Log.w(TAG, "AutoLink not connected after 30s (ssid=${currentSsid()}) — retrying once")
                 autoRetryCount++
                 triggerLaunch(this@AutoLinkService, skipCheck = true, isRetry = true)
             } else {
@@ -461,7 +461,7 @@ class AutoLinkService : Service() {
         const val EXTRA_SKIP_CHECK = "skip_check"
         const val EXTRA_IS_RETRY = "is_retry"
         private const val MAX_AUTO_RETRIES = 1
-        private const val CONNECTION_CHECK_INTERVAL_MS = 2_000L
+        private const val CONNECTION_CHECK_INTERVAL_MS = 6_000L
 
         fun triggerLaunch(context: Context, skipCheck: Boolean = false, isRetry: Boolean = false) {
             context.startService(Intent(context, AutoLinkService::class.java).apply {
