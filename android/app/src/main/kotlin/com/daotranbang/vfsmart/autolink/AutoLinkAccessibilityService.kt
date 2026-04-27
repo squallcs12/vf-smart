@@ -47,9 +47,7 @@ class AutoLinkAccessibilityService : AccessibilityService() {
     private val pollForStartNowRunnable = object : Runnable {
         override fun run() {
             if (state != State.FINDING_START_NOW) return
-            val root = rootInActiveWindow
-            val node = (root?.findAccessibilityNodeInfosByText("Bắt đầu ngay")?.firstOrNull()
-                ?: root?.findAccessibilityNodeInfosByText("Start now")?.firstOrNull())
+            val node = findStartNowNode()
             if (node != null) {
                 Log.d(TAG, "'Bắt đầu ngay' found — clicking and returning to MainActivity")
                 clickNodeOrParent(node)
@@ -67,8 +65,24 @@ class AutoLinkAccessibilityService : AccessibilityService() {
                 Log.v(TAG, "'Bắt đầu ngay' not yet visible — retrying in ${POLL_INTERVAL_MS}ms")
                 handler.postDelayed(this, POLL_INTERVAL_MS)
             }
-            @Suppress("DEPRECATION") root?.recycle()
         }
+    }
+
+    private fun findStartNowNode(): AccessibilityNodeInfo? {
+        // Search all windows (covers system dialogs from com.android.systemui)
+        for (window in windows ?: emptyList()) {
+            val root = window.root ?: continue
+            val node = root.findAccessibilityNodeInfosByText("Bắt đầu ngay")?.firstOrNull()
+                ?: root.findAccessibilityNodeInfosByText("Start now")?.firstOrNull()
+            @Suppress("DEPRECATION") root.recycle()
+            if (node != null) return node
+        }
+        // Fallback to active window
+        val root = rootInActiveWindow ?: return null
+        val node = root.findAccessibilityNodeInfosByText("Bắt đầu ngay")?.firstOrNull()
+            ?: root.findAccessibilityNodeInfosByText("Start now")?.firstOrNull()
+        @Suppress("DEPRECATION") root.recycle()
+        return node
     }
 
 
@@ -77,10 +91,11 @@ class AutoLinkAccessibilityService : AccessibilityService() {
         serviceInfo = AccessibilityServiceInfo().apply {
             eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
                     AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
-            packageNames = arrayOf(AUTOLINK_PACKAGE)
+            packageNames = arrayOf(AUTOLINK_PACKAGE, "com.android.systemui")
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
             flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
-                    AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
+                    AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS or
+                    AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
             notificationTimeout = 100
         }
     }
