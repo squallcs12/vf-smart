@@ -15,7 +15,7 @@ import com.daotranbang.vfsmart.ui.MainActivity
 
 class AutoLinkAccessibilityService : AccessibilityService() {
 
-    private enum class State { IDLE, FINDING_DEVICE, FINDING_START_NOW }
+    private enum class State { IDLE, CLICKING_HELP, FINDING_DEVICE, FINDING_START_NOW }
 
     private var state = State.IDLE
     private val handler = Handler(Looper.getMainLooper())
@@ -24,6 +24,28 @@ class AutoLinkAccessibilityService : AccessibilityService() {
     private val timeoutRunnable = Runnable {
         Log.w(TAG, "startConnecting timed out — no device or 'Start now' found")
         state = State.IDLE
+    }
+
+    private val pollForHelpRunnable = object : Runnable {
+        override fun run() {
+            if (state != State.CLICKING_HELP) return
+            val root = rootInActiveWindow
+            val node = root?.let { findNodeByContentDesc(it, "Help") }
+            if (node != null) {
+                Log.d(TAG, "Help button found — clicking")
+                clickNodeOrParent(node)
+                @Suppress("DEPRECATION") node.recycle()
+                handler.postDelayed({
+                    Log.d(TAG, "pressing Back after Help click")
+                    performGlobalAction(GLOBAL_ACTION_BACK)
+                    state = State.FINDING_DEVICE
+                    handler.post(pollForDeviceRunnable)
+                }, 1000)
+            } else {
+                Log.v(TAG, "Help button not yet visible — retrying in ${POLL_INTERVAL_MS}ms")
+                handler.postDelayed(this, POLL_INTERVAL_MS)
+            }
+        }
     }
 
     private val pollForDeviceRunnable = object : Runnable {
@@ -107,6 +129,15 @@ class AutoLinkAccessibilityService : AccessibilityService() {
         // Both FINDING_DEVICE and FINDING_START_NOW are handled by their poll runnables.
     }
 
+    private fun findNodeByContentDesc(node: AccessibilityNodeInfo, desc: String): AccessibilityNodeInfo? {
+        if (node.contentDescription?.toString() == desc) return node
+        for (i in 0 until node.childCount) {
+            val found = findNodeByContentDesc(node.getChild(i) ?: continue, desc)
+            if (found != null) return found
+        }
+        return null
+    }
+
     private fun clickNodeOrParent(node: AccessibilityNodeInfo) {
         if (!node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
             node.parent?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
@@ -117,12 +148,13 @@ class AutoLinkAccessibilityService : AccessibilityService() {
 
     fun startConnecting(onStartNowClicked: (() -> Unit)? = null) {
         this.onStartNowClicked = onStartNowClicked
-        Log.d(TAG, "startConnecting — polling for DIRECT-phonelink-112391")
-        state = State.FINDING_DEVICE
+        Log.d(TAG, "startConnecting — clicking Help then polling for DIRECT-phonelink-112391")
+        state = State.CLICKING_HELP
         handler.removeCallbacks(timeoutRunnable)
+        handler.removeCallbacks(pollForHelpRunnable)
         handler.removeCallbacks(pollForDeviceRunnable)
         handler.postDelayed(timeoutRunnable, TIMEOUT_MS)
-        handler.post(pollForDeviceRunnable)
+        handler.post(pollForHelpRunnable)
     }
 
     private fun releaseWakeLock() {
@@ -133,6 +165,7 @@ class AutoLinkAccessibilityService : AccessibilityService() {
     override fun onInterrupt() {
         state = State.IDLE
         handler.removeCallbacksAndMessages(null)
+        handler.removeCallbacks(pollForHelpRunnable)
         handler.removeCallbacks(pollForDeviceRunnable)
         handler.removeCallbacks(pollForStartNowRunnable)
         releaseWakeLock()
