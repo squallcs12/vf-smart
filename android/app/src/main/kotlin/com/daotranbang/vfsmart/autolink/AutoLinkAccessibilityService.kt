@@ -127,7 +127,7 @@ class AutoLinkAccessibilityService : AccessibilityService() {
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
             flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
                     AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
-            notificationTimeout = POLL_INTERVAL_MS.toInt()
+            notificationTimeout = POLL_INTERVAL_MS
         }
     }
 
