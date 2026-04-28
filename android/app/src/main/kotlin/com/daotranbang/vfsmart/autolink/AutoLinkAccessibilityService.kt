@@ -25,6 +25,7 @@ class AutoLinkAccessibilityService : AccessibilityService() {
     private val timeoutRunnable = Runnable {
         Log.w(TAG, "startConnecting timed out — no device or 'Start now' found")
         state = State.IDLE
+        setWindowScanEnabled(false)
     }
 
     private val pollForHelpRunnable = object : Runnable {
@@ -83,6 +84,7 @@ class AutoLinkAccessibilityService : AccessibilityService() {
                 @Suppress("DEPRECATION") node.recycle()
                 handler.removeCallbacks(timeoutRunnable)
                 state = State.IDLE
+                setWindowScanEnabled(false)
                 handler.postDelayed({
                     Log.i(TAG, "AutoLink connection complete — Android Auto started successfully")
                     startActivity(Intent(this@AutoLinkAccessibilityService, MainActivity::class.java).apply {
@@ -120,14 +122,12 @@ class AutoLinkAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         instance = this
         serviceInfo = AccessibilityServiceInfo().apply {
-            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
-                    AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
             packageNames = arrayOf(AUTOLINK_PACKAGE, "com.android.systemui")
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
             flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
-                    AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS or
-                    AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
-            notificationTimeout = 100
+                    AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
+            notificationTimeout = POLL_INTERVAL_MS.toInt()
         }
     }
 
@@ -142,6 +142,15 @@ class AutoLinkAccessibilityService : AccessibilityService() {
             if (found != null) return found
         }
         return null
+    }
+
+    private fun setWindowScanEnabled(enabled: Boolean) {
+        serviceInfo = serviceInfo?.apply {
+            flags = if (enabled)
+                flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+            else
+                flags and AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS.inv()
+        }
     }
 
     private fun clickNodeOrParent(node: AccessibilityNodeInfo) {
@@ -159,6 +168,8 @@ class AutoLinkAccessibilityService : AccessibilityService() {
         handler.removeCallbacks(timeoutRunnable)
         handler.removeCallbacks(pollForHelpRunnable)
         handler.removeCallbacks(pollForDeviceRunnable)
+        handler.removeCallbacks(pollForStartNowRunnable)
+        setWindowScanEnabled(true)
         handler.postDelayed(timeoutRunnable, TIMEOUT_MS)
         handler.post(pollForHelpRunnable)
     }
@@ -170,6 +181,7 @@ class AutoLinkAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {
         state = State.IDLE
+        setWindowScanEnabled(false)
         helpClickCount = 0
         handler.removeCallbacksAndMessages(null)
         handler.removeCallbacks(pollForHelpRunnable)

@@ -7,6 +7,8 @@ import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Icon
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -25,13 +27,24 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 class NavigationNotificationService : NotificationListenerService() {
 
+    private val handler = Handler(Looper.getMainLooper())
+    private val relaunchRunnable = Runnable {
+        if (!autoLinkMirroringActive) {
+            Log.i(TAG, "Mirroring still inactive after grace period — triggering relaunch")
+            AutoLinkService.triggerLaunch(this, skipCheck = false)
+        } else {
+            Log.d(TAG, "Mirroring restored within grace period — relaunch cancelled")
+        }
+    }
+
     companion object {
         private val _navigationState = MutableStateFlow(NavigationState())
         val navigationState: StateFlow<NavigationState> = _navigationState.asStateFlow()
 
-        private const val MAPS_PACKAGE     = "com.google.android.apps.maps"
-        private const val AUTOLINK_PACKAGE = "com.link.autolink.pro"
-        private const val TAG = "NavNotifService"
+        private const val MAPS_PACKAGE      = "com.google.android.apps.maps"
+        private const val AUTOLINK_PACKAGE  = "com.link.autolink.pro"
+        private const val TAG               = "NavNotifService"
+        private const val RELAUNCH_GRACE_MS = 3_000L
 
         @Volatile @JvmField var autoLinkMirroringActive = false
     }
@@ -51,6 +64,7 @@ class NavigationNotificationService : NotificationListenerService() {
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
+        handler.removeCallbacks(relaunchRunnable)
         Log.w(TAG, "=== LISTENER DISCONNECTED ===")
     }
 
@@ -58,6 +72,7 @@ class NavigationNotificationService : NotificationListenerService() {
         processNotification(sbn)
         if (sbn.packageName == AUTOLINK_PACKAGE && isAutoLinkMirroring(sbn)) {
             autoLinkMirroringActive = true
+            handler.removeCallbacks(relaunchRunnable)
             Log.i(TAG, "AutoLink Mirroring notification posted")
         }
     }
@@ -66,8 +81,9 @@ class NavigationNotificationService : NotificationListenerService() {
         if (sbn.packageName == MAPS_PACKAGE) _navigationState.value = NavigationState()
         if (sbn.packageName == AUTOLINK_PACKAGE && autoLinkMirroringActive && isAutoLinkMirroring(sbn)) {
             autoLinkMirroringActive = false
-            Log.i(TAG, "AutoLink Mirroring notification removed — triggering AutoLink relaunch")
-            AutoLinkService.triggerLaunch(this, skipCheck = true)
+            Log.i(TAG, "AutoLink Mirroring notification removed — scheduling relaunch check in ${RELAUNCH_GRACE_MS}ms")
+            handler.removeCallbacks(relaunchRunnable)
+            handler.postDelayed(relaunchRunnable, RELAUNCH_GRACE_MS)
         }
     }
 

@@ -31,6 +31,7 @@ class AutoLinkService : Service() {
 
     private var lastLaunchTime = 0L
     private var autoRetryCount = 0
+    private var connectionCheckAttempt = 0
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var carConnection: CarConnection
 
@@ -208,6 +209,7 @@ class AutoLinkService : Service() {
 
     @Suppress("DEPRECATION")
     private fun wakeScreen() {
+        AutoLinkAccessibilityService.wakeLock?.let { if (it.isHeld) it.release() }
         val pm = getSystemService(PowerManager::class.java)
         val wl = pm.newWakeLock(
             PowerManager.FULL_WAKE_LOCK or
@@ -222,14 +224,15 @@ class AutoLinkService : Service() {
     private fun isAutoLinkConnected(): Boolean =
         NavigationNotificationService.autoLinkMirroringActive
 
-    private fun scheduleConnectionCheck(attempt: Int = 0) {
-        handler.postDelayed({
+    private val connectionCheckRunnable = object : Runnable {
+        override fun run() {
             if (NavigationNotificationService.autoLinkMirroringActive) {
-                Log.i(TAG, "AutoLink Mirroring notification active ✓ (check ${attempt + 1})")
+                Log.i(TAG, "AutoLink Mirroring notification active ✓ (check ${connectionCheckAttempt + 1})")
                 autoRetryCount = 0
-            } else if (attempt < 4) {
-                Log.v(TAG, "connection check ${attempt + 1}/5 — mirroring=${NavigationNotificationService.autoLinkMirroringActive}")
-                scheduleConnectionCheck(attempt + 1)
+            } else if (connectionCheckAttempt < 4) {
+                connectionCheckAttempt++
+                Log.v(TAG, "connection check $connectionCheckAttempt/5 — mirroring=false")
+                handler.postDelayed(this, CONNECTION_CHECK_INTERVAL_MS)
             } else if (autoRetryCount < MAX_AUTO_RETRIES) {
                 Log.w(TAG, "AutoLink not mirroring after 30s — retrying once")
                 autoRetryCount++
@@ -238,7 +241,13 @@ class AutoLinkService : Service() {
                 Log.e(TAG, "AutoLink connection failed after retry — giving up")
                 autoRetryCount = 0
             }
-        }, CONNECTION_CHECK_INTERVAL_MS)
+        }
+    }
+
+    private fun scheduleConnectionCheck() {
+        handler.removeCallbacks(connectionCheckRunnable)
+        connectionCheckAttempt = 0
+        handler.postDelayed(connectionCheckRunnable, CONNECTION_CHECK_INTERVAL_MS)
     }
 
     private fun launchAutoLink(skipCheck: Boolean = false, isRetry: Boolean = false) {
