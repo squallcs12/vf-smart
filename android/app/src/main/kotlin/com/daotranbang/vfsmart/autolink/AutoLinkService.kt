@@ -13,11 +13,6 @@ import android.content.IntentFilter
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
-import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
-import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -34,13 +29,8 @@ import com.daotranbang.vfsmart.ui.MainActivity
 
 class AutoLinkService : Service() {
 
-    private val wifiManager get() = applicationContext.getSystemService(WifiManager::class.java)
-
-    private lateinit var networkCallback: ConnectivityManager.NetworkCallback
-    private var lastAutoLinkNetwork: Network? = null
     private var lastLaunchTime = 0L
     private var autoRetryCount = 0
-    private var wifiScanReceiver: BroadcastReceiver? = null
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var carConnection: CarConnection
 
@@ -167,7 +157,6 @@ class AutoLinkService : Service() {
         setupMediaSessionMonitor()
         registerCarConnectionObserver()
         registerCarModeReceiver()
-        registerNetworkCallback()
     }
 
     private fun grantWriteSettingsViaRoot() {
@@ -217,34 +206,6 @@ class AutoLinkService : Service() {
         registerReceiver(receiver, IntentFilter(UiModeManager.ACTION_ENTER_CAR_MODE))
     }
 
-    private fun registerNetworkCallback() {
-        networkCallback = object : ConnectivityManager.NetworkCallback() {
-            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-                if (currentSsid() == AUTOLINK_SSID) {
-                    lastAutoLinkNetwork = network
-                }
-            }
-
-            override fun onLost(network: Network) {
-                if (network == lastAutoLinkNetwork) {
-                    lastAutoLinkNetwork = null
-                    launchAutoLink()
-                }
-            }
-        }
-        getSystemService(ConnectivityManager::class.java).registerNetworkCallback(
-            NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),
-            networkCallback
-        )
-    }
-
-    @Suppress("DEPRECATION")
-    private fun currentSsid(): String? =
-        applicationContext.getSystemService(WifiManager::class.java)
-            ?.connectionInfo?.ssid
-            ?.trim('"')
-            ?.takeIf { it.isNotEmpty() && it != "<unknown ssid>" }
-
     @Suppress("DEPRECATION")
     private fun wakeScreen() {
         val pm = getSystemService(PowerManager::class.java)
@@ -259,18 +220,18 @@ class AutoLinkService : Service() {
     }
 
     private fun isAutoLinkConnected(): Boolean =
-        lastAutoLinkNetwork != null || currentSsid() == AUTOLINK_SSID
+        NavigationNotificationService.autoLinkMirroringActive
 
     private fun scheduleConnectionCheck(attempt: Int = 0) {
         handler.postDelayed({
-            if (currentSsid() == AUTOLINK_SSID) {
-                Log.i(TAG, "AutoLink connection verified ✓ (check ${attempt + 1})")
+            if (NavigationNotificationService.autoLinkMirroringActive) {
+                Log.i(TAG, "AutoLink Mirroring notification active ✓ (check ${attempt + 1})")
                 autoRetryCount = 0
             } else if (attempt < 4) {
-                Log.v(TAG, "connection check ${attempt + 1}/5 — ssid=${currentSsid()}")
+                Log.v(TAG, "connection check ${attempt + 1}/5 — mirroring=${NavigationNotificationService.autoLinkMirroringActive}")
                 scheduleConnectionCheck(attempt + 1)
             } else if (autoRetryCount < MAX_AUTO_RETRIES) {
-                Log.w(TAG, "AutoLink not connected after 30s (ssid=${currentSsid()}) — retrying once")
+                Log.w(TAG, "AutoLink not mirroring after 30s — retrying once")
                 autoRetryCount++
                 triggerLaunch(this@AutoLinkService, skipCheck = true, isRetry = true)
             } else {
@@ -289,121 +250,30 @@ class AutoLinkService : Service() {
             Log.d(TAG, "launchAutoLink debounced — ${DEBOUNCE_MS - (now - lastLaunchTime)}ms remaining")
             return
         }
-        val ssid = currentSsid()
-        Log.d(TAG, "current SSID=$ssid lastAutoLinkNetwork=$lastAutoLinkNetwork")
         if (!skipCheck && isAutoLinkConnected()) {
-            Log.d(TAG, "launchAutoLink skipped — already on $AUTOLINK_SSID")
+            Log.d(TAG, "launchAutoLink skipped — AutoLink is already mirroring")
             return
         }
 
-        Log.i(TAG, "scanning WiFi for $AUTOLINK_SSID before launching (wifiEnabled=${wifiManager.isWifiEnabled})")
-        scanForAutoLinkSsid(
-            onFound = {
-                Log.i(TAG, "$AUTOLINK_SSID visible — launching AutoLink Pro")
-                lastLaunchTime = System.currentTimeMillis()
-                val launchIntent = Intent().apply {
-                    setClassName(AUTOLINK_PACKAGE, AUTOLINK_MAIN_ACTIVITY)
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                }
-                wakeScreen()
-                startActivity(launchIntent)
-                val accessibility = AutoLinkAccessibilityService.instance
-                Log.d(TAG, "accessibility instance=$accessibility")
-                if (accessibility != null) {
-                    accessibility.startConnecting(onStartNowClicked = { scheduleConnectionCheck() })
-                } else {
-                    Log.w(TAG, "accessibility not available — returning to MainActivity after delay")
-                    handler.postDelayed({
-                        startActivity(Intent(this, MainActivity::class.java).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                        })
-                    }, RETURN_DELAY_MS)
-                }
-            },
-            onNotFound = {
-                Log.w(TAG, "$AUTOLINK_SSID not found in scan — skipping launch")
-            }
-        )
-    }
-
-    private fun scanForAutoLinkSsid(onFound: () -> Unit, onNotFound: () -> Unit) {
-        stopWifiScan()
-        if (!wifiManager.isWifiEnabled) {
-            Log.d(TAG, "WiFi disabled — enabling via root then polling")
-            enableWifiViaRoot()
-            pollUntilWifiEnabled(onFound, onNotFound)
+        Log.i(TAG, "launching AutoLink Pro")
+        lastLaunchTime = System.currentTimeMillis()
+        AutoLinkAccessibilityService.instance?.helpClickCount = 0
+        wakeScreen()
+        startActivity(Intent().apply {
+            setClassName(AUTOLINK_PACKAGE, AUTOLINK_MAIN_ACTIVITY)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        })
+        val accessibility = AutoLinkAccessibilityService.instance
+        Log.d(TAG, "accessibility instance=$accessibility")
+        if (accessibility != null) {
+            accessibility.startConnecting(onStartNowClicked = { scheduleConnectionCheck() })
         } else {
-            Log.d(TAG, "WiFi enabled — starting scan")
-            startWifiScan(onFound, onNotFound)
-        }
-    }
-
-    private fun pollUntilWifiEnabled(onFound: () -> Unit, onNotFound: () -> Unit, attempt: Int = 0) {
-        if (wifiManager.isWifiEnabled) {
-            Log.d(TAG, "WiFi enabled after $attempt polls — starting scan")
-            startWifiScan(onFound, onNotFound)
-        } else if (attempt < 10) {
-            Log.d(TAG, "WiFi not yet enabled — poll attempt $attempt/10")
-            handler.postDelayed({ pollUntilWifiEnabled(onFound, onNotFound, attempt + 1) }, 1000)
-        } else {
-            Log.e(TAG, "WiFi failed to enable after 10 attempts — aborting")
-            onNotFound()
-        }
-    }
-
-    private fun enableWifiViaRoot() {
-        Thread {
-            try {
-                val process = Runtime.getRuntime().exec("su")
-                val writer = process.outputStream.bufferedWriter()
-                writer.write("svc wifi enable\n")
-                writer.flush()
-                writer.close()
-                process.waitFor()
-            } catch (_: Exception) {}
-        }.start()
-    }
-
-    @Suppress("DEPRECATION", "MissingPermission")
-    private fun startWifiScan(onFound: () -> Unit, onNotFound: () -> Unit) {
-        val deadline = System.currentTimeMillis() + SCAN_WINDOW_MS
-        var attempt = 0
-
-        fun scheduleScan() {
-            attempt++
-            Log.d(TAG, "WiFi scan attempt $attempt — looking for $AUTOLINK_SSID")
-
-            wifiScanReceiver = object : BroadcastReceiver() {
-                @Suppress("DEPRECATION", "MissingPermission")
-                override fun onReceive(context: Context, intent: Intent) {
-                    stopWifiScan()
-                    val results = wifiManager.scanResults
-                    val found = results.any { it.SSID == AUTOLINK_SSID }
-                    Log.d(TAG, "scan #$attempt: ${results.size} networks, $AUTOLINK_SSID found=$found")
-                    when {
-                        found -> onFound()
-                        System.currentTimeMillis() < deadline -> {
-                            Log.d(TAG, "not found — next scan in ${SCAN_INTERVAL_MS / 1000}s")
-                            handler.postDelayed({ scheduleScan() }, SCAN_INTERVAL_MS)
-                        }
-                        else -> {
-                            Log.w(TAG, "$AUTOLINK_SSID not found after ${SCAN_WINDOW_MS / 60_000}min — giving up")
-                            onNotFound()
-                        }
-                    }
-                }
-            }
-            registerReceiver(wifiScanReceiver, IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION))
-            wifiManager.startScan()
-        }
-
-        scheduleScan()
-    }
-
-    private fun stopWifiScan() {
-        wifiScanReceiver?.let {
-            try { unregisterReceiver(it) } catch (_: Exception) {}
-            wifiScanReceiver = null
+            Log.w(TAG, "accessibility not available — returning to MainActivity after delay")
+            handler.postDelayed({
+                startActivity(Intent(this, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                })
+            }, RETURN_DELAY_MS)
         }
     }
 
@@ -435,9 +305,7 @@ class AutoLinkService : Service() {
 
     override fun onDestroy() {
         teardownMediaSessionMonitor()
-        stopWifiScan()
         carConnection.type.removeObserver(carConnectionObserver)
-        getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(networkCallback)
         handler.removeCallbacksAndMessages(null)
         super.onDestroy()
     }
@@ -450,12 +318,9 @@ class AutoLinkService : Service() {
         private const val NOTIFICATION_ID = 2001
         private const val AUTOLINK_PACKAGE       = "com.link.autolink.pro"
         private const val AUTOLINK_MAIN_ACTIVITY = "com.link.autolink.activity.MainActivity"
-        private const val AUTOLINK_SSID           = "DIRECT-phonelink-112391"
         private const val RETURN_DELAY_MS = 2000L
         private const val DEBOUNCE_MS = 5000L
         private const val WAKE_TIMEOUT_MS = 35_000L
-        private const val SCAN_INTERVAL_MS = 30_000L
-        private const val SCAN_WINDOW_MS   = 30 * 60_000L
         private const val DOUBLE_PRESS_WINDOW_MS = 1000L
         const val ACTION_LAUNCH_AUTOLINK = "com.daotranbang.vfsmart.LAUNCH_AUTOLINK"
         const val EXTRA_SKIP_CHECK = "skip_check"

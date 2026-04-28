@@ -20,6 +20,7 @@ class AutoLinkAccessibilityService : AccessibilityService() {
     private var state = State.IDLE
     private val handler = Handler(Looper.getMainLooper())
     private var onStartNowClicked: (() -> Unit)? = null
+    var helpClickCount = 0
 
     private val timeoutRunnable = Runnable {
         Log.w(TAG, "startConnecting timed out — no device or 'Start now' found")
@@ -32,14 +33,19 @@ class AutoLinkAccessibilityService : AccessibilityService() {
             val root = rootInActiveWindow
             val node = root?.let { findNodeByContentDesc(it, "Help") }
             if (node != null) {
-                Log.d(TAG, "Help button found — clicking")
+                helpClickCount++
+                Log.d(TAG, "Help button found — clicking ($helpClickCount/2)")
                 clickNodeOrParent(node)
                 @Suppress("DEPRECATION") node.recycle()
                 handler.postDelayed({
-                    Log.d(TAG, "pressing Back after Help click")
+                    Log.d(TAG, "pressing Back after Help click $helpClickCount")
                     performGlobalAction(GLOBAL_ACTION_BACK)
-                    state = State.FINDING_DEVICE
-                    handler.post(pollForDeviceRunnable)
+                    if (helpClickCount < 2) {
+                        handler.postDelayed(this, POLL_INTERVAL_MS)
+                    } else {
+                        state = State.FINDING_DEVICE
+                        handler.post(pollForDeviceRunnable)
+                    }
                 }, 1000)
             } else {
                 Log.v(TAG, "Help button not yet visible — retrying in ${POLL_INTERVAL_MS}ms")
@@ -148,7 +154,7 @@ class AutoLinkAccessibilityService : AccessibilityService() {
 
     fun startConnecting(onStartNowClicked: (() -> Unit)? = null) {
         this.onStartNowClicked = onStartNowClicked
-        Log.d(TAG, "startConnecting — clicking Help then polling for DIRECT-phonelink-112391")
+        Log.d(TAG, "startConnecting — clicking Help×2 then polling for DIRECT-phonelink-112391")
         state = State.CLICKING_HELP
         handler.removeCallbacks(timeoutRunnable)
         handler.removeCallbacks(pollForHelpRunnable)
@@ -164,6 +170,7 @@ class AutoLinkAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {
         state = State.IDLE
+        helpClickCount = 0
         handler.removeCallbacksAndMessages(null)
         handler.removeCallbacks(pollForHelpRunnable)
         handler.removeCallbacks(pollForDeviceRunnable)

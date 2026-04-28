@@ -11,6 +11,7 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import androidx.annotation.RequiresApi
+import com.daotranbang.vfsmart.autolink.AutoLinkService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,14 +29,24 @@ class NavigationNotificationService : NotificationListenerService() {
         private val _navigationState = MutableStateFlow(NavigationState())
         val navigationState: StateFlow<NavigationState> = _navigationState.asStateFlow()
 
-        private const val MAPS_PACKAGE = "com.google.android.apps.maps"
+        private const val MAPS_PACKAGE     = "com.google.android.apps.maps"
+        private const val AUTOLINK_PACKAGE = "com.link.autolink.pro"
         private const val TAG = "NavNotifService"
+
+        @Volatile @JvmField var autoLinkMirroringActive = false
     }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
         Log.w(TAG, "=== LISTENER CONNECTED ===")
-        activeNotifications?.forEach { processNotification(it) }
+        autoLinkMirroringActive = false
+        activeNotifications?.forEach { sbn ->
+            processNotification(sbn)
+            if (sbn.packageName == AUTOLINK_PACKAGE && isAutoLinkMirroring(sbn)) {
+                autoLinkMirroringActive = true
+                Log.i(TAG, "AutoLink Mirroring notification already active on connect")
+            }
+        }
     }
 
     override fun onListenerDisconnected() {
@@ -43,10 +54,29 @@ class NavigationNotificationService : NotificationListenerService() {
         Log.w(TAG, "=== LISTENER DISCONNECTED ===")
     }
 
-    override fun onNotificationPosted(sbn: StatusBarNotification) = processNotification(sbn)
+    override fun onNotificationPosted(sbn: StatusBarNotification) {
+        processNotification(sbn)
+        if (sbn.packageName == AUTOLINK_PACKAGE && isAutoLinkMirroring(sbn)) {
+            autoLinkMirroringActive = true
+            Log.i(TAG, "AutoLink Mirroring notification posted")
+        }
+    }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         if (sbn.packageName == MAPS_PACKAGE) _navigationState.value = NavigationState()
+        if (sbn.packageName == AUTOLINK_PACKAGE && autoLinkMirroringActive && isAutoLinkMirroring(sbn)) {
+            autoLinkMirroringActive = false
+            Log.i(TAG, "AutoLink Mirroring notification removed — triggering AutoLink relaunch")
+            AutoLinkService.triggerLaunch(this, skipCheck = true)
+        }
+    }
+
+    private fun isAutoLinkMirroring(sbn: StatusBarNotification): Boolean {
+        val extras = sbn.notification.extras
+        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
+        val body  = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+        return title.contains("Mirroring", ignoreCase = true) ||
+               body.contains("Mirroring", ignoreCase = true)
     }
 
     private fun processNotification(sbn: StatusBarNotification) {
