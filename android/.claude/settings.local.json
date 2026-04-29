@@ -29,7 +29,8 @@
       "PowerShell(adb *)",
       "PowerShell(Start-Process \"C:\\\\Users\\\\daotr\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\extras\\\\google\\\\auto\\\\desktop-head-unit.exe\")",
       "Bash(adb -s R3CN203BDKN logcat -s VF3Auto:D AutoLinkA11y:D --line-buffered)",
-      "Bash(kill %1)"
+      "Bash(kill %1)",
+      "Bash(adb *)"
     ]
   }
 }
