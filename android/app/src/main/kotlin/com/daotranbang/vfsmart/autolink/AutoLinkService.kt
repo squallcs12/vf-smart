@@ -23,6 +23,9 @@ import android.util.Log
 import androidx.car.app.connection.CarConnection
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.Observer
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.navigation.NavigationNotificationService
 import com.daotranbang.vfsmart.ui.MainActivity
@@ -141,11 +144,13 @@ class AutoLinkService : Service() {
         when (type) {
             CarConnection.CONNECTION_TYPE_PROJECTION -> {
                 Log.i(TAG, "Android Auto connected — dimming screen, triggering AutoLink")
+                _androidAutoConnected.value = true
                 dimScreen()
                 launchAutoLink()
             }
             else -> {
                 Log.i(TAG, "Android Auto disconnected — restoring brightness")
+                _androidAutoConnected.value = false
                 restoreBrightness()
             }
         }
@@ -324,6 +329,9 @@ class AutoLinkService : Service() {
     companion object {
         private const val TAG = "AutoLinkSvc"
         private const val CHANNEL_ID = "autolink_monitor"
+
+        private val _androidAutoConnected = MutableStateFlow(false)
+        val androidAutoConnected: StateFlow<Boolean> = _androidAutoConnected.asStateFlow()
         private const val NOTIFICATION_ID = 2001
         private const val AUTOLINK_PACKAGE       = "com.link.autolink.pro"
         private const val AUTOLINK_MAIN_ACTIVITY = "com.link.autolink.activity.MainActivity"

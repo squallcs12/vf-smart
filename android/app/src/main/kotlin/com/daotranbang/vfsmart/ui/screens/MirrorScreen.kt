@@ -43,6 +43,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.daotranbang.vfsmart.autolink.AutoLinkService
 import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.data.model.CarStatus
 import com.daotranbang.vfsmart.data.model.TpmsData
@@ -142,13 +143,29 @@ fun MirrorScreen(
 private fun rememberPhoneGpsState(): GpsState {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val isAndroidAutoConnected by AutoLinkService.androidAutoConnected.collectAsStateWithLifecycle()
     var state by remember { mutableStateOf(GpsState()) }
+    var isResumed by remember { mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
 
     DisposableEffect(lifecycle) {
-        val granted = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        if (!granted) return@DisposableEffect onDispose {}
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> isResumed = true
+                Lifecycle.Event.ON_PAUSE  -> isResumed = false
+                else -> {}
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+
+    val shouldTrack = isAndroidAutoConnected && isResumed
+    val granted = ContextCompat.checkSelfPermission(
+        context, Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    DisposableEffect(shouldTrack) {
+        if (!shouldTrack || !granted) return@DisposableEffect onDispose {}
 
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val listener = LocationListener { loc ->
@@ -160,40 +177,21 @@ private fun rememberPhoneGpsState(): GpsState {
                 bearing   = loc.bearing
             )
         }
-
-        fun startGps() {
-            try {
-                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener)
-                lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let { loc ->
-                    state = GpsState(
-                        isActive  = true,
-                        latitude  = loc.latitude,
-                        longitude = loc.longitude,
-                        speedMs   = loc.speed,
-                        bearing   = loc.bearing
-                    )
-                }
-            } catch (_: Exception) {}
-        }
-
-        fun stopGps() {
-            try { lm.removeUpdates(listener) } catch (_: Exception) {}
-        }
-
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> startGps()
-                Lifecycle.Event.ON_PAUSE  -> stopGps()
-                else -> {}
+        try {
+            lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener)
+            lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let { loc ->
+                state = GpsState(
+                    isActive  = true,
+                    latitude  = loc.latitude,
+                    longitude = loc.longitude,
+                    speedMs   = loc.speed,
+                    bearing   = loc.bearing
+                )
             }
-        }
-        lifecycle.addObserver(observer)
-        // Observer won't replay past events — start immediately if already resumed
-        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) startGps()
+        } catch (_: Exception) {}
 
         onDispose {
-            lifecycle.removeObserver(observer)
-            stopGps()
+            try { lm.removeUpdates(listener) } catch (_: Exception) {}
         }
     }
 
