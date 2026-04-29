@@ -141,9 +141,10 @@ fun MirrorScreen(
 @Composable
 private fun rememberPhoneGpsState(): GpsState {
     val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     var state by remember { mutableStateOf(GpsState()) }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(lifecycle) {
         val granted = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
@@ -159,21 +160,40 @@ private fun rememberPhoneGpsState(): GpsState {
                 bearing   = loc.bearing
             )
         }
-        try {
-            lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener)
-            lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let { loc ->
-                state = GpsState(
-                    isActive  = true,
-                    latitude  = loc.latitude,
-                    longitude = loc.longitude,
-                    speedMs   = loc.speed,
-                    bearing   = loc.bearing
-                )
+
+        fun startGps() {
+            try {
+                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener)
+                lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let { loc ->
+                    state = GpsState(
+                        isActive  = true,
+                        latitude  = loc.latitude,
+                        longitude = loc.longitude,
+                        speedMs   = loc.speed,
+                        bearing   = loc.bearing
+                    )
+                }
+            } catch (_: Exception) {}
+        }
+
+        fun stopGps() {
+            try { lm.removeUpdates(listener) } catch (_: Exception) {}
+        }
+
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> startGps()
+                Lifecycle.Event.ON_PAUSE  -> stopGps()
+                else -> {}
             }
-        } catch (_: Exception) {}
+        }
+        lifecycle.addObserver(observer)
+        // Observer won't replay past events — start immediately if already resumed
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) startGps()
 
         onDispose {
-            try { lm.removeUpdates(listener) } catch (_: Exception) {}
+            lifecycle.removeObserver(observer)
+            stopGps()
         }
     }
 
