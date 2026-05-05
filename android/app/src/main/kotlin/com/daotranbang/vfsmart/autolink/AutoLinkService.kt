@@ -271,7 +271,6 @@ class AutoLinkService : Service() {
 
         Log.i(TAG, "launching AutoLink Pro")
         lastLaunchTime = System.currentTimeMillis()
-        AutoLinkAccessibilityService.instance?.helpClickCount = 0
         wakeScreen()
         startActivity(Intent().apply {
             setClassName(AUTOLINK_PACKAGE, AUTOLINK_MAIN_ACTIVITY)
