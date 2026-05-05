@@ -15,12 +15,13 @@ import com.daotranbang.vfsmart.ui.MainActivity
 
 class AutoLinkAccessibilityService : AccessibilityService() {
 
-    private enum class State { IDLE, CHECKING_MODE, CLICKING_WIFI_TOGGLE, FINDING_DEVICE, FINDING_START_NOW, SWITCHING_TO_USB }
+    private enum class State { IDLE, CHECKING_MODE, CLICKING_WIFI_TOGGLE, REFRESHING_SCAN, FINDING_DEVICE, FINDING_START_NOW, SWITCHING_TO_USB }
 
     private var state = State.IDLE
     private val handler = Handler(Looper.getMainLooper())
     private var onStartNowClicked: (() -> Unit)? = null
     private var usbSwitchRetries = 0
+    private var scanRefreshCount = 0
 
     private val timeoutRunnable = Runnable {
         Log.w(TAG, "startConnecting timed out — no device or 'Start now' found")
@@ -127,21 +128,52 @@ class AutoLinkAccessibilityService : AccessibilityService() {
         }, 1000)
     }
 
+    private val pollForRefreshScanRunnable: Runnable = object : Runnable {
+        override fun run() {
+            if (state != State.REFRESHING_SCAN) return
+            val root = rootInActiveWindow ?: run {
+                handler.postDelayed(this, POLL_INTERVAL_MS)
+                return
+            }
+            val usbBtn = root.findAccessibilityNodeInfosByViewId(
+                "com.link.autolink.pro:id/action_button_usb"
+            )?.firstOrNull()
+            if (usbBtn != null) {
+                Log.d(TAG, "refresh scan — clicking USB (refresh $scanRefreshCount/$MAX_SCAN_REFRESHES)")
+                clickNodeOrParent(usbBtn)
+                @Suppress("DEPRECATION") usbBtn.recycle()
+                state = State.CLICKING_WIFI_TOGGLE
+                handler.postDelayed({ handler.post(pollForWifiToggleRunnable) }, 1000)
+            } else {
+                handler.postDelayed(this, POLL_INTERVAL_MS)
+            }
+        }
+    }
+
     private val pollForDeviceRunnable = object : Runnable {
         override fun run() {
             if (state != State.FINDING_DEVICE) return
-            val node = rootInActiveWindow
-                ?.findAccessibilityNodeInfosByText("DIRECT-phonelink-112391")
-                ?.firstOrNull()
-            if (node != null) {
+            val root = rootInActiveWindow
+            val deviceNode = root?.findAccessibilityNodeInfosByText("DIRECT-phonelink-112391")?.firstOrNull()
+            if (deviceNode != null) {
                 Log.d(TAG, "device node found — clicking DIRECT-phonelink-112391")
                 state = State.FINDING_START_NOW
-                clickNodeOrParent(node)
-                @Suppress("DEPRECATION") node.recycle()
+                clickNodeOrParent(deviceNode)
+                @Suppress("DEPRECATION") deviceNode.recycle()
                 handler.post(pollForStartNowRunnable)
             } else {
-                Log.v(TAG, "device node not yet visible — retrying in ${POLL_INTERVAL_MS}ms")
-                handler.postDelayed(this, POLL_INTERVAL_MS)
+                val cantFind = root?.findAccessibilityNodeInfosByText("Can't find any devices")?.firstOrNull()
+                if (cantFind != null && scanRefreshCount < MAX_SCAN_REFRESHES) {
+                    scanRefreshCount++
+                    Log.w(TAG, "\"Can't find any devices\" — USB→WiFi refresh (attempt $scanRefreshCount/$MAX_SCAN_REFRESHES)")
+                    @Suppress("DEPRECATION") cantFind.recycle()
+                    state = State.REFRESHING_SCAN
+                    handler.post(pollForRefreshScanRunnable)
+                } else {
+                    @Suppress("DEPRECATION") cantFind?.recycle()
+                    Log.v(TAG, "device node not yet visible — retrying in ${POLL_INTERVAL_MS}ms")
+                    handler.postDelayed(this, POLL_INTERVAL_MS)
+                }
             }
         }
     }
@@ -218,11 +250,13 @@ class AutoLinkAccessibilityService : AccessibilityService() {
 
     fun startConnecting(onStartNowClicked: (() -> Unit)? = null) {
         this.onStartNowClicked = onStartNowClicked
+        scanRefreshCount = 0
         Log.d(TAG, "startConnecting — checking mode then polling for DIRECT-phonelink-112391")
         state = State.CHECKING_MODE
         handler.removeCallbacks(timeoutRunnable)
         handler.removeCallbacks(pollForModeCheckRunnable)
         handler.removeCallbacks(pollForWifiToggleRunnable)
+        handler.removeCallbacks(pollForRefreshScanRunnable)
         handler.removeCallbacks(pollForDeviceRunnable)
         handler.removeCallbacks(pollForStartNowRunnable)
         handler.removeCallbacks(pollForUsbToggleRunnable)
@@ -242,6 +276,7 @@ class AutoLinkAccessibilityService : AccessibilityService() {
         handler.removeCallbacksAndMessages(null)
         handler.removeCallbacks(pollForModeCheckRunnable)
         handler.removeCallbacks(pollForWifiToggleRunnable)
+        handler.removeCallbacks(pollForRefreshScanRunnable)
         handler.removeCallbacks(pollForDeviceRunnable)
         handler.removeCallbacks(pollForStartNowRunnable)
         handler.removeCallbacks(pollForUsbToggleRunnable)
@@ -263,6 +298,7 @@ class AutoLinkAccessibilityService : AccessibilityService() {
         private const val TIMEOUT_MS = 30_000L
         private const val POLL_INTERVAL_MS = 500L
         private const val USB_SWITCH_MAX_RETRIES = 6
+        private const val MAX_SCAN_REFRESHES = 2
 
         fun enableViaRoot(context: Context) {
             if (instance != null) return
