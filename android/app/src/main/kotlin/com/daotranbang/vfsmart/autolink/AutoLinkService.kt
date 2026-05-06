@@ -115,24 +115,23 @@ class AutoLinkService : Service() {
     }
 
     private val powerDisconnectRunnable = Runnable {
-        Log.i(TAG, "Power disconnected for ${POWER_DISCONNECT_DELAY_MS / 1000}s — launching ODO screen, stopping service")
+        Log.i(TAG, "Power disconnected for ${POWER_DISCONNECT_DELAY_MS / 1000}s — showing ODO screen")
         restoreBrightness()
         startActivity(Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
         })
-        stopSelf()
     }
 
     private val powerReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_POWER_DISCONNECTED -> {
-                    Log.i(TAG, "Power disconnected — stopping AutoLink in ${POWER_DISCONNECT_DELAY_MS / 1000}s if not reconnected")
+                    Log.i(TAG, "Power disconnected — showing ODO in ${POWER_DISCONNECT_DELAY_MS / 1000}s if not reconnected")
                     handler.removeCallbacks(powerDisconnectRunnable)
                     handler.postDelayed(powerDisconnectRunnable, POWER_DISCONNECT_DELAY_MS)
                 }
                 Intent.ACTION_POWER_CONNECTED -> {
-                    Log.i(TAG, "Power reconnected — cancelling stop timer")
+                    Log.i(TAG, "Power reconnected — cancelling ODO timer")
                     handler.removeCallbacks(powerDisconnectRunnable)
                 }
             }
@@ -144,11 +143,6 @@ class AutoLinkService : Service() {
             addAction(Intent.ACTION_POWER_CONNECTED)
             addAction(Intent.ACTION_POWER_DISCONNECTED)
         })
-        val bm = getSystemService(android.os.BatteryManager::class.java)
-        if (!bm.isCharging) {
-            Log.i(TAG, "Service started without power — scheduling stop in ${POWER_DISCONNECT_DELAY_MS / 1000}s")
-            handler.postDelayed(powerDisconnectRunnable, POWER_DISCONNECT_DELAY_MS)
-        }
     }
 
     private var savedBrightness = -1
@@ -238,16 +232,17 @@ class AutoLinkService : Service() {
         Log.d(TAG, "CarConnection observer registered")
     }
 
-    private fun registerCarModeReceiver() {
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                if (intent.action == UiModeManager.ACTION_ENTER_CAR_MODE) {
-                    Log.i(TAG, "ACTION_ENTER_CAR_MODE received — triggering AutoLink")
-                    launchAutoLink()
-                }
+    private val carModeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == UiModeManager.ACTION_ENTER_CAR_MODE) {
+                Log.i(TAG, "ACTION_ENTER_CAR_MODE received — triggering AutoLink")
+                launchAutoLink()
             }
         }
-        registerReceiver(receiver, IntentFilter(UiModeManager.ACTION_ENTER_CAR_MODE))
+    }
+
+    private fun registerCarModeReceiver() {
+        registerReceiver(carModeReceiver, IntentFilter(UiModeManager.ACTION_ENTER_CAR_MODE))
     }
 
     @Suppress("DEPRECATION")
@@ -357,7 +352,7 @@ class AutoLinkService : Service() {
     override fun onDestroy() {
         teardownMediaSessionMonitor()
         carConnection.type.removeObserver(carConnectionObserver)
-        handler.removeCallbacks(powerDisconnectRunnable)
+        try { unregisterReceiver(carModeReceiver) } catch (_: Exception) {}
         try { unregisterReceiver(powerReceiver) } catch (_: Exception) {}
         handler.removeCallbacksAndMessages(null)
         super.onDestroy()
