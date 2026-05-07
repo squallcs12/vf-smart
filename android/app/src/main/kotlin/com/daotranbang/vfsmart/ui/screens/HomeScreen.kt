@@ -104,6 +104,10 @@ private fun FullContent(
                         Icon(Icons.Default.Fullscreen,
                             contentDescription = stringResource(R.string.mirror_mode_cd))
                     }
+                    IconButton(onClick = { playLightReminder(context) }) {
+                        Icon(Icons.Default.VolumeUp,
+                            contentDescription = stringResource(R.string.light_reminder_test_cd))
+                    }
                     IconButton(onClick = onNavigateToSetup) {
                         Icon(Icons.Default.Settings,
                             contentDescription = stringResource(R.string.setup_cd))
@@ -389,6 +393,35 @@ private fun DisconnectedBanner(
                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f))
             }
         }
+    }
+}
+
+private fun playLightReminder(context: android.content.Context) {
+    val attrs = android.media.AudioAttributes.Builder()
+        .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+        .build()
+    val audioManager = context.getSystemService(android.media.AudioManager::class.java)
+    val focusRequest = android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+        .setAudioAttributes(attrs)
+        .setOnAudioFocusChangeListener {}
+        .build()
+    if (audioManager.requestAudioFocus(focusRequest) != android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED) return
+    try {
+        android.media.MediaPlayer().apply {
+            setAudioAttributes(attrs)
+            val afd = context.resources.openRawResourceFd(R.raw.light_reminder)
+            setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+            afd.close()
+            setOnPreparedListener { it.start() }
+            setOnCompletionListener {
+                it.release()
+                audioManager.abandonAudioFocusRequest(focusRequest)
+            }
+            prepareAsync()
+        }
+    } catch (e: Exception) {
+        audioManager.abandonAudioFocusRequest(focusRequest)
     }
 }
 

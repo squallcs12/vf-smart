@@ -149,4 +149,6 @@
     <!-- AutoLinkService notification -->
     <string name="autolink_channel_name">Màn hình AutoLink</string>
     <string name="autolink_notif_text">Đang theo dõi AutoLink Pro</string>
+    <string name="autolink_light_reminder">Trời đang tối, vui lòng bật đèn xe</string>
+    <string name="light_reminder_test_cd">Phát nhắc nhở đèn xe</string>
 </resources>
