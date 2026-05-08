@@ -40,7 +40,8 @@ import java.util.Calendar
 
 class AutoLinkService : Service() {
 
-    private var lightReminderLocationListener: LocationListener? = null
+    private var drivingLocationListener: LocationListener? = null
+    private var lightReminderPlayed = false
     private var lastLaunchTime = 0L
     private var autoRetryCount = 0
     private var connectionCheckAttempt = 0
@@ -187,16 +188,13 @@ class AutoLinkService : Service() {
                 _androidAutoConnected.value = true
                 dimScreen()
                 launchAutoLink()
-                val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-                if (hour >= 18 || hour < 6) {
-                    Log.i(TAG, "Android Auto connected at ${hour}h — waiting for speed > 5km/h")
-                    waitForSpeedAndPlayReminder()
-                }
+                startDrivingTracker()
             }
             else -> {
                 Log.i(TAG, "Android Auto disconnected — restoring brightness")
                 _androidAutoConnected.value = false
                 restoreBrightness()
+                stopDrivingTracker()
             }
         }
     }
@@ -353,28 +351,43 @@ class AutoLinkService : Service() {
             .build()
     }
 
-    private fun waitForSpeedAndPlayReminder() {
+    private fun startDrivingTracker() {
+        stopDrivingTracker()
+        lightReminderPlayed = false
         val locationManager = getSystemService(LocationManager::class.java)
-        val listener = object : LocationListener {
-            override fun onLocationChanged(location: Location) {
-                val speedKmh = location.speed * 3.6f
-                Log.d(TAG, "speed=${speedKmh}km/h")
-                if (speedKmh > 5f) {
-                    Log.i(TAG, "speed exceeded 5km/h — playing light reminder")
-                    locationManager.removeUpdates(this)
-                    lightReminderLocationListener = null
+        val listener = LocationListener { location ->
+            val speedKmh = location.speed * 3.6f
+            val moving = speedKmh > 5f
+            if (_isMoving.value != moving) Log.d(TAG, "isMoving=$moving speed=${speedKmh}km/h")
+            _isMoving.value = moving
+            if (moving && !lightReminderPlayed) {
+                val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                if (hour >= 18 || hour < 6) {
+                    Log.i(TAG, "speed exceeded 5km/h at ${hour}h — playing light reminder")
+                    lightReminderPlayed = true
                     playLightReminder()
                 }
             }
         }
-        lightReminderLocationListener = listener
+        drivingLocationListener = listener
         try {
             locationManager.requestLocationUpdates(
                 LocationManager.GPS_PROVIDER, 2000L, 0f, listener, Looper.getMainLooper()
             )
+            Log.i(TAG, "driving tracker started")
         } catch (e: SecurityException) {
             Log.e(TAG, "location permission not granted: ${e.message}")
         }
+    }
+
+    private fun stopDrivingTracker() {
+        drivingLocationListener?.let {
+            getSystemService(LocationManager::class.java).removeUpdates(it)
+            drivingLocationListener = null
+        }
+        _isMoving.value = false
+        lightReminderPlayed = false
+        Log.i(TAG, "driving tracker stopped")
     }
 
     private fun playLightReminder() {
@@ -424,10 +437,7 @@ class AutoLinkService : Service() {
     }
 
     override fun onDestroy() {
-        lightReminderLocationListener?.let {
-            getSystemService(LocationManager::class.java).removeUpdates(it)
-            lightReminderLocationListener = null
-        }
+        stopDrivingTracker()
         teardownMediaSessionMonitor()
         carConnection.type.removeObserver(carConnectionObserver)
         try { unregisterReceiver(carModeReceiver) } catch (_: Exception) {}
@@ -444,6 +454,8 @@ class AutoLinkService : Service() {
 
         private val _androidAutoConnected = MutableStateFlow(false)
         val androidAutoConnected: StateFlow<Boolean> = _androidAutoConnected.asStateFlow()
+        private val _isMoving = MutableStateFlow(false)
+        val isMoving: StateFlow<Boolean> = _isMoving.asStateFlow()
         private const val NOTIFICATION_ID = 2001
         private const val AUTOLINK_PACKAGE       = "com.link.autolink.pro"
         private const val AUTOLINK_MAIN_ACTIVITY = "com.link.autolink.activity.MainActivity"

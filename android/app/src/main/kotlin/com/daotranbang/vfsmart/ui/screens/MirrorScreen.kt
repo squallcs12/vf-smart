@@ -119,10 +119,14 @@ fun MirrorScreen(
         onDispose { controller.show(WindowInsetsCompat.Type.systemBars()) }
     }
 
+    val isAndroidAutoConnected by AutoLinkService.androidAutoConnected.collectAsStateWithLifecycle()
+    val isMoving by AutoLinkService.isMoving.collectAsStateWithLifecycle()
+    val isDriving = isAndroidAutoConnected && isMoving
+
     @OptIn(ExperimentalFoundationApi::class)
     Box(modifier = Modifier
         .fillMaxSize()
-        .combinedClickable(onDoubleClick = onNavigateBack) {}
+        .combinedClickable(onDoubleClick = if (isDriving) null else onNavigateBack) {}
     ) {
         MirrorContent(
             carStatus       = carStatus,

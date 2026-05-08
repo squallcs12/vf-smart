@@ -10,9 +10,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.daotranbang.vfsmart.ui.screens.ControlScreen
 import com.daotranbang.vfsmart.ui.screens.DebugScreen
@@ -41,6 +45,18 @@ class MainActivity : ComponentActivity() {
         setContent {
             VF3SmartTheme {
                 val navController = rememberNavController()
+                val currentRoute by navController.currentBackStackEntryAsState()
+                val isAndroidAutoConnected by AutoLinkService.androidAutoConnected.collectAsStateWithLifecycle()
+                val isMoving by AutoLinkService.isMoving.collectAsStateWithLifecycle()
+                LaunchedEffect(isAndroidAutoConnected, isMoving) {
+                    if (isAndroidAutoConnected && isMoving &&
+                        currentRoute?.destination?.route != "mirror") {
+                        navController.navigate("mirror") {
+                            popUpTo("mirror") { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    }
+                }
                 NavHost(
                     navController = navController,
                     startDestination = "mirror",
