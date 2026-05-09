@@ -129,6 +129,7 @@ class AutoLinkService : Service() {
         restoreBrightness()
         startActivity(Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(EXTRA_NAVIGATE_MIRROR, true)
         })
     }
 
@@ -330,6 +331,7 @@ class AutoLinkService : Service() {
             handler.postDelayed({
                 startActivity(Intent(this, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    putExtra(EXTRA_NAVIGATE_MIRROR, true)
                 })
             }, RETURN_DELAY_MS)
         }
@@ -466,6 +468,7 @@ class AutoLinkService : Service() {
         const val ACTION_LAUNCH_AUTOLINK = "com.daotranbang.vfsmart.LAUNCH_AUTOLINK"
         const val EXTRA_SKIP_CHECK = "skip_check"
         const val EXTRA_IS_RETRY = "is_retry"
+        const val EXTRA_NAVIGATE_MIRROR = "navigate_mirror"
         private const val MAX_AUTO_RETRIES = 1
         private const val CONNECTION_CHECK_INTERVAL_MS = 6_000L
         private const val POWER_DISCONNECT_DELAY_MS = 60_000L

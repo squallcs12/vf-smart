@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import kotlinx.coroutines.flow.MutableStateFlow
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,6 +36,15 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { AutoLinkService.start(this) }
 
+    private val navigateToMirror = MutableStateFlow(false)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.getBooleanExtra(AutoLinkService.EXTRA_NAVIGATE_MIRROR, false)) {
+            navigateToMirror.value = true
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -48,13 +58,24 @@ class MainActivity : ComponentActivity() {
                 val currentRoute by navController.currentBackStackEntryAsState()
                 val isAndroidAutoConnected by AutoLinkService.androidAutoConnected.collectAsStateWithLifecycle()
                 val isMoving by AutoLinkService.isMoving.collectAsStateWithLifecycle()
-                LaunchedEffect(isAndroidAutoConnected, isMoving) {
-                    if (isAndroidAutoConnected && isMoving &&
-                        currentRoute?.destination?.route != "mirror") {
+                val shouldGoMirror by navigateToMirror.collectAsStateWithLifecycle()
+
+                fun navigateMirror() {
+                    if (currentRoute?.destination?.route != "mirror") {
                         navController.navigate("mirror") {
                             popUpTo("mirror") { inclusive = false }
                             launchSingleTop = true
                         }
+                    }
+                }
+
+                LaunchedEffect(isAndroidAutoConnected, isMoving) {
+                    if (isAndroidAutoConnected && isMoving) navigateMirror()
+                }
+                LaunchedEffect(shouldGoMirror) {
+                    if (shouldGoMirror) {
+                        navigateMirror()
+                        navigateToMirror.value = false
                     }
                 }
                 NavHost(
