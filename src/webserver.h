@@ -1,5 +1,5 @@
-#ifndef WEBSERVER_H
-#define WEBSERVER_H
+#ifndef VF3_WEBSERVER_H
+#define VF3_WEBSERVER_H
 
 #include <ESPAsyncWebServer.h>
 #include "config.h"
@@ -17,4 +17,4 @@ void sendUnauthorized(AsyncWebServerRequest *request);
 void setupWebServer();
 void setupOnboardingServer();
 
-#endif // WEBSERVER_H
+#endif // VF3_WEBSERVER_H

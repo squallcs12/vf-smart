@@ -48,9 +48,19 @@ bool isPCF8575Ready() {
   return pcf8575_initialized;
 }
 
+// Log "not initialized" only once per boot — the main loop hammers these
+// helpers and the repeating warning floods the serial console.
+static bool warnedNotInitialized = false;
+static void warnOnce() {
+  if (!warnedNotInitialized) {
+    warnedNotInitialized = true;
+    Serial.println("WARNING: PCF8575 not initialized, skipping all I/O (further warnings suppressed)");
+  }
+}
+
 void safeDigitalWrite(uint8_t pin, uint8_t value) {
   if (!pcf8575_initialized) {
-    Serial.println("WARNING: PCF8575 not initialized, skipping digitalWrite");
+    warnOnce();
     return;
   }
   pcf8575.digitalWrite(pin, value);
@@ -58,7 +68,7 @@ void safeDigitalWrite(uint8_t pin, uint8_t value) {
 
 uint8_t safeDigitalRead(uint8_t pin) {
   if (!pcf8575_initialized) {
-    Serial.println("WARNING: PCF8575 not initialized, skipping digitalRead");
+    warnOnce();
     return LOW;  // Return LOW as default safe value
   }
   return pcf8575.digitalRead(pin);

@@ -1,5 +1,6 @@
 #include "tpms.h"
 #include <Preferences.h>
+#include <ArduinoJson.h>
 
 // ── Global tire state ─────────────────────────────────────────────────────────
 TpmsTire tpms_fl = {0, 0, 0, true, false, 0, false};
@@ -82,18 +83,18 @@ static void IRAM_ATTR rfISR() {
 // Nominal 9600 baud Manchester: T=104μs, T/2=52μs
 // Tolerances ±50%: SHORT = 26–80μs, LONG = 81–170μs, GAP = >4000μs
 
-#define SHORT_MIN 26
-#define SHORT_MAX 80
-#define LONG_MIN  81
-#define LONG_MAX  170
-#define GAP_MIN   4000
+#define PULSE_SHORT_MIN 26
+#define PULSE_SHORT_MAX 80
+#define PULSE_LONG_MIN  81
+#define PULSE_LONG_MAX  170
+#define PULSE_GAP_MIN   4000
 
 enum PulseType { P_SHORT, P_LONG, P_GAP, P_NOISE };
 
 static PulseType classify(uint32_t us) {
-    if (us >= GAP_MIN)                      return P_GAP;
-    if (us >= LONG_MIN && us <= LONG_MAX)   return P_LONG;
-    if (us >= SHORT_MIN && us <= SHORT_MAX) return P_SHORT;
+    if (us >= PULSE_GAP_MIN)                            return P_GAP;
+    if (us >= PULSE_LONG_MIN && us <= PULSE_LONG_MAX)   return P_LONG;
+    if (us >= PULSE_SHORT_MIN && us <= PULSE_SHORT_MAX) return P_SHORT;
     return P_NOISE;
 }
 

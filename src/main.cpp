@@ -7,7 +7,7 @@
 #include "controls.h"
 #include "time_sync.h"
 #include "storage.h"
-#include "ble_client.h"
+#include "ble_server.h"
 #include "webserver.h"
 #include "discovery.h"
 #include "ota.h"
@@ -115,13 +115,14 @@ void setup() {
     setupOnboardingServer();
   }
 
-  // Initialize BLE client — works independently of WiFi mode
-  initBleClient();
+  // Initialize BLE server — advertises so the phone can connect (works
+  // independently of WiFi mode).
+  initBleServer();
 }
 
 void loop() {
-  // Handle BLE client (connect & write car status to phone GATT server)
-  handleBleClient();
+  // Handle BLE server (notify subscribed phone with delta car status)
+  handleBleServer();
 
   // Handle OTA updates
   handleOTA();

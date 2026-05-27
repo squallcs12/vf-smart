@@ -1,33 +1,31 @@
-#include "ble_client.h"
+#include "ble_server.h"
 #include "pins.h"
 #include "config.h"
 #include "time_sync.h"
 #include "controls/car_state.h"
 #include <BLEDevice.h>
-#include <BLEClient.h>
+#include <BLEServer.h>
 #include <BLEUtils.h>
-#include <BLEScan.h>
-#include <BLEAdvertisedDevice.h>
+#include <BLE2902.h>
 #include <Arduino.h>
 
-// ── UUIDs (must match Android VF3GattServer) ─────────────────────────────────
+// ── UUIDs (must match Android client) ────────────────────────────────────────
 static const char* SERVICE_UUID         = "A1B2C3D4-E5F6-7890-ABCD-EF1234567890";
 static const char* CAR_STATUS_CHAR_UUID = "A1B2C3D4-E5F6-7890-ABCD-EF1234567895";
 
 // ── Timing constants ──────────────────────────────────────────────────────────
-static const unsigned long FULL_INTERVAL_MS    = 60000UL; // heartbeat full send every 60 s
-static const unsigned long RECONNECT_DELAY_MS  = 10000UL; // wait 10 s before re-scan
+static const unsigned long FULL_INTERVAL_MS = 60000UL; // heartbeat full send every 60 s
 
 // ── BLE state ─────────────────────────────────────────────────────────────────
-static volatile bool doConnect       = false;
-static volatile bool connected       = false;
-static BLEAdvertisedDevice* targetDevice = nullptr;
-static BLEClient*            bleClient    = nullptr;
-static BLERemoteCharacteristic* carStatusChar = nullptr;
+static BLEServer*         bleServer     = nullptr;
+static BLECharacteristic* carStatusChar = nullptr;
 
-static unsigned long lastFullSendMs  = 0;
-static unsigned long disconnectedAt  = 0;
-static bool snapshotValid            = false;
+static volatile bool     connected     = false;
+static volatile uint16_t connId        = 0;
+static volatile uint16_t currentMtu    = 23;   // default ATT MTU
+static bool              snapshotValid = false;
+
+static unsigned long lastFullSendMs = 0;
 
 // ── Previous-value snapshot (per group) ──────────────────────────────────────
 // Sensors
@@ -233,140 +231,133 @@ static String buildDelta() {
     return any ? out : String();
 }
 
-// ── Write payload over BLE ────────────────────────────────────────────────────
-static void writePayload(const String& payload) {
-    if (!carStatusChar || payload.isEmpty()) return;
-    if (bleClient && !bleClient->isConnected()) {
-        connected     = false;
-        carStatusChar = nullptr;
-        snapshotValid = false;
+// ── Send a single notify with the given bytes ─────────────────────────────────
+static void notifyOnce(const char* data, size_t len) {
+    carStatusChar->setValue((uint8_t*)data, len);
+    carStatusChar->notify();
+}
+
+// ── Send a payload, chunking by group if MTU is too small ────────────────────
+// Max ATT payload = MTU - 3. Default MTU 23 → 20-byte payload, which is too
+// small for the full snapshot, so we fall back to one notify per group.
+static void sendPayload(const String& payload) {
+    if (!connected || !carStatusChar || payload.isEmpty()) return;
+
+    const uint16_t mtu     = currentMtu > 0 ? currentMtu : 23;
+    const size_t   maxAttr = (mtu > 3) ? (size_t)(mtu - 3) : 20;
+
+    if (payload.length() <= maxAttr) {
+        notifyOnce(payload.c_str(), payload.length());
         return;
     }
-    carStatusChar->writeValue(
-        reinterpret_cast<const uint8_t*>(payload.c_str()),
-        payload.length(),
-        false // WRITE_NO_RESPONSE
-    );
-}
 
-// ── BLE scan callback ─────────────────────────────────────────────────────────
-class ScanCallback : public BLEAdvertisedDeviceCallbacks {
-    void onResult(BLEAdvertisedDevice device) override {
-        if (device.haveServiceUUID() &&
-            device.isAdvertisingService(BLEUUID(SERVICE_UUID))) {
-            Serial.print("[BLE] Found VF3 GATT server: ");
-            Serial.println(device.getAddress().toString().c_str());
-            BLEDevice::getScan()->stop();
-            if (targetDevice) delete targetDevice;
-            targetDevice = new BLEAdvertisedDevice(device);
-            doConnect = true;
+    // Too big — split on '|' and send each group as its own "U|<group>" notify.
+    // The first '|' is the boundary between the F/U prefix and the first group.
+    int sep = payload.indexOf('|');
+    if (sep < 0) {
+        // Malformed (no separator) — best effort, send a truncated chunk.
+        notifyOnce(payload.c_str(), maxAttr);
+        return;
+    }
+
+    int start = sep + 1;
+    while (start < (int)payload.length()) {
+        int next = payload.indexOf('|', start);
+        int end  = (next < 0) ? (int)payload.length() : next;
+
+        String chunk = "U|";
+        chunk += payload.substring(start, end);
+
+        if (chunk.length() <= maxAttr) {
+            notifyOnce(chunk.c_str(), chunk.length());
+        } else {
+            // Single group exceeds MTU — extremely unlikely (groups are <= ~40 bytes,
+            // requires MTU < ~43). Send what fits as a last resort.
+            notifyOnce(chunk.c_str(), maxAttr);
         }
-    }
-};
-static ScanCallback scanCallback;
 
-// ── BLE client callbacks ──────────────────────────────────────────────────────
-class ClientCallback : public BLEClientCallbacks {
-    void onConnect(BLEClient*) override {
-        Serial.println("[BLE] Connected");
+        // Brief pacing so the BLE stack can flush each notify to the peer.
+        delay(10);
+        start = end + 1;
     }
-    void onDisconnect(BLEClient*) override {
-        connected     = false;
-        carStatusChar = nullptr;
-        snapshotValid = false;
-        disconnectedAt = millis();
-        Serial.println("[BLE] Disconnected — will re-scan in 10 s");
-    }
-};
-static ClientCallback clientCallback;
-
-// ── Connect to server ─────────────────────────────────────────────────────────
-static bool connectToServer() {
-    if (!targetDevice) return false;
-
-    if (!bleClient) {
-        bleClient = BLEDevice::createClient();
-        bleClient->setClientCallbacks(&clientCallback);
-    }
-
-    if (!bleClient->connect(targetDevice)) {
-        Serial.println("[BLE] Connection failed");
-        return false;
-    }
-    bleClient->setMTU(512);
-
-    BLERemoteService* svc = bleClient->getService(BLEUUID(SERVICE_UUID));
-    if (!svc) {
-        Serial.println("[BLE] Service not found");
-        bleClient->disconnect();
-        return false;
-    }
-
-    carStatusChar = svc->getCharacteristic(BLEUUID(CAR_STATUS_CHAR_UUID));
-    if (!carStatusChar) {
-        Serial.println("[BLE] CAR_STATUS characteristic not found");
-        bleClient->disconnect();
-        return false;
-    }
-
-    connected = true;
-    Serial.println("[BLE] CAR_STATUS characteristic ready");
-    return true;
 }
+
+// ── Server callbacks ──────────────────────────────────────────────────────────
+class ServerCallback : public BLEServerCallbacks {
+    void onConnect(BLEServer* pServer, esp_ble_gatts_cb_param_t* param) override {
+        connId        = param->connect.conn_id;
+        currentMtu    = 23;     // resets on every new connection
+        connected     = true;
+        snapshotValid = false;
+        Serial.printf("[BLE] Phone connected (conn_id=%u)\n", (unsigned)connId);
+        // Stay non-advertising while connected; resume on disconnect.
+    }
+    void onDisconnect(BLEServer* pServer) override {
+        connected     = false;
+        snapshotValid = false;
+        currentMtu    = 23;
+        Serial.println("[BLE] Phone disconnected — resuming advertising");
+        BLEDevice::startAdvertising();
+    }
+    void onMtuChanged(BLEServer* pServer, esp_ble_gatts_cb_param_t* param) override {
+        currentMtu = param->mtu.mtu;
+        Serial.printf("[BLE] MTU negotiated = %u\n", (unsigned)currentMtu);
+    }
+};
+static ServerCallback serverCallback;
 
 // ── Public API ────────────────────────────────────────────────────────────────
-void initBleClient() {
+void initBleServer() {
     BLEDevice::init("VF3-MCU");
-    BLEScan* scan = BLEDevice::getScan();
-    scan->setAdvertisedDeviceCallbacks(&scanCallback);
-    scan->setActiveScan(true);
-    scan->setInterval(100);
-    scan->setWindow(99);
-    scan->start(0, true); // non-blocking, scan until found
-    Serial.println("[BLE] Scanning for VF3 phone GATT server...");
+
+    // Allow the phone to negotiate up to a 247-byte MTU (~244-byte ATT payload).
+    BLEDevice::setMTU(247);
+
+    bleServer = BLEDevice::createServer();
+    bleServer->setCallbacks(&serverCallback);
+
+    BLEService* svc = bleServer->createService(SERVICE_UUID);
+    carStatusChar = svc->createCharacteristic(
+        CAR_STATUS_CHAR_UUID,
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
+    );
+    // CCCD — required so the phone can subscribe to notifications.
+    carStatusChar->addDescriptor(new BLE2902());
+    svc->start();
+
+    BLEAdvertising* adv = BLEDevice::getAdvertising();
+    adv->addServiceUUID(SERVICE_UUID);
+    adv->setScanResponse(true);
+    adv->setMinPreferred(0x06);
+    adv->setMinPreferred(0x12);
+    BLEDevice::startAdvertising();
+
+    Serial.println("[BLE] Advertising as VF3-MCU — waiting for phone to connect");
 }
 
-void handleBleClient() {
+void handleBleServer() {
+    if (!connected || !carStatusChar) return;
+
     unsigned long now = millis();
 
-    // ── Connect when scan finds the phone ────────────────────────────────────
-    if (doConnect) {
-        doConnect = false;
-        if (connectToServer()) {
-            // Full status on fresh connect, then snapshot so delta tracks changes
-            writePayload(buildFull());
-            takeSnapshot();
-            lastFullSendMs = now;
-        } else {
-            disconnectedAt = now;
-        }
+    // First send after connect (or after a forced resync) → full snapshot.
+    if (!snapshotValid) {
+        sendPayload(buildFull());
+        takeSnapshot();
+        lastFullSendMs = now;
         return;
     }
-
-    // ── Re-scan after disconnect ──────────────────────────────────────────────
-    if (!connected && !doConnect && disconnectedAt != 0) {
-        if (now - disconnectedAt >= RECONNECT_DELAY_MS) {
-            disconnectedAt = 0;
-            Serial.println("[BLE] Re-scanning for VF3 phone...");
-            BLEDevice::getScan()->clearResults();
-            BLEDevice::getScan()->start(0, true);
-        }
-        return;
-    }
-
-    // ── Connected: send full heartbeat or delta ───────────────────────────────
-    if (!connected || !carStatusChar) return;
 
     if (now - lastFullSendMs >= FULL_INTERVAL_MS) {
         // Periodic full resync
-        writePayload(buildFull());
+        sendPayload(buildFull());
         takeSnapshot();
         lastFullSendMs = now;
     } else {
         // Delta: only send if something changed
         String delta = buildDelta();
         if (!delta.isEmpty()) {
-            writePayload(delta);
+            sendPayload(delta);
         }
     }
 }
