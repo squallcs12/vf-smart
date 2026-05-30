@@ -485,6 +485,24 @@ Each cell: centered icon (40dp) → large bold value (28sp, 1sp letter-spacing) 
 
 **Still looking for 3 more features** — must be VF3-specific, not already on VF3 original screen.
 
+### AutoLink Integration
+
+AutoLink Pro (`com.link.autolink.pro`) is launched manually by the user or via Android Auto. The app has no foreground service monitoring it.
+
+**Screen capture permission (root):**
+AutoLink Pro requires screen capture consent. On every app start (`MainActivity.onCreate`), VF3 Smart grants this silently via root so no "Start now" dialog ever appears:
+```
+su -c "appops set com.link.autolink.pro PROJECT_MEDIA allow"
+```
+
+**What was removed:**
+- `AutoLinkService` foreground service — no longer monitors AA connection or auto-launches AutoLink
+- `AutoLinkAccessibilityService` — no longer needed to click through the UI flow
+- Double-press media button detection — removed
+- Wake lock and screen wake — removed
+- Auto-dim screen on AA connect — removed
+- Auto-relaunch on mirroring drop — removed
+
 ### ODO Screen — Feature 4: Google Maps Navigation Direction
 
 **Concept**: Display current Google Maps turn-by-turn instruction on the ODO screen.

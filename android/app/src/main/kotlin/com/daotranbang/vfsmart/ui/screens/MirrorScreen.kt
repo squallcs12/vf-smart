@@ -43,7 +43,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.daotranbang.vfsmart.autolink.AutoLinkService
 import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.data.model.CarStatus
 import com.daotranbang.vfsmart.data.model.TpmsData
@@ -119,14 +118,10 @@ fun MirrorScreen(
         onDispose { controller.show(WindowInsetsCompat.Type.systemBars()) }
     }
 
-    val isAndroidAutoConnected by AutoLinkService.androidAutoConnected.collectAsStateWithLifecycle()
-    val isMoving by AutoLinkService.isMoving.collectAsStateWithLifecycle()
-    val isDriving = isAndroidAutoConnected && isMoving
-
     @OptIn(ExperimentalFoundationApi::class)
     Box(modifier = Modifier
         .fillMaxSize()
-        .combinedClickable(onDoubleClick = if (isDriving) null else onNavigateBack) {}
+        .combinedClickable(onDoubleClick = onNavigateBack) {}
     ) {
         MirrorContent(
             carStatus       = carStatus,
@@ -147,7 +142,6 @@ fun MirrorScreen(
 private fun rememberPhoneGpsState(): GpsState {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val isAndroidAutoConnected by AutoLinkService.androidAutoConnected.collectAsStateWithLifecycle()
     var state by remember { mutableStateOf(GpsState()) }
     var isResumed by remember { mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
 
@@ -163,7 +157,7 @@ private fun rememberPhoneGpsState(): GpsState {
         onDispose { lifecycle.removeObserver(observer) }
     }
 
-    val shouldTrack = isAndroidAutoConnected && isResumed
+    val shouldTrack = isResumed
     val granted = ContextCompat.checkSelfPermission(
         context, Manifest.permission.ACCESS_FINE_LOCATION
     ) == PackageManager.PERMISSION_GRANTED

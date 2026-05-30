@@ -7,13 +7,10 @@ import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Icon
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import androidx.annotation.RequiresApi
-import com.daotranbang.vfsmart.autolink.AutoLinkService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,72 +24,24 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 class NavigationNotificationService : NotificationListenerService() {
 
-    private val handler = Handler(Looper.getMainLooper())
-    private val relaunchRunnable = Runnable {
-        if (!autoLinkMirroringActive) {
-            Log.i(TAG, "Mirroring still inactive after grace period — triggering relaunch")
-            AutoLinkService.triggerLaunch(this, skipCheck = false)
-        } else {
-            Log.d(TAG, "Mirroring restored within grace period — relaunch cancelled")
-        }
-    }
-
     companion object {
         private val _navigationState = MutableStateFlow(NavigationState())
         val navigationState: StateFlow<NavigationState> = _navigationState.asStateFlow()
 
-        private const val MAPS_PACKAGE      = "com.google.android.apps.maps"
-        private const val AUTOLINK_PACKAGE  = "com.link.autolink.pro"
-        private const val TAG               = "NavNotifService"
-        private const val RELAUNCH_GRACE_MS = 3_000L
-
-        @Volatile @JvmField var autoLinkMirroringActive = false
+        private const val MAPS_PACKAGE = "com.google.android.apps.maps"
+        private const val TAG          = "NavNotifService"
     }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
         Log.w(TAG, "=== LISTENER CONNECTED ===")
-        autoLinkMirroringActive = false
-        activeNotifications?.forEach { sbn ->
-            processNotification(sbn)
-            if (sbn.packageName == AUTOLINK_PACKAGE && isAutoLinkMirroring(sbn)) {
-                autoLinkMirroringActive = true
-                Log.i(TAG, "AutoLink Mirroring notification already active on connect")
-            }
-        }
+        activeNotifications?.forEach { processNotification(it) }
     }
 
-    override fun onListenerDisconnected() {
-        super.onListenerDisconnected()
-        handler.removeCallbacks(relaunchRunnable)
-        Log.w(TAG, "=== LISTENER DISCONNECTED ===")
-    }
-
-    override fun onNotificationPosted(sbn: StatusBarNotification) {
-        processNotification(sbn)
-        if (sbn.packageName == AUTOLINK_PACKAGE && isAutoLinkMirroring(sbn)) {
-            autoLinkMirroringActive = true
-            handler.removeCallbacks(relaunchRunnable)
-            Log.i(TAG, "AutoLink Mirroring notification posted")
-        }
-    }
+    override fun onNotificationPosted(sbn: StatusBarNotification) = processNotification(sbn)
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         if (sbn.packageName == MAPS_PACKAGE) _navigationState.value = NavigationState()
-        if (sbn.packageName == AUTOLINK_PACKAGE && autoLinkMirroringActive && isAutoLinkMirroring(sbn)) {
-            autoLinkMirroringActive = false
-            Log.i(TAG, "AutoLink Mirroring notification removed — scheduling relaunch check in ${RELAUNCH_GRACE_MS}ms")
-            handler.removeCallbacks(relaunchRunnable)
-            handler.postDelayed(relaunchRunnable, RELAUNCH_GRACE_MS)
-        }
-    }
-
-    private fun isAutoLinkMirroring(sbn: StatusBarNotification): Boolean {
-        val extras = sbn.notification.extras
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
-        val body  = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
-        return title.contains("Mirroring", ignoreCase = true) ||
-               body.contains("Mirroring", ignoreCase = true)
     }
 
     private fun processNotification(sbn: StatusBarNotification) {
