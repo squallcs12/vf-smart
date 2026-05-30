@@ -27,6 +27,7 @@ import com.daotranbang.vfsmart.viewmodel.ControlViewModel
 fun ControlScreen(
     onNavigateBack: () -> Unit,
     onNavigateToTpmsCalibration: () -> Unit = {},
+    onNavigateToCamera: () -> Unit = {},
     modifier: Modifier = Modifier,
     statusViewModel: CarStatusViewModel = hiltViewModel(),
     controlViewModel: ControlViewModel = hiltViewModel()
@@ -276,6 +277,19 @@ fun ControlScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+
+            // External camera
+            ControlSection(
+                title = stringResource(R.string.section_camera),
+                icon = Icons.Default.Videocam
+            ) {
+                ControlButton(
+                    text = stringResource(R.string.btn_view_camera),
+                    onClick = onNavigateToCamera,
+                    modifier = Modifier.fillMaxWidth(),
+                    icon = { Icon(Icons.Default.Videocam, contentDescription = null) }
                 )
             }
 

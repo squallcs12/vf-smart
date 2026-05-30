@@ -146,4 +146,10 @@
         <item>T7</item>
     </string-array>
     <string name="light_reminder_test_cd">Phát nhắc nhở đèn xe</string>
+
+    <!-- CameraPreviewScreen -->
+    <string name="camera_no_signal">KHÔNG CÓ TÍN HIỆU</string>
+    <string name="camera_error">LỖI CAMERA</string>
+    <string name="section_camera">Camera ngoài</string>
+    <string name="btn_view_camera">Xem camera</string>
 </resources>

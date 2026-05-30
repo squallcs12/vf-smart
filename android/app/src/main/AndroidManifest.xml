@@ -10,6 +10,10 @@
     <!-- Dim/restore screen brightness when Android Auto connects/disconnects -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions" />
 
+    <!-- Camera for external CCD/CVBS preview -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <!-- Network permissions for API and WebSocket -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />

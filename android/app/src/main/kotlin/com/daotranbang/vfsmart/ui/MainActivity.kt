@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.daotranbang.vfsmart.ui.screens.CameraPreviewScreen
 import com.daotranbang.vfsmart.ui.screens.ControlScreen
 import com.daotranbang.vfsmart.ui.screens.DebugScreen
 import com.daotranbang.vfsmart.ui.screens.HomeScreen
@@ -93,6 +94,17 @@ class MainActivity : ComponentActivity() {
                             },
                             onNavigateToTpmsCalibration = {
                                 navController.navigate("tpms_calibration")
+                            },
+                            onNavigateToCamera = {
+                                navController.navigate("camera")
+                            }
+                        )
+                    }
+
+                    composable("camera") {
+                        CameraPreviewScreen(
+                            onNavigateBack = {
+                                navController.popBackStack()
                             }
                         )
                     }
@@ -131,6 +143,7 @@ class MainActivity : ComponentActivity() {
                 add(Manifest.permission.BLUETOOTH_ADVERTISE)
                 add(Manifest.permission.BLUETOOTH_SCAN)
             }
+            add(Manifest.permission.CAMERA)
             add(Manifest.permission.ACCESS_FINE_LOCATION)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 add(Manifest.permission.POST_NOTIFICATIONS)
