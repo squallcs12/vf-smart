@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">VF3 Smart</string>
-    <string name="autolink_accessibility_description">Tự động kết nối thiết bị AutoLink Pro OBD và trở về VF3 Smart</string>
 
     <!-- Common -->
     <string name="back">Quay lại</string>
