@@ -151,4 +151,35 @@
     <string name="camera_error">LỖI CAMERA</string>
     <string name="section_camera">Camera ngoài</string>
     <string name="btn_view_camera">Xem camera</string>
+
+    <!-- RtspCaptureScreen -->
+    <string name="rtsp_capture_title">Quay camera IP</string>
+    <string name="btn_rtsp_capture">Quay camera IP (RTSP)</string>
+    <string name="rtsp_url_label">Địa chỉ RTSP</string>
+    <string name="rtsp_apply">Áp dụng</string>
+    <string name="rtsp_start_recording">Bắt đầu quay</string>
+    <string name="rtsp_stop_recording">Dừng lại</string>
+    <string name="rtsp_saving">Đang lưu…</string>
+    <string name="rtsp_saved">Đã lưu vào thư viện</string>
+    <string name="rtsp_error_empty_url">Vui lòng nhập địa chỉ RTSP</string>
+    <string name="rtsp_error_save">Lỗi lưu video</string>
+    <string name="rtsp_detect">Tự động tìm camera Imou</string>
+    <string name="rtsp_detecting">Đang quét mạng…</string>
+    <string name="rtsp_detect_found">Đã tìm thấy camera: %1$s</string>
+    <string name="rtsp_detect_not_found">Không tìm thấy camera Imou trong mạng</string>
+
+    <!-- RedLightDetectorScreen -->
+    <string name="red_light_title">Đếm giây đèn đỏ</string>
+    <string name="section_red_light">Đèn giao thông</string>
+    <string name="btn_red_light_detector">Đếm giây đèn đỏ</string>
+    <string name="red_light_instructions">Chọn hoặc chụp ảnh đèn giao thông có đồng hồ đếm ngược. Ứng dụng sẽ tự đọc số giây hiển thị trên đèn.</string>
+    <string name="red_light_pick_image">Chọn ảnh</string>
+    <string name="red_light_pick_another">Chọn ảnh khác</string>
+    <string name="red_light_detecting">Đang nhận diện…</string>
+    <string name="red_light_result_label">Số giây phát hiện</string>
+    <string name="red_light_seconds_format">%d giây</string>
+    <string name="red_light_no_number">Không phát hiện được số trên đèn</string>
+    <string name="red_light_all_numbers">Các số nhận được: %s</string>
+    <string name="red_light_error">Lỗi nhận diện: %s</string>
+    <string name="red_light_image_cd">Ảnh đèn giao thông đã chọn</string>
 </resources>

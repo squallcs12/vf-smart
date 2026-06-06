@@ -12,6 +12,10 @@
 
     <!-- Camera for external CCD/CVBS preview -->
     <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Write to public Movies directory on Android 9 and below -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <!-- Network permissions for API and WebSocket -->

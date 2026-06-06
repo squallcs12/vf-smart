@@ -25,7 +25,7 @@ android {
         }
 
         ndk {
-            abiFilters += "armeabi-v7a"
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
         }
     }
 
@@ -113,6 +113,12 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
+
+    // ML Kit on-device text recognition (red-light countdown OCR)
+    implementation(libs.mlkit.text.recognition)
+
+    // FFmpegKit for background RTSP recording
+    implementation(libs.ffmpegkit)
 
     // Testing
     testImplementation(libs.junit)

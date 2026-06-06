@@ -28,6 +28,8 @@ fun ControlScreen(
     onNavigateBack: () -> Unit,
     onNavigateToTpmsCalibration: () -> Unit = {},
     onNavigateToCamera: () -> Unit = {},
+    onNavigateToRedLight: () -> Unit = {},
+    onNavigateToRtspCapture: () -> Unit = {},
     modifier: Modifier = Modifier,
     statusViewModel: CarStatusViewModel = hiltViewModel(),
     controlViewModel: ControlViewModel = hiltViewModel()
@@ -290,6 +292,25 @@ fun ControlScreen(
                     onClick = onNavigateToCamera,
                     modifier = Modifier.fillMaxWidth(),
                     icon = { Icon(Icons.Default.Videocam, contentDescription = null) }
+                )
+                ControlButton(
+                    text = stringResource(R.string.btn_rtsp_capture),
+                    onClick = onNavigateToRtspCapture,
+                    modifier = Modifier.fillMaxWidth(),
+                    icon = { Icon(Icons.Default.VideoCall, contentDescription = null) }
+                )
+            }
+
+            // Red-light countdown detector
+            ControlSection(
+                title = stringResource(R.string.section_red_light),
+                icon = Icons.Default.Timer
+            ) {
+                ControlButton(
+                    text = stringResource(R.string.btn_red_light_detector),
+                    onClick = onNavigateToRedLight,
+                    modifier = Modifier.fillMaxWidth(),
+                    icon = { Icon(Icons.Default.Timer, contentDescription = null) }
                 )
             }
 

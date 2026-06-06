@@ -36,6 +36,7 @@ class SecurePreferences private constructor(context: Context) {
         private const val KEY_DEVICE_NAME = "device_name"
         private const val KEY_MAC_ADDRESS = "mac_address"
         private const val KEY_IS_CONFIGURED  = "is_configured"
+        private const val KEY_RTSP_URL = "rtsp_url"
 
         @Volatile
         private var INSTANCE: SecurePreferences? = null
@@ -115,4 +116,10 @@ class SecurePreferences private constructor(context: Context) {
     fun updateDeviceIp(newIp: String) {
         encryptedPrefs.edit().putString(KEY_DEVICE_IP, newIp).apply()
     }
+
+    fun saveRtspUrl(url: String) {
+        encryptedPrefs.edit().putString(KEY_RTSP_URL, url).apply()
+    }
+
+    fun getRtspUrl(): String? = encryptedPrefs.getString(KEY_RTSP_URL, null)
 }

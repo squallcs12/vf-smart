@@ -15,10 +15,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.daotranbang.vfsmart.ui.screens.CameraPreviewScreen
+import com.daotranbang.vfsmart.ui.screens.RtspCaptureScreen
 import com.daotranbang.vfsmart.ui.screens.ControlScreen
 import com.daotranbang.vfsmart.ui.screens.DebugScreen
 import com.daotranbang.vfsmart.ui.screens.HomeScreen
 import com.daotranbang.vfsmart.ui.screens.MirrorScreen
+import com.daotranbang.vfsmart.ui.screens.RedLightDetectorScreen
 import com.daotranbang.vfsmart.ui.screens.SetupScreen
 import com.daotranbang.vfsmart.ui.screens.TpmsCalibrationScreen
 import com.daotranbang.vfsmart.ui.theme.VF3SmartTheme
@@ -97,6 +99,20 @@ class MainActivity : ComponentActivity() {
                             },
                             onNavigateToCamera = {
                                 navController.navigate("camera")
+                            },
+                            onNavigateToRedLight = {
+                                navController.navigate("red_light")
+                            },
+                            onNavigateToRtspCapture = {
+                                navController.navigate("rtsp_capture")
+                            }
+                        )
+                    }
+
+                    composable("red_light") {
+                        RedLightDetectorScreen(
+                            onNavigateBack = {
+                                navController.popBackStack()
                             }
                         )
                     }
@@ -106,6 +122,12 @@ class MainActivity : ComponentActivity() {
                             onNavigateBack = {
                                 navController.popBackStack()
                             }
+                        )
+                    }
+
+                    composable("rtsp_capture") {
+                        RtspCaptureScreen(
+                            onNavigateBack = { navController.popBackStack() }
                         )
                     }
 
@@ -145,6 +167,9 @@ class MainActivity : ComponentActivity() {
             }
             add(Manifest.permission.CAMERA)
             add(Manifest.permission.ACCESS_FINE_LOCATION)
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 add(Manifest.permission.POST_NOTIFICATIONS)
             }

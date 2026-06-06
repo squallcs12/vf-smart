@@ -36,11 +36,22 @@
       "PowerShell(Add-Type -Assembly 'System.IO.Compression.FileSystem'; [IO.Compression.ZipFile]::OpenRead\\('C:/temp/AUX.apk'\\).Entries | Select-Object -ExpandProperty FullName)",
       "PowerShell($size = \\(Get-Item 'C:/temp/AUX.apk'\\).Length; Write-Output \"File size: $size bytes\")",
       "WebSearch",
+      "WebFetch",
       "WebFetch(domain:xdaforums.com)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\daotr\\\\bang\\\\vf3-smart\\\\android\" -Recurse -Depth 3 | Where-Object { $_.PSIsContainer } | Select-Object -ExpandProperty FullName)",
       "PowerShell(adb -s 192.168.0.104:5555 pull /data/local/tmp/fb0.raw \"$env:TEMP\\\\fb0.raw\")",
       "PowerShell(adb -s 192.168.0.104:5555 pull /data/local/tmp/fb0.raw \"$env:TEMP\\\\fb0.raw\" 2>&1)",
-      "PowerShell(head *)"
+      "PowerShell(head *)",
+      "Bash(ipconfig)",
+      "Bash(findstr /i \"IPv4\")",
+      "Bash(nmap -sn 10.240.43.0/24 --open)",
+      "Bash(nmap -sn 192.168.1.0/24)",
+      "Bash(nmap *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\daotr\\\\bang\\\\vf3-smart\\\\android\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(./gradlew assembleDebug)",
+      "PowerShell(\\(Get-Command gradle -ErrorAction SilentlyContinue\\).Source; \\(Get-Command java -ErrorAction SilentlyContinue\\).Source)",
+      "PowerShell(python \"C:\\\\Users\\\\daotr\\\\AppData\\\\Local\\\\Temp\\\\probe_mp4.py\" \"$env:TEMP\\\\vf3_rec.mp4\")"
     ]
   }
 }

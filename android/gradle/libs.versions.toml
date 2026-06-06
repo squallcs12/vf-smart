@@ -15,6 +15,8 @@ androidx-activity = "1.9.3"
 security-crypto = "1.1.0-alpha06"
 coroutines = "1.10.1"
 gson = "2.11.0"
+mlkit-text = "16.0.1"
+ffmpegkit = "6.1.4"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
@@ -45,6 +47,9 @@ okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 okhttp-logging = { module = "com.squareup.okhttp3:logging-interceptor", version.ref = "okhttp" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 
+# ML Kit (on-device OCR — bundled, works offline, no API key)
+mlkit-text-recognition = { module = "com.google.mlkit:text-recognition", version.ref = "mlkit-text" }
+
 # Dependency Injection
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
@@ -53,6 +58,9 @@ hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", ve
 # Security
 androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "security-crypto" }
 androidx-media = { module = "androidx.media:media", version.ref = "androidx-media" }
+# FFmpegKit official binaries were retired Apr 2025; this is the maintained
+# community re-host (16KB-page fork). Java package is still com.arthenica.ffmpegkit.
+ffmpegkit = { module = "io.github.jamaismagic.ffmpeg:ffmpeg-kit-lts-min-16kb", version.ref = "ffmpegkit" }
 
 # Coroutines
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
