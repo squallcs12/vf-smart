@@ -30,7 +30,17 @@
       "PowerShell(Start-Process \"C:\\\\Users\\\\daotr\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\extras\\\\google\\\\auto\\\\desktop-head-unit.exe\")",
       "Bash(adb -s R3CN203BDKN logcat -s VF3Auto:D --line-buffered)",
       "Bash(kill %1)",
-      "Bash(adb *)"
+      "Bash(adb *)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\daotr\\\\bang\\\\vf3-smart\\\\android\\\\app\\\\src\\\\main\\\\kotlin\\\\com\\\\daotranbang\\\\vfsmart\\\\autolink\\\\AutoLinkAccessibilityService.kt\")",
+      "Bash(Remove-Item \"C:\\\\Users\\\\daotr\\\\bang\\\\vf3-smart\\\\android\\\\app\\\\src\\\\main\\\\res\\\\xml\\\\autolink_accessibility_config.xml\")",
+      "PowerShell(Add-Type -Assembly 'System.IO.Compression.FileSystem'; [IO.Compression.ZipFile]::OpenRead\\('C:/temp/AUX.apk'\\).Entries | Select-Object -ExpandProperty FullName)",
+      "PowerShell($size = \\(Get-Item 'C:/temp/AUX.apk'\\).Length; Write-Output \"File size: $size bytes\")",
+      "WebSearch",
+      "WebFetch(domain:xdaforums.com)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\daotr\\\\bang\\\\vf3-smart\\\\android\" -Recurse -Depth 3 | Where-Object { $_.PSIsContainer } | Select-Object -ExpandProperty FullName)",
+      "PowerShell(adb -s 192.168.0.104:5555 pull /data/local/tmp/fb0.raw \"$env:TEMP\\\\fb0.raw\")",
+      "PowerShell(adb -s 192.168.0.104:5555 pull /data/local/tmp/fb0.raw \"$env:TEMP\\\\fb0.raw\" 2>&1)",
+      "PowerShell(head *)"
     ]
   }
 }

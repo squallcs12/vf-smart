@@ -141,7 +141,7 @@ External CCD (CVBS/RCA)
     → Display
 ```
 
-The CIF (`/dev/video0`) always reports `CIF_CIF_FRAME_STATUS = 0x0` — it receives zero frames regardless of camera state. The actual video routing is done by the LCDC, not the CIF.
+The CIF (`/dev/video0`) normally delivers zero frames. However when the CVBS decoder is properly initialized (see GPIO reset below), the CIF CAN deliver frames at ~15fps. The LCDC overlay is the primary display path; CIF is secondary.
 
 ### AUDIOSWB device
 
@@ -156,32 +156,114 @@ The AUX app does this sequence on every launch:
 
 ### Camera parameters
 
-| Parameter    | Value                                              |
-|--------------|----------------------------------------------------|
-| Preview size | 720 × 480 (NTSC default — PAL/720×576 not in list) |
-| Format       | yuv420sp                                           |
-| Antibanding  | `off` (system app) / `50hz` (our app, PAL hint)    |
-| Supported AB | `auto`, `50hz`, `60hz`, `off`                      |
+| Parameter    | Value                                                               |
+|--------------|---------------------------------------------------------------------|
+| Preview size | 720 × 480 (NTSC — confirmed live; 720×576 PAL not in supported list)|
+| All supported| 1280×720, 800×600, 720×480, 640×480, 352×288, 320×240, 176×144     |
+| Format       | yuv420sp                                                            |
+| Antibanding  | `off` fails / `60hz` fails / **`50hz` accepted** when chip is properly initialized |
+| Supported AB | `auto`, `50hz`, `60hz`, `off` — only `50hz` actually works at driver level |
 
-### Why blue screen
+### Root cause of blue screen — GPIO not initialized
 
-| Symptom                     | Cause                                                    |
-|-----------------------------|----------------------------------------------------------|
-| Blue on AUX app launch      | CVBS decoder powered but not locked to camera signal     |
-| Blue on our app (old build) | Missing `ioctl 0x5404` — LCDC not routing CVBS at all   |
-| `mANativeWindow is NULL`    | Camera HAL cleanup log — **normal**, not a bug           |
-| Media server crash (~90s)   | `setPreviewCallback` allocating 518 KB/frame at 30fps → OOM |
+**The ov2659 DTS is missing `rockchip,powerdown` and `rockchip,hwreset` GPIO entries.**
+
+Every camera close triggers:
+```
+rk_cam_io(1099): SENSOR_PWRSEQ_PWRDN failed
+rk_cam_io(1088): SENSOR_PWRSEQ_HWRST failed
+```
+
+This leaves the chip in **powerdown + hardware reset** after every session:
+- GPIO 107 (PWDN, GPIO3 bit 11) = HIGH → chip in powerdown
+- GPIO 119 (HWRST, GPIO3 bit 23) = LOW → chip in hardware reset ← **the critical bug**
+
+Without the GPIO reset, the chip never initializes properly:
+- `antibanding=50hz` fails (I2C can't reach chip in reset)
+- CIF delivers 0 fps
+- LCDC shows blue (decoder in reset outputs blue)
+
+### GPIO reset sequence (required before every camera open)
+
+GPIO3 base address: `0x20088000`
+- PWDN = bit 11, HWRST = bit 23
+
+```
+Step 1: PWDN=HIGH, HWRST=LOW  (ensure in powerdown+reset)  → wait 10ms
+Step 2: PWDN=LOW              (wake chip, keep in reset)    → wait 10ms
+Step 3: HWRST=HIGH            (release reset, chip boots)   → wait 50ms
+```
+
+After proper reset:
+- `antibanding=50hz` is accepted by Camera HAL
+- CIF delivers ~15fps
+- LCDC shows live CVBS video (if signal present and decoder locks)
+
+### setuid helper binary
+
+`/system/xbin/sensor_reset` (chmod 4755, owner root) — does the GPIO reset sequence.
+Source: `tools/sensor_reset.c`. Install:
+```bash
+adb push sensor_reset /data/local/tmp/
+adb shell "su 0 cp /data/local/tmp/sensor_reset /system/xbin/ && su 0 chmod 4755 /system/xbin/sensor_reset"
+```
+
+Called from `AudioSwb.enable()` via `Runtime.getRuntime().exec("/system/xbin/sensor_reset")` before Camera.open().
+
+### Signal detection
+
+**`/proc/interrupts` IRQ 40 (`rk312x-camera`)** increments while camera is open (~26-28/sec).
+This detects "camera is open" not "signal present".
+
+**Framebuffer pixel sampling** (`/dev/graphics/fb0`): read 16 pixels across the screen.
+- All pixels `rgb(<40, <50, >130)` → NO_SIGNAL (decoder outputs blue)
+- Any pixel outside that range → SIGNAL (real video content)
+
+Implemented in `tools/cvbs_detect.c` and `tools/signal_detect.sh`.
+
+### Symptom reference
+
+| Symptom | Cause |
+|---------|-------|
+| Blue screen | Decoder active, not locked to CVBS signal — OR chip in reset (HWRST=LOW) |
+| Black screen in camera view | AUDIOSWB not fired (ioctl 0x5404 not called) |
+| `antibanding(50hz) failed` | Chip in reset/powerdown, I2C not responding |
+| `antibanding(50hz)` no error | Chip properly initialized, I2C working |
+| CIF fps=0 | Chip in reset OR no CVBS signal lock |
+| CIF fps=15 | Chip properly initialized, partial signal |
+| `SENSOR_PWRSEQ_PWRDN failed` | Normal — DTS missing GPIO entry, driver can't control it |
+| `SENSOR_PWRSEQ_HWRST failed` | Normal — same cause; but means chip went back to reset |
+| `mANativeWindow is NULL` | Camera HAL cleanup log — not a bug |
 
 ### GPIO state (camera-related)
 
-| GPIO | Label             | State    | Note                                          |
-|------|-------------------|----------|-----------------------------------------------|
-| 74   | camera power      | out lo   | Claimed by LCDC display driver (not camera)   |
-| 107  | camera powerdown  | out hi   | PWDN active — DTS property missing so ov2659 driver never owns it |
-| 119  | camera reset      | out hi   | MUX unclaimed                                 |
-| 127  | camera powerdown  | out hi   | MUX unclaimed                                 |
+| GPIO | Label             | Boot state | Note |
+|------|-------------------|-----------|------|
+| 74   | camera power      | out lo    | Claimed by LCDC; LOW = active |
+| 107  | camera powerdown  | out hi    | PWDN HIGH = chip powerdown; DTS missing so driver can't change it |
+| 119  | camera reset      | out lo    | **HWRST LOW = chip in hardware reset** — this is the bug |
+| 127  | camera powerdown  | out hi    | MUX unclaimed |
 
-GPIO 107 PWDN=HIGH means the decoder chip is in powerdown by default at boot. The `ioctl 0x5404` on AUDIOSWB likely wakes it as part of the LCDC routing switch.
+### AUDIOSWB channel values
+
+`ioctl(fd, 0x5404, channel)` — confirmed via `libAUXctl.so` (`ch4052 ch = %d`):
+
+| Channel | Effect |
+|---------|--------|
+| 0 | Disable LCDC overlay — normal Android UI visible |
+| 1 | Enable CVBS overlay (LCDC win0 routed to display) |
+
+Source: `Java_com_android_aux_AUXActivity_ch4052` in `/system/lib/libAUXctl.so`.
+
+### Diagnostic tools built
+
+| Binary | Source | Purpose |
+|--------|--------|---------|
+| `gpio_pwdn` | `tools/gpio_pwdn.c` | Read/set GPIO107 (CVBS PWDN) via /dev/mem mmap |
+| `audioswb_probe` | `tools/audioswb_probe.c` | Send ioctl(0x5404, ch) to /dev/AUDIOSWB |
+
+Push with: `adb push <bin> /data/local/tmp/ && adb shell chmod 755 /data/local/tmp/<bin>`
+Run as root: `adb shell su 0 /data/local/tmp/<bin>`
 
 ### Our replacement (CameraPreviewScreen)
 
