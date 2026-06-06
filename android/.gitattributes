@@ -1,0 +1,4 @@
+# Gradle wrapper — the Unix launcher must stay LF and executable; jar is binary
+gradlew text eol=lf
+gradlew.bat text eol=crlf
+*.jar binary
