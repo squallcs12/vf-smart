@@ -64,6 +64,11 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    // Keep the TFLite model uncompressed so the interpreter can memory-map it.
+    androidResources {
+        noCompress += "tflite"
+    }
 }
 
 kotlin {
@@ -114,11 +119,17 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
 
-    // ML Kit on-device text recognition (red-light countdown OCR)
-    implementation(libs.mlkit.text.recognition)
+    // TensorFlow Lite — custom YOLO digit detector for the red-light countdown
+    implementation(libs.tensorflow.lite)
+    implementation(libs.tensorflow.lite.gpu)
 
     // FFmpegKit for background RTSP recording
     implementation(libs.ffmpegkit)
+
+    // Media3 ExoPlayer — live RTSP playback on the mirror screen when stopped
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.exoplayer.rtsp)
+    implementation(libs.androidx.media3.ui)
 
     // Testing
     testImplementation(libs.junit)

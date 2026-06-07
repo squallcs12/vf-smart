@@ -10,6 +10,7 @@ import android.location.LocationManager
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -44,6 +45,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daotranbang.vfsmart.R
+import com.daotranbang.vfsmart.data.local.SecurePreferences
 import com.daotranbang.vfsmart.data.model.CarStatus
 import com.daotranbang.vfsmart.data.model.TpmsData
 import com.daotranbang.vfsmart.data.model.TpmsTire
@@ -51,9 +53,11 @@ import com.daotranbang.vfsmart.navigation.GpsState
 import com.daotranbang.vfsmart.navigation.NavigationNotificationService
 import com.daotranbang.vfsmart.navigation.NavigationState
 import com.daotranbang.vfsmart.navigation.VF3GattServer
+import com.daotranbang.vfsmart.ui.components.RtspVideoPlayer
 import com.daotranbang.vfsmart.viewmodel.CarStatusViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 // ── ODO colour palette ────────────────────────────────────────────────────────
 private val OdoBg       = Color(0xFF0A0A0A)
@@ -70,6 +74,7 @@ private val OdoAlert    = Color(0xFFEF5350)
 @Composable
 fun MirrorScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToRtspPlayer: () -> Unit = {},
     statusViewModel: CarStatusViewModel = hiltViewModel()
 ) {
     val carStatus       by statusViewModel.carStatus.collectAsStateWithLifecycle()
@@ -118,21 +123,18 @@ fun MirrorScreen(
         onDispose { controller.show(WindowInsetsCompat.Type.systemBars()) }
     }
 
-    @OptIn(ExperimentalFoundationApi::class)
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .combinedClickable(onDoubleClick = onNavigateBack) {}
-    ) {
-        MirrorContent(
-            carStatus       = carStatus,
-            connectionState = connectionState,
-            navigationState = navigationState,
-            gpsState        = gpsState,
-            tpmsData        = tpmsData,
-            speedLimit      = speedLimit,
-            tripText        = tripText
-        )
-    }
+    MirrorContent(
+        carStatus       = carStatus,
+        connectionState = connectionState,
+        navigationState = navigationState,
+        gpsState        = gpsState,
+        tpmsData        = tpmsData,
+        speedLimit      = speedLimit,
+        tripText        = tripText,
+        onNavCellDoubleTap = onNavigateBack,
+        onResetTrip        = { foregroundTime = System.currentTimeMillis() },
+        onSpeedLimitClick  = onNavigateToRtspPlayer
+    )
 }
 
 // ── Phone GPS ─────────────────────────────────────────────────────────────────
@@ -207,11 +209,23 @@ private fun MirrorContent(
     tpmsData: TpmsData?,
     speedLimit: Int?,
     tripText: String,
+    onNavCellDoubleTap: () -> Unit,
+    onResetTrip: () -> Unit,
+    onSpeedLimitClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val location = gpsState.toLocation()
     val speedKmh = gpsState.speedKmh
     val hasSpeed = gpsState.isActive
+
+    // When the car stops after having moved, replace the ODO grid with the live
+    // RTSP camera feed until it starts moving again.
+    val context = LocalContext.current
+    val rtspUrl = remember { SecurePreferences.getInstance(context).getRtspUrl() }
+    var hasMovedOnce by remember { mutableStateOf(false) }
+    LaunchedEffect(speedKmh >= 1f) { if (speedKmh >= 1f) hasMovedOnce = true }
+    val isStopped = hasSpeed && speedKmh < 1f
+    val showVideo = isStopped && hasMovedOnce && !rtspUrl.isNullOrBlank()
 
     Box(modifier = modifier.fillMaxSize().background(OdoBg)) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -220,13 +234,14 @@ private fun MirrorContent(
                 Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     OdoLocationCell(location = location, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
-                    OdoNavCell(navigationState = navigationState, modifier = Modifier.weight(1f))
+                    OdoNavCell(navigationState = navigationState, onDoubleTap = onNavCellDoubleTap,
+                        modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
                     OdoGpsSpeedCell(speedKmh = speedKmh, hasSpeed = hasSpeed,
                         speedLimit = speedLimit, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
-                    OdoTripCell(speedKmh = speedKmh, hasSpeed = hasSpeed,
-                        tripText = tripText, modifier = Modifier.weight(1f))
+                    OdoTripCell(tripText = tripText, onReset = onResetTrip,
+                        modifier = Modifier.weight(1f))
                 }
 
                 OdoHorizontalDivider()
@@ -237,7 +252,8 @@ private fun MirrorContent(
                     OdoVerticalDivider()
                     OdoTpmsCell(tpms = tpmsData, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
-                    OdoSpeedLimitCell(speedLimit = speedLimit, modifier = Modifier.weight(1f))
+                    OdoSpeedLimitCell(speedLimit = speedLimit, onClick = onSpeedLimitClick,
+                        modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
                     OdoClockCell(location = location, modifier = Modifier.weight(1f))
                 }
@@ -245,6 +261,14 @@ private fun MirrorContent(
 
             OdoHorizontalDivider()
             OdoStatusBar(carStatus = carStatus)
+        }
+
+        // Full-screen live camera overlay while the car is stopped
+        if (showVideo) {
+            RtspVideoPlayer(
+                url = rtspUrl!!,
+                modifier = Modifier.fillMaxSize().background(Color.Black)
+            )
         }
 
         ConnectionDot(connectionState = connectionState,
@@ -407,6 +431,17 @@ private fun OdoClockCell(
         }
     }
 
+    // Tap to refresh weather immediately
+    val scope = rememberCoroutineScope()
+    val refreshWeather = {
+        scope.launch {
+            currentLocation?.let { loc ->
+                fetchWeather(loc.latitude, loc.longitude)?.let { weather = it }
+            }
+        }
+        Unit
+    }
+
     val hour        = cal.get(java.util.Calendar.HOUR_OF_DAY)
     val minute      = cal.get(java.util.Calendar.MINUTE)
     val isNight     = hour < 6 || hour >= 18
@@ -420,7 +455,7 @@ private fun OdoClockCell(
     val month      = cal.get(java.util.Calendar.MONTH) + 1
 
     Column(
-        modifier = modifier.fillMaxSize().padding(vertical = 12.dp),
+        modifier = modifier.fillMaxSize().clickable { refreshWeather() }.padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
@@ -480,61 +515,29 @@ private fun OdoGpsSpeedCell(
 
 @Composable
 private fun OdoTripCell(
-    speedKmh: Float,
-    hasSpeed: Boolean,
     tripText: String,
+    onReset: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var colonVisible   by remember { mutableStateOf(true) }
     LaunchedEffect(Unit) { while (true) { delay(1000); colonVisible = !colonVisible } }
 
-    var hasMovedOnce   by remember { mutableStateOf(false) }
-    var countdownSecs  by remember { mutableIntStateOf(15) }
-    var countdownActive by remember { mutableStateOf(false) }
-    val isStopped = hasSpeed && speedKmh < 1f
-
-    LaunchedEffect(isStopped) {
-        if (speedKmh >= 1f) {
-            hasMovedOnce    = true
-            countdownActive = false
-            countdownSecs   = 15
-        } else if (isStopped && hasMovedOnce) {
-            countdownActive = true
-            countdownSecs   = 15
-            while (countdownSecs > 0) {
-                delay(1000)
-                if (!countdownActive) break
-                countdownSecs--
-            }
-            countdownActive = false
-        }
-    }
-
-    Column(modifier = modifier.fillMaxHeight(),
+    Column(modifier = modifier
+        .fillMaxHeight()
+        .clickable { onReset() },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center) {
-        if (countdownActive && countdownSecs > 0) {
-            Icon(Icons.Default.Timer, contentDescription = null,
-                tint = OdoWarning, modifier = Modifier.size(32.dp))
-            Spacer(Modifier.height(8.dp))
-            Text(text = "$countdownSecs", color = OdoWarning, fontSize = 28.sp,
+        Text(text = stringResource(R.string.odo_trip_label), color = OdoLabel, fontSize = 10.sp,
+            fontWeight = FontWeight.Medium, letterSpacing = 2.sp)
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val parts = tripText.split(":")
+            Text(parts[0], color = OdoNormal, fontSize = 28.sp,
                 fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-            Spacer(Modifier.height(6.dp))
-            Text(text = stringResource(R.string.odo_stopped), color = OdoLabel, fontSize = 10.sp,
-                fontWeight = FontWeight.Medium, letterSpacing = 2.sp)
-        } else {
-            Text(text = stringResource(R.string.odo_trip_label), color = OdoLabel, fontSize = 10.sp,
-                fontWeight = FontWeight.Medium, letterSpacing = 2.sp)
-            Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val parts = tripText.split(":")
-                Text(parts[0], color = OdoNormal, fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                Text(":", color = if (colonVisible) OdoNormal else Color.Transparent,
-                    fontSize = 28.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                Text(parts.getOrElse(1) { "00" }, color = OdoNormal, fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-            }
+            Text(":", color = if (colonVisible) OdoNormal else Color.Transparent,
+                fontSize = 28.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            Text(parts.getOrElse(1) { "00" }, color = OdoNormal, fontSize = 28.sp,
+                fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         }
     }
 }
@@ -544,6 +547,7 @@ private fun OdoTripCell(
 @Composable
 private fun OdoNavCell(
     navigationState: NavigationState,
+    onDoubleTap: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Arrow rotation: 0° = up (straight). Positive = clockwise (right). Negative = counter-clockwise (left).
@@ -570,7 +574,10 @@ private fun OdoNavCell(
     }
     val color = if (navigationState.isActive) OdoNormal else OdoInactive
 
-    Column(modifier = modifier.fillMaxHeight(),
+    @OptIn(ExperimentalFoundationApi::class)
+    Column(modifier = modifier
+        .fillMaxHeight()
+        .combinedClickable(onDoubleClick = onDoubleTap) {},
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center) {
         Icon(icon, contentDescription = null, tint = color,
@@ -806,11 +813,13 @@ private fun OdoChargingCell(
 @Composable
 private fun OdoSpeedLimitCell(
     speedLimit: Int?,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val valueText = speedLimit?.toString() ?: "--"
 
-    Box(contentAlignment = Alignment.Center, modifier = modifier.fillMaxSize()) {
+    Box(contentAlignment = Alignment.Center,
+        modifier = modifier.fillMaxSize().clickable { onClick() }) {
         Box(contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxHeight().aspectRatio(1f).padding(10.dp)
                 .background(Color(0xFFE57373), CircleShape)) {
