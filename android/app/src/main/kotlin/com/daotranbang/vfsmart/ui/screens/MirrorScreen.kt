@@ -54,6 +54,7 @@ import com.daotranbang.vfsmart.navigation.NavigationNotificationService
 import com.daotranbang.vfsmart.navigation.NavigationState
 import com.daotranbang.vfsmart.navigation.VF3GattServer
 import com.daotranbang.vfsmart.ui.components.RtspVideoPlayer
+import com.daotranbang.vfsmart.util.RtspRecorder
 import com.daotranbang.vfsmart.viewmodel.CarStatusViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -221,6 +222,7 @@ private fun MirrorContent(
     // and reappears the next time the car moves and stops again.
     val context = LocalContext.current
     val rtspUrl = remember { SecurePreferences.getInstance(context).getRtspUrl() }
+    val recorder = remember { RtspRecorder(context) }
     var hasMovedOnce by remember { mutableStateOf(false) }
     var manualVideo by remember { mutableStateOf(false) }
     var dismissedThisStop by remember { mutableStateOf(false) }
@@ -272,8 +274,13 @@ private fun MirrorContent(
         }
 
         // Full-screen live camera overlay (auto when stopped, or manual via the
-        // speed-limit cell). Tap anywhere on it to dismiss.
+        // speed-limit cell). Tap anywhere on it to dismiss. While it's visible the
+        // stream is also recorded to the library; the clip is saved on dismissal.
         if (showVideo) {
+            DisposableEffect(Unit) {
+                recorder.start(rtspUrl!!)
+                onDispose { recorder.stop() }
+            }
             Box(modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
