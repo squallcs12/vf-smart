@@ -16,7 +16,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.daotranbang.vfsmart.ui.screens.CameraPreviewScreen
 import com.daotranbang.vfsmart.ui.screens.RtspCaptureScreen
-import com.daotranbang.vfsmart.ui.screens.RtspPlayerScreen
 import com.daotranbang.vfsmart.ui.screens.ControlScreen
 import com.daotranbang.vfsmart.ui.screens.DebugScreen
 import com.daotranbang.vfsmart.ui.screens.HomeScreen
@@ -86,17 +85,6 @@ class MainActivity : ComponentActivity() {
                                     popUpTo("mirror") { inclusive = false }
                                     launchSingleTop = true
                                 }
-                            },
-                            onNavigateToRtspPlayer = {
-                                navController.navigate("rtsp_player")
-                            }
-                        )
-                    }
-
-                    composable("rtsp_player") {
-                        RtspPlayerScreen(
-                            onNavigateBack = {
-                                navController.popBackStack()
                             }
                         )
                     }

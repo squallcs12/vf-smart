@@ -74,7 +74,6 @@ private val OdoAlert    = Color(0xFFEF5350)
 @Composable
 fun MirrorScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToRtspPlayer: () -> Unit = {},
     statusViewModel: CarStatusViewModel = hiltViewModel()
 ) {
     val carStatus       by statusViewModel.carStatus.collectAsStateWithLifecycle()
@@ -132,8 +131,7 @@ fun MirrorScreen(
         speedLimit      = speedLimit,
         tripText        = tripText,
         onNavCellDoubleTap = onNavigateBack,
-        onResetTrip        = { foregroundTime = System.currentTimeMillis() },
-        onSpeedLimitClick  = onNavigateToRtspPlayer
+        onResetTrip        = { foregroundTime = System.currentTimeMillis() }
     )
 }
 
@@ -211,21 +209,31 @@ private fun MirrorContent(
     tripText: String,
     onNavCellDoubleTap: () -> Unit,
     onResetTrip: () -> Unit,
-    onSpeedLimitClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val location = gpsState.toLocation()
     val speedKmh = gpsState.speedKmh
     val hasSpeed = gpsState.isActive
 
-    // When the car stops after having moved, replace the ODO grid with the live
-    // RTSP camera feed until it starts moving again.
+    // The live RTSP camera overlay shows either automatically (car stopped after
+    // moving) or manually (tapping the speed-limit cell). Tapping the overlay
+    // always dismisses it; the auto overlay stays dismissed for the current stop
+    // and reappears the next time the car moves and stops again.
     val context = LocalContext.current
     val rtspUrl = remember { SecurePreferences.getInstance(context).getRtspUrl() }
     var hasMovedOnce by remember { mutableStateOf(false) }
-    LaunchedEffect(speedKmh >= 1f) { if (speedKmh >= 1f) hasMovedOnce = true }
+    var manualVideo by remember { mutableStateOf(false) }
+    var dismissedThisStop by remember { mutableStateOf(false) }
+    LaunchedEffect(speedKmh >= 1f) {
+        if (speedKmh >= 1f) {
+            hasMovedOnce = true
+            manualVideo = false        // moving off hides a manually-opened camera
+            dismissedThisStop = false  // and re-arms the auto overlay for the next stop
+        }
+    }
     val isStopped = hasSpeed && speedKmh < 1f
-    val showVideo = isStopped && hasMovedOnce && !rtspUrl.isNullOrBlank()
+    val autoShow  = isStopped && hasMovedOnce && !dismissedThisStop
+    val showVideo = !rtspUrl.isNullOrBlank() && (manualVideo || autoShow)
 
     Box(modifier = modifier.fillMaxSize().background(OdoBg)) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -252,7 +260,7 @@ private fun MirrorContent(
                     OdoVerticalDivider()
                     OdoTpmsCell(tpms = tpmsData, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
-                    OdoSpeedLimitCell(speedLimit = speedLimit, onClick = onSpeedLimitClick,
+                    OdoSpeedLimitCell(speedLimit = speedLimit, onClick = { manualVideo = true },
                         modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
                     OdoClockCell(location = location, modifier = Modifier.weight(1f))
@@ -263,12 +271,16 @@ private fun MirrorContent(
             OdoStatusBar(carStatus = carStatus)
         }
 
-        // Full-screen live camera overlay while the car is stopped
+        // Full-screen live camera overlay (auto when stopped, or manual via the
+        // speed-limit cell). Tap anywhere on it to dismiss.
         if (showVideo) {
-            RtspVideoPlayer(
-                url = rtspUrl!!,
-                modifier = Modifier.fillMaxSize().background(Color.Black)
-            )
+            Box(modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .clickable { manualVideo = false; dismissedThisStop = true }
+            ) {
+                RtspVideoPlayer(url = rtspUrl!!, modifier = Modifier.fillMaxSize())
+            }
         }
 
         ConnectionDot(connectionState = connectionState,
