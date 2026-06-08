@@ -222,7 +222,7 @@ class AutoLinkService : Service() {
         val accessibility = AutoLinkAccessibilityService.instance
         Log.d(TAG, "accessibility instance=$accessibility")
         if (accessibility != null) {
-            accessibility.startConnecting(onStartNowClicked = { scheduleConnectionCheck() })
+            accessibility.startConnecting(onConnected = { scheduleConnectionCheck() })
         } else {
             Log.w(TAG, "accessibility not available — returning to MainActivity after delay")
             handler.postDelayed({
