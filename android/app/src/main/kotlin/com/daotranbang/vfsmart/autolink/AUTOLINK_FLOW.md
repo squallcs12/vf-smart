@@ -13,8 +13,12 @@ our own `MainActivity`. (Screen-capture consent is pre-granted via `appops`, so 
 
 | Class | Role |
 |---|---|
-| `AutoLinkService` (foreground `Service`) | Detects the triggers, debounces, launches AutoLink Pro, verifies the connection, and runs side features (driving tracker, light reminder) |
+| `AutoLinkService` (foreground `Service`) | Detects the triggers, debounces, launches AutoLink Pro, and verifies the connection |
 | `AutoLinkAccessibilityService` (`AccessibilityService`) | Drives the AutoLink Pro UI: switches it to USB mode |
+
+> **Lifecycle:** the service runs only while the head unit has power — `VF3Application`
+> starts it on `ACTION_POWER_CONNECTED` (and at launch if already powered) and stops it
+> on `ACTION_POWER_DISCONNECTED`.
 
 > **Target device:** the armeabi-v7a head unit (see root `CLAUDE.md` → Target Devices).
 > This flow assumes a **rooted** head unit — accessibility is enabled via `su` and
@@ -29,7 +33,7 @@ our own `MainActivity`. (Screen-capture consent is pre-granted via `appops`, so 
 
 | # | Source | Path | Notes |
 |---|---|---|---|
-| 1 | **Android Auto connects** | `CarConnection` observer → `CONNECTION_TYPE_PROJECTION` | Also starts the driving tracker. Sets `androidAutoConnected = true` |
+| 1 | **Android Auto connects** | `CarConnection` observer → `CONNECTION_TYPE_PROJECTION` | Sets `androidAutoConnected = true` |
 | 2 | **Car mode entered** | `ACTION_ENTER_CAR_MODE` broadcast | `UiModeManager` system broadcast |
 | 3 | **Media double-press** | `MediaSessionManager` monitor → pause→play within 1 s | `skipCheck = true`; re-pauses music so it doesn't keep playing |
 | 4 | **Explicit intent** | `onStartCommand` with `ACTION_LAUNCH_AUTOLINK` | Carries `EXTRA_SKIP_CHECK` / `EXTRA_IS_RETRY`; used by `triggerLaunch()` and the retry path |
@@ -129,20 +133,18 @@ Mirroring status is read from `NavigationNotificationService.autoLinkMirroringAc
 
 ---
 
-## Side features (only while projecting)
+## Driving speed & light reminder (moved out of this service)
 
-These run between Android Auto connect and disconnect (trigger 1):
+Vehicle speed and the night light reminder are **no longer owned by `AutoLinkService`**.
+They live with the MirrorScreen speed cell so the app keeps a single GPS listener:
 
-### Driving tracker
-- GPS location updates every 2 s.
-- `speed × 3.6 > 5 km/h` → `isMoving = true` (exposed as `StateFlow`).
-- Stopped on disconnect.
-
-### Light reminder
-- The first time speed exceeds 5 km/h **at night** (hour ≥ 18 or < 6), plays
-  `R.raw.light_reminder` once via `MediaPlayer`, ducking other audio
-  (`AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`, navigation-guidance usage).
-- `lightReminderPlayed` flag resets each time the tracker starts.
+- `navigation/DrivingState` is the one app-wide speed source (`speedKmh` + `isMoving`,
+  >5 km/h). The MirrorScreen GPS (the speed cell) is the only producer; it resets speed
+  to 0 when it stops tracking. `MainActivity` reads `DrivingState.isMoving`.
+- The **light reminder** runs in `OdoGpsSpeedCell`: the first time speed exceeds 5 km/h
+  **at night** (hour ≥ 18 or < 6) it plays `R.raw.light_reminder` once via the shared
+  `util/playLightReminder` (ducks other audio with navigation-guidance focus). It plays
+  once per screen session.
 
 ---
 
@@ -151,7 +153,7 @@ These run between Android Auto connect and disconnect (trigger 1):
 | Flow | Meaning |
 |---|---|
 | `AutoLinkService.androidAutoConnected` | Android Auto projection is connected |
-| `AutoLinkService.isMoving` | Vehicle speed > 5 km/h |
+| `DrivingState.isMoving` | Vehicle speed > 5 km/h (produced by the MirrorScreen speed cell) |
 
 ---
 

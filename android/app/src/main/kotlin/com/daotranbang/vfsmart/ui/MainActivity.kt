@@ -19,6 +19,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.daotranbang.vfsmart.autolink.AutoLinkService
+import com.daotranbang.vfsmart.navigation.DrivingState
 import com.daotranbang.vfsmart.ui.screens.CameraPreviewScreen
 import com.daotranbang.vfsmart.ui.screens.RtspCaptureScreen
 import com.daotranbang.vfsmart.ui.screens.ControlScreen
@@ -64,7 +65,7 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val currentRoute by navController.currentBackStackEntryAsState()
                 val isAndroidAutoConnected by AutoLinkService.androidAutoConnected.collectAsStateWithLifecycle()
-                val isMoving by AutoLinkService.isMoving.collectAsStateWithLifecycle()
+                val isMoving by DrivingState.isMoving.collectAsStateWithLifecycle()
                 val shouldGoMirror by navigateToMirror.collectAsStateWithLifecycle()
 
                 fun navigateMirror() {

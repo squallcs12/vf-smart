@@ -51,7 +51,8 @@
       "Bash(Select-Object -ExpandProperty FullName)",
       "Bash(./gradlew assembleDebug)",
       "PowerShell(\\(Get-Command gradle -ErrorAction SilentlyContinue\\).Source; \\(Get-Command java -ErrorAction SilentlyContinue\\).Source)",
-      "PowerShell(python \"C:\\\\Users\\\\daotr\\\\AppData\\\\Local\\\\Temp\\\\probe_mp4.py\" \"$env:TEMP\\\\vf3_rec.mp4\")"
+      "PowerShell(python \"C:\\\\Users\\\\daotr\\\\AppData\\\\Local\\\\Temp\\\\probe_mp4.py\" \"$env:TEMP\\\\vf3_rec.mp4\")",
+      "Bash(./gradlew -q app:dependencies --configuration releaseRuntimeClasspath)"
     ]
   }
 }

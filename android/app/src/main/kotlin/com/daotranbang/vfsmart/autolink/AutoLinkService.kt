@@ -10,13 +10,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
-import android.media.AudioManager
-import android.media.MediaPlayer
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
@@ -33,12 +26,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.navigation.NavigationNotificationService
 import com.daotranbang.vfsmart.ui.MainActivity
-import java.util.Calendar
 
 class AutoLinkService : Service() {
 
-    private var drivingLocationListener: LocationListener? = null
-    private var lightReminderPlayed = false
     private var lastLaunchTime = 0L
     private var autoRetryCount = 0
     private var connectionCheckAttempt = 0
@@ -133,12 +123,10 @@ class AutoLinkService : Service() {
                 Log.i(TAG, "Android Auto connected — triggering AutoLink")
                 _androidAutoConnected.value = true
                 launchAutoLink()
-                startDrivingTracker()
             }
             else -> {
                 Log.i(TAG, "Android Auto disconnected")
                 _androidAutoConnected.value = false
-                stopDrivingTracker()
             }
         }
     }
@@ -250,81 +238,6 @@ class AutoLinkService : Service() {
             .build()
     }
 
-    private fun startDrivingTracker() {
-        stopDrivingTracker()
-        lightReminderPlayed = false
-        val locationManager = getSystemService(LocationManager::class.java)
-        val listener = LocationListener { location ->
-            val speedKmh = location.speed * 3.6f
-            val moving = speedKmh > 5f
-            if (_isMoving.value != moving) Log.d(TAG, "isMoving=$moving speed=${speedKmh}km/h")
-            _isMoving.value = moving
-            if (moving && !lightReminderPlayed) {
-                val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-                if (hour >= 18 || hour < 6) {
-                    Log.i(TAG, "speed exceeded 5km/h at ${hour}h — playing light reminder")
-                    lightReminderPlayed = true
-                    playLightReminder()
-                }
-            }
-        }
-        drivingLocationListener = listener
-        try {
-            locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER, 2000L, 0f, listener, Looper.getMainLooper()
-            )
-            Log.i(TAG, "driving tracker started")
-        } catch (e: SecurityException) {
-            Log.e(TAG, "location permission not granted: ${e.message}")
-        }
-    }
-
-    private fun stopDrivingTracker() {
-        drivingLocationListener?.let {
-            getSystemService(LocationManager::class.java).removeUpdates(it)
-            drivingLocationListener = null
-        }
-        _isMoving.value = false
-        lightReminderPlayed = false
-        Log.i(TAG, "driving tracker stopped")
-    }
-
-    private fun playLightReminder() {
-        val attrs = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-            .build()
-        val audioManager = getSystemService(AudioManager::class.java)
-        val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-            .setAudioAttributes(attrs)
-            .setOnAudioFocusChangeListener {}
-            .build()
-        val result = audioManager.requestAudioFocus(focusRequest)
-        Log.i(TAG, "audio focus result=$result")
-        if (result != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-            Log.w(TAG, "audio focus not granted — skipping playback")
-            return
-        }
-        try {
-            MediaPlayer().apply {
-                setAudioAttributes(attrs)
-                val afd = resources.openRawResourceFd(R.raw.light_reminder)
-                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                afd.close()
-                setOnPreparedListener { it.start() }
-                setOnCompletionListener {
-                    it.release()
-                    audioManager.abandonAudioFocusRequest(focusRequest)
-                }
-                prepareAsync()
-            }
-            Log.i(TAG, "playing light reminder")
-        } catch (e: Exception) {
-            Log.e(TAG, "MediaPlayer error: ${e.message}")
-            audioManager.abandonAudioFocusRequest(focusRequest)
-        }
-    }
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_LAUNCH_AUTOLINK) {
             launchAutoLink(
@@ -336,7 +249,6 @@ class AutoLinkService : Service() {
     }
 
     override fun onDestroy() {
-        stopDrivingTracker()
         teardownMediaSessionMonitor()
         carConnection.type.removeObserver(carConnectionObserver)
         try { unregisterReceiver(carModeReceiver) } catch (_: Exception) {}
@@ -352,8 +264,6 @@ class AutoLinkService : Service() {
 
         private val _androidAutoConnected = MutableStateFlow(false)
         val androidAutoConnected: StateFlow<Boolean> = _androidAutoConnected.asStateFlow()
-        private val _isMoving = MutableStateFlow(false)
-        val isMoving: StateFlow<Boolean> = _isMoving.asStateFlow()
         private const val NOTIFICATION_ID = 2001
         private const val AUTOLINK_PACKAGE       = "com.link.autolink.pro"
         private const val AUTOLINK_MAIN_ACTIVITY = "com.link.autolink.activity.MainActivity"

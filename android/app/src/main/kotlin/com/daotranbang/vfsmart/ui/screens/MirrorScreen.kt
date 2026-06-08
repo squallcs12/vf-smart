@@ -49,12 +49,14 @@ import com.daotranbang.vfsmart.data.local.SecurePreferences
 import com.daotranbang.vfsmart.data.model.CarStatus
 import com.daotranbang.vfsmart.data.model.TpmsData
 import com.daotranbang.vfsmart.data.model.TpmsTire
+import com.daotranbang.vfsmart.navigation.DrivingState
 import com.daotranbang.vfsmart.navigation.GpsState
 import com.daotranbang.vfsmart.navigation.NavigationNotificationService
 import com.daotranbang.vfsmart.navigation.NavigationState
 import com.daotranbang.vfsmart.navigation.VF3GattServer
 import com.daotranbang.vfsmart.ui.components.RtspVideoPlayer
 import com.daotranbang.vfsmart.util.RtspRecorder
+import com.daotranbang.vfsmart.util.playLightReminder
 import com.daotranbang.vfsmart.viewmodel.CarStatusViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -175,6 +177,8 @@ private fun rememberPhoneGpsState(): GpsState {
                 speedMs   = loc.speed,
                 bearing   = loc.bearing
             )
+            // Publish to the single app-wide speed source.
+            DrivingState.setSpeedKmh(loc.speed * 3.6f)
         }
         try {
             lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener)
@@ -186,11 +190,14 @@ private fun rememberPhoneGpsState(): GpsState {
                     speedMs   = loc.speed,
                     bearing   = loc.bearing
                 )
+                DrivingState.setSpeedKmh(loc.speed * 3.6f)
             }
         } catch (_: Exception) {}
 
         onDispose {
             try { lm.removeUpdates(listener) } catch (_: Exception) {}
+            // No longer tracking — report stationary so consumers don't act on stale speed.
+            DrivingState.setSpeedKmh(0f)
         }
     }
 
@@ -516,6 +523,20 @@ private fun OdoGpsSpeedCell(
         overLimitPlus5 -> OdoAlert
         overLimit      -> OdoWarning
         else           -> OdoNormal
+    }
+
+    // Night "turn your lights on" reminder — plays once per screen session the
+    // first time the car exceeds 5 km/h between 18:00 and 06:00.
+    val context = LocalContext.current
+    var lightReminderPlayed by remember { mutableStateOf(false) }
+    LaunchedEffect(hasSpeed, speedKmh) {
+        if (hasSpeed && speedKmh > 5f && !lightReminderPlayed) {
+            val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+            if (hour >= 18 || hour < 6) {
+                lightReminderPlayed = true
+                playLightReminder(context)
+            }
+        }
     }
 
     Column(modifier = modifier.fillMaxHeight(),

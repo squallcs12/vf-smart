@@ -21,6 +21,7 @@ import com.daotranbang.vfsmart.data.model.CarStatus
 import com.daotranbang.vfsmart.navigation.VF3GattServer
 import com.daotranbang.vfsmart.ui.components.ControlButton
 import com.daotranbang.vfsmart.ui.components.StatusCard
+import com.daotranbang.vfsmart.util.playLightReminder
 import com.daotranbang.vfsmart.viewmodel.CarStatusViewModel
 import com.daotranbang.vfsmart.viewmodel.ControlViewModel
 
@@ -386,35 +387,6 @@ private fun DisconnectedBanner(
                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f))
             }
         }
-    }
-}
-
-private fun playLightReminder(context: android.content.Context) {
-    val attrs = android.media.AudioAttributes.Builder()
-        .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
-        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
-        .build()
-    val audioManager = context.getSystemService(android.media.AudioManager::class.java)
-    val focusRequest = android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-        .setAudioAttributes(attrs)
-        .setOnAudioFocusChangeListener {}
-        .build()
-    if (audioManager.requestAudioFocus(focusRequest) != android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED) return
-    try {
-        android.media.MediaPlayer().apply {
-            setAudioAttributes(attrs)
-            val afd = context.resources.openRawResourceFd(R.raw.light_reminder)
-            setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-            afd.close()
-            setOnPreparedListener { it.start() }
-            setOnCompletionListener {
-                it.release()
-                audioManager.abandonAudioFocusRequest(focusRequest)
-            }
-            prepareAsync()
-        }
-    } catch (e: Exception) {
-        audioManager.abandonAudioFocusRequest(focusRequest)
     }
 }
 
