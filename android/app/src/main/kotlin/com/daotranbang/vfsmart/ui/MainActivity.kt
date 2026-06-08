@@ -10,10 +10,15 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.daotranbang.vfsmart.autolink.AutoLinkService
 import com.daotranbang.vfsmart.ui.screens.CameraPreviewScreen
 import com.daotranbang.vfsmart.ui.screens.RtspCaptureScreen
 import com.daotranbang.vfsmart.ui.screens.ControlScreen
@@ -25,6 +30,7 @@ import com.daotranbang.vfsmart.ui.screens.SetupScreen
 import com.daotranbang.vfsmart.ui.screens.TpmsCalibrationScreen
 import com.daotranbang.vfsmart.ui.theme.VF3SmartTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.MutableStateFlow
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -32,6 +38,15 @@ class MainActivity : ComponentActivity() {
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {}
+
+    private val navigateToMirror = MutableStateFlow(false)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.getBooleanExtra(AutoLinkService.EXTRA_NAVIGATE_MIRROR, false)) {
+            navigateToMirror.value = true
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,6 +63,29 @@ class MainActivity : ComponentActivity() {
         setContent {
             VF3SmartTheme {
                 val navController = rememberNavController()
+                val currentRoute by navController.currentBackStackEntryAsState()
+                val isAndroidAutoConnected by AutoLinkService.androidAutoConnected.collectAsStateWithLifecycle()
+                val isMoving by AutoLinkService.isMoving.collectAsStateWithLifecycle()
+                val shouldGoMirror by navigateToMirror.collectAsStateWithLifecycle()
+
+                fun navigateMirror() {
+                    if (currentRoute?.destination?.route != "mirror") {
+                        navController.navigate("mirror") {
+                            popUpTo("mirror") { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    }
+                }
+
+                LaunchedEffect(isAndroidAutoConnected, isMoving) {
+                    if (isAndroidAutoConnected && isMoving) navigateMirror()
+                }
+                LaunchedEffect(shouldGoMirror) {
+                    if (shouldGoMirror) {
+                        navigateMirror()
+                        navigateToMirror.value = false
+                    }
+                }
 
                 NavHost(
                     navController = navController,

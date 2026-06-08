@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">VF3 Smart</string>
+    <string name="autolink_accessibility_description">Tự động kết nối thiết bị AutoLink Pro OBD và trở về VF3 Smart</string>
 
     <!-- Common -->
     <string name="back">Quay lại</string>
@@ -144,6 +145,11 @@
         <item>T6</item>
         <item>T7</item>
     </string-array>
+
+    <!-- AutoLinkService notification -->
+    <string name="autolink_channel_name">Màn hình AutoLink</string>
+    <string name="autolink_notif_text">Đang theo dõi AutoLink Pro</string>
+    <string name="autolink_light_reminder">Trời đang tối, vui lòng bật đèn xe</string>
     <string name="light_reminder_test_cd">Phát nhắc nhở đèn xe</string>
 
     <!-- CameraPreviewScreen -->

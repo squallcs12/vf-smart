@@ -115,6 +115,9 @@ dependencies {
     // Security
     implementation(libs.androidx.security.crypto)
 
+    // Media session (for media button capture in AutoLinkService)
+    implementation(libs.androidx.media)
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)

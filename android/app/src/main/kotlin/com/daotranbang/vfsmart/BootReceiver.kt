@@ -9,6 +9,8 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
 
+        // AutoLinkService is started by VF3Application when power is present.
+        // Launch the main UI via root shell — bypasses Android 10+ background activity restriction
         val component = "${context.packageName}/${MainActivity::class.java.name}"
         Thread {
             try {
