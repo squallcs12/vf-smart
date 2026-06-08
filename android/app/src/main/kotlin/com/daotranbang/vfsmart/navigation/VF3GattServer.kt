@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothGattServer
 import android.bluetooth.BluetoothGattServerCallback
 import android.bluetooth.BluetoothGattService
@@ -35,13 +36,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
 
 /**
- * BLE GATT server with three write characteristics:
+ * BLE GATT server — the sole transport between phone and car (no ESP32 webserver).
  *
+ * Inbound (ESP32 → phone), three write characteristics:
  *   TPMS_CHAR        — tire pressure data        →  [tpmsState]
  *   SPEED_LIMIT_CHAR — speed limit km/h          →  [speedLimitState]
  *   CAR_STATUS_CHAR  — delta car status updates  →  [carStatusState]
  *
- * The phone advertises as a peripheral. The client (ESP32) connects and writes.
+ * Outbound (phone → ESP32), one notify characteristic:
+ *   COMMAND_CHAR     — control commands           ←  [sendCommand]
+ *
+ * The phone advertises as a peripheral. The client (ESP32) connects, writes the
+ * status characteristics, and subscribes to COMMAND_CHAR to receive commands.
  *
  * ── Wire formats ──────────────────────────────────────────────────────────────
  *
@@ -62,6 +68,17 @@ import java.util.UUID
  *     P  rear_l,rear_r
  *     C  brake_pressed,acc_power,cameras,car_lock,car_unlock
  *     X  charging,lock_state(0/1),wca,wcr_secs,lr,is_night
+ *
+ * COMMAND_CHAR — UTF-8 command strings, "verb[:args]" with comma-separated args:
+ *     "lock"                 "unlock"
+ *     "acc:on" / "off" / "toggle"          "cameras:toggle"
+ *     "windows:close" / "stop"
+ *     "window:down,left,on"  ("up"/"down", side, "on"/"off")
+ *     "buzzer:beep,500" / "on" / "off"
+ *     "light-reminder:toggle"              "charger-unlock"
+ *     "mirrors:open" / "close"
+ *     "odo:toggle"  "armrest:toggle"  "dashcam:toggle"
+ *     "tpms:reset"  "tpms:swap,fl,fr"
  */
 class VF3GattServer(private val context: Context) {
 
@@ -84,6 +101,12 @@ class VF3GattServer(private val context: Context) {
         /** Car status delta updates — WRITE | WRITE_NO_RESPONSE */
         val CAR_STATUS_CHAR_UUID: UUID = UUID.fromString("A1B2C3D4-E5F6-7890-ABCD-EF1234567895")
 
+        /** Control commands phone → ESP32 — NOTIFY */
+        val COMMAND_CHAR_UUID: UUID = UUID.fromString("A1B2C3D4-E5F6-7890-ABCD-EF1234567896")
+
+        /** Client Characteristic Configuration Descriptor (standard 0x2902) */
+        val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+
         // ── Public state flows ─────────────────────────────────────────────────
 
         private val _tpmsState = MutableStateFlow<TpmsData?>(null)
@@ -99,6 +122,21 @@ class VF3GattServer(private val context: Context) {
         val bleConnectionState: StateFlow<BleConnectionState> = _bleConnectionState.asStateFlow()
 
         private const val TAG = "VF3GattServer"
+
+        /** The running server instance, used to route outbound commands. */
+        @Volatile
+        private var activeInstance: VF3GattServer? = null
+
+        /**
+         * Send a control command to the connected ESP32 via COMMAND_CHAR notify.
+         * @return true if the notification was dispatched, false if no server is
+         *         running, no client is connected, or the client hasn't subscribed.
+         */
+        fun sendCommand(command: String): Boolean =
+            activeInstance?.notifyCommand(command) ?: run {
+                Log.w(TAG, "sendCommand(\"$command\") — no active GATT server")
+                false
+            }
     }
 
     private val bluetoothManager =
@@ -107,6 +145,12 @@ class VF3GattServer(private val context: Context) {
 
     private var gattServer: BluetoothGattServer? = null
     private var advertiser: BluetoothLeAdvertiser? = null
+
+    // ── Outbound command state ────────────────────────────────────────────────
+    private var commandCharacteristic: BluetoothGattCharacteristic? = null
+    private var connectedDevice: BluetoothDevice? = null
+    /** Set once the client writes the CCCD to enable notifications on COMMAND_CHAR. */
+    private var commandNotificationsEnabled = false
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -127,14 +171,19 @@ class VF3GattServer(private val context: Context) {
         if (gattServer != null) { Log.d(TAG, "Already running"); return }
         openGattServer()
         startAdvertising()
+        activeInstance = this
     }
 
     @SuppressLint("MissingPermission")
     fun stop() {
+        if (activeInstance === this) activeInstance = null
         try { advertiser?.stopAdvertising(advertiseCallback) } catch (_: Exception) {}
         gattServer?.close()
         gattServer = null
         advertiser = null
+        commandCharacteristic = null
+        connectedDevice = null
+        commandNotificationsEnabled = false
         _tpmsState.value = null
         _speedLimitState.value = null
         _carStatusState.value = null
@@ -156,6 +205,22 @@ class VF3GattServer(private val context: Context) {
             BluetoothGattCharacteristic.PERMISSION_WRITE
         )
 
+        // Outbound commands: NOTIFY, with a CCCD so the client can subscribe.
+        val commandChar = BluetoothGattCharacteristic(
+            COMMAND_CHAR_UUID,
+            BluetoothGattCharacteristic.PROPERTY_NOTIFY,
+            BluetoothGattCharacteristic.PERMISSION_READ
+        ).apply {
+            addDescriptor(
+                BluetoothGattDescriptor(
+                    CCCD_UUID,
+                    BluetoothGattDescriptor.PERMISSION_READ or
+                        BluetoothGattDescriptor.PERMISSION_WRITE
+                )
+            )
+        }
+        commandCharacteristic = commandChar
+
         val service = BluetoothGattService(
             SERVICE_UUID,
             BluetoothGattService.SERVICE_TYPE_PRIMARY
@@ -163,11 +228,12 @@ class VF3GattServer(private val context: Context) {
             it.addCharacteristic(writeChar(TPMS_CHAR_UUID))
             it.addCharacteristic(writeChar(SPEED_LIMIT_CHAR_UUID))
             it.addCharacteristic(writeChar(CAR_STATUS_CHAR_UUID))
+            it.addCharacteristic(commandChar)
         }
 
         server.addService(service)
         gattServer = server
-        Log.d(TAG, "GATT server opened (tpms + speed_limit + car_status)")
+        Log.d(TAG, "GATT server opened (tpms + speed_limit + car_status + command)")
     }
 
     @SuppressLint("MissingPermission")
@@ -205,10 +271,40 @@ class VF3GattServer(private val context: Context) {
 
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
             Log.d(TAG, "Connection: ${device.address} → state=$newState")
-            _bleConnectionState.value = when (newState) {
-                BluetoothProfile.STATE_CONNECTED    -> BleConnectionState.Connected
-                BluetoothProfile.STATE_DISCONNECTED -> BleConnectionState.Disconnected
-                else                                -> _bleConnectionState.value
+            when (newState) {
+                BluetoothProfile.STATE_CONNECTED -> {
+                    connectedDevice = device
+                    _bleConnectionState.value = BleConnectionState.Connected
+                }
+                BluetoothProfile.STATE_DISCONNECTED -> {
+                    if (connectedDevice?.address == device.address) {
+                        connectedDevice = null
+                        commandNotificationsEnabled = false
+                    }
+                    _bleConnectionState.value = BleConnectionState.Disconnected
+                }
+            }
+        }
+
+        @SuppressLint("MissingPermission")
+        override fun onDescriptorWriteRequest(
+            device: BluetoothDevice,
+            requestId: Int,
+            descriptor: BluetoothGattDescriptor,
+            preparedWrite: Boolean,
+            responseNeeded: Boolean,
+            offset: Int,
+            value: ByteArray
+        ) {
+            if (descriptor.uuid == CCCD_UUID &&
+                descriptor.characteristic.uuid == COMMAND_CHAR_UUID
+            ) {
+                commandNotificationsEnabled =
+                    value.contentEquals(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
+                Log.d(TAG, "COMMAND_CHAR notifications enabled=$commandNotificationsEnabled")
+            }
+            if (responseNeeded) {
+                gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
             }
         }
 
@@ -231,6 +327,38 @@ class VF3GattServer(private val context: Context) {
                 SPEED_LIMIT_CHAR_UUID -> { Log.d(TAG, "Speed: \"$payload\""); _speedLimitState.value = payload.toIntOrNull() }
                 CAR_STATUS_CHAR_UUID  -> { Log.d(TAG, "Status len=${payload.length}"); applyCarStatusPayload(payload) }
             }
+        }
+    }
+
+    // ── Outbound command notify ───────────────────────────────────────────────
+
+    /**
+     * Push a command to the connected client over COMMAND_CHAR.
+     * Returns false if there is no connected/subscribed client or the notify fails.
+     */
+    @SuppressLint("MissingPermission")
+    @Suppress("DEPRECATION")
+    private fun notifyCommand(command: String): Boolean {
+        val server = gattServer ?: return false
+        val char = commandCharacteristic ?: return false
+        val device = connectedDevice ?: run {
+            Log.w(TAG, "notifyCommand(\"$command\") — no connected device")
+            return false
+        }
+        if (!commandNotificationsEnabled) {
+            Log.w(TAG, "notifyCommand(\"$command\") — client not subscribed")
+            return false
+        }
+        return try {
+            val bytes = command.toByteArray(Charsets.UTF_8)
+            // Deprecated setValue + 3-arg notify keeps a single path for minSdk 23.
+            char.value = bytes
+            val ok = server.notifyCharacteristicChanged(device, char, false)
+            Log.d(TAG, "notifyCommand(\"$command\") dispatched=$ok")
+            ok
+        } catch (e: Exception) {
+            Log.e(TAG, "notifyCommand(\"$command\") failed", e)
+            false
         }
     }
 

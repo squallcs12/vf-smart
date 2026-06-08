@@ -8,22 +8,24 @@ The VF3 Smart app integrates with Google Assistant using **Google App Actions**,
 
 **Architecture:**
 ```
-Voice Command → Google Assistant → App Actions → VoiceAssistantActivity → AssistantCommandHandler → VF3Repository → ESP32 API
+Voice Command → Google Assistant → App Actions → VoiceAssistantActivity → AssistantCommandHandler → VF3Repository → BLE command → ESP32
 ```
+
+The final hop is a BLE notification on the Command characteristic (see `VF3GattServer`), not an HTTP request — the ESP32 has no webserver.
 
 ## Supported Voice Commands
 
-| Voice Command | Action | API Endpoint |
-|--------------|--------|--------------|
-| "Hey Google, lock my car" | Lock the car | `POST /car/lock` |
-| "Hey Google, unlock my car" | Unlock the car | `POST /car/unlock` |
-| "Hey Google, close the windows" | Close all windows (30s) | `POST /car/windows/close` |
-| "Hey Google, open the mirrors" | Open side mirrors | `POST /car/side-mirrors?action=open` |
-| "Hey Google, close the mirrors" | Close side mirrors | `POST /car/side-mirrors?action=close` |
-| "Hey Google, honk the horn" | Beep horn for 1 second | `POST /car/buzzer?state=beep` |
-| "Hey Google, turn on accessory power" | Enable accessory power | `POST /car/accessory-power?state=on` |
-| "Hey Google, turn off accessory power" | Disable accessory power | `POST /car/accessory-power?state=off` |
-| "Hey Google, unlock the charger" | Unlock charging port | `POST /car/charger-unlock` |
+| Voice Command | Action | BLE Command |
+|--------------|--------|-------------|
+| "Hey Google, lock my car" | Lock the car | `lock` |
+| "Hey Google, unlock my car" | Unlock the car | `unlock` |
+| "Hey Google, close the windows" | Close all windows (30s) | `windows:close` |
+| "Hey Google, open the mirrors" | Open side mirrors | `mirrors:open` |
+| "Hey Google, close the mirrors" | Close side mirrors | `mirrors:close` |
+| "Hey Google, honk the horn" | Beep horn for 1 second | `buzzer:beep,1000` |
+| "Hey Google, turn on accessory power" | Enable accessory power | `acc:on` |
+| "Hey Google, turn off accessory power" | Disable accessory power | `acc:off` |
+| "Hey Google, unlock the charger" | Unlock charging port | `charger-unlock` |
 
 ## Implementation Components
 
@@ -150,9 +152,8 @@ The app provides voice feedback for all commands:
 - "Honking horn"
 
 ❌ **Error feedback:**
-- "Failed to lock car: Network error"
-- "Cannot reach the car, check WiFi connection"
-- "Failed to unlock car: Unauthorized - Invalid API key"
+- "Failed to lock car: Car not connected"
+- "Failed to unlock car: Car not connected" (BLE link down or client not subscribed)
 
 ## Requirements
 
@@ -173,9 +174,10 @@ dependencies {
 
 ### Permissions
 
-The following permissions are already included in `AndroidManifest.xml`:
-- `android.permission.INTERNET` - For API communication
-- `android.permission.ACCESS_NETWORK_STATE` - For network state checks
+Car control uses BLE, so the relevant permissions in `AndroidManifest.xml` are:
+- `android.permission.BLUETOOTH_ADVERTISE` / `BLUETOOTH_CONNECT` (API 31+) — GATT server + commands
+- `android.permission.BLUETOOTH` / `BLUETOOTH_ADMIN` (API ≤ 30)
+- `android.permission.INTERNET` / `ACCESS_NETWORK_STATE` — used only for RTSP camera streaming
 
 ### Device Requirements
 
@@ -187,8 +189,8 @@ The following permissions are already included in `AndroidManifest.xml`:
 
 ### For Users
 
-1. Install VF3 Smart app
-2. Complete device setup (configure WiFi and API key)
+1. Install VF3 Smart app (no WiFi/API-key setup — the car connects over BLE automatically)
+2. Make sure Bluetooth is on and permissions are granted
 3. Say "Hey Google" to activate Assistant
 4. Try voice commands: "Lock my car", "Close the windows", etc.
 5. Assistant will automatically discover available commands from the app
@@ -245,17 +247,16 @@ The following permissions are already included in `AndroidManifest.xml`:
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ VF3Repository                                                    │
-│ - Calls apiService.lockCar()                                    │
-│ - Makes HTTP POST to ESP32                                      │
+│ - Calls repository.lockCar()                                    │
+│ - VF3GattServer.sendCommand("lock") → BLE notify                │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ ESP32 VF3 Smart Device                                          │
-│ - Receives POST /car/lock                                       │
-│ - Validates API key                                             │
+│ - Receives "lock" notification on Command characteristic        │
 │ - Triggers relay to lock car                                    │
-│ - Returns success response                                      │
+│ (fire-and-forget — no response channel)                         │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ▼
@@ -270,20 +271,16 @@ The following permissions are already included in `AndroidManifest.xml`:
 
 The integration handles errors gracefully:
 
-### Network Errors
-- **Scenario:** ESP32 device unreachable
-- **Feedback:** "Cannot reach the car, check WiFi connection"
-
-### Authentication Errors
-- **Scenario:** Invalid API key
-- **Feedback:** "Authentication failed, check API key"
+### Connection Errors
+- **Scenario:** car not connected over BLE / not subscribed to the Command characteristic
+- **Feedback:** "Failed to <action>: Car not connected"
 
 ### Unknown Commands
 - **Scenario:** Unsupported action
 - **Feedback:** "Unknown command: <action>"
 
-### API Errors
-- **Scenario:** ESP32 returns error
+### Command Errors
+- **Scenario:** BLE notify failed to dispatch
 - **Feedback:** "Failed to <action>: <error message>"
 
 ## Android Auto Integration
@@ -309,9 +306,8 @@ Voice commands work seamlessly in Android Auto:
    - Use TextToSpeech efficiently
 
 3. **Security:**
-   - Never expose API key in deep links
+   - Car control is over the local BLE link only (no API key, no internet exposure)
    - Validate all input parameters
-   - Use HTTPS for API communication (if available)
 
 4. **Testing:**
    - Test all voice commands on physical device

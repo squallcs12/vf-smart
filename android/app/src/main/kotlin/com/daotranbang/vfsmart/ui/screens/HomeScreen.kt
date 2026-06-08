@@ -28,7 +28,6 @@ import com.daotranbang.vfsmart.viewmodel.ControlViewModel
 fun HomeScreen(
     onNavigateToControls: () -> Unit = {},
     onNavigateToDebug: () -> Unit = {},
-    onNavigateToSetup: () -> Unit = {},
     onNavigateToMirror: () -> Unit = {},
     modifier: Modifier = Modifier,
     statusViewModel: CarStatusViewModel = hiltViewModel(),
@@ -52,7 +51,6 @@ fun HomeScreen(
         controlViewModel     = controlViewModel,
         onNavigateToControls = onNavigateToControls,
         onNavigateToDebug    = onNavigateToDebug,
-        onNavigateToSetup    = onNavigateToSetup,
         onNavigateToMirror   = onNavigateToMirror,
         modifier             = modifier.fillMaxSize()
     )
@@ -68,7 +66,6 @@ private fun FullContent(
     controlViewModel: ControlViewModel,
     onNavigateToControls: () -> Unit,
     onNavigateToDebug: () -> Unit,
-    onNavigateToSetup: () -> Unit,
     onNavigateToMirror: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -107,10 +104,6 @@ private fun FullContent(
                     IconButton(onClick = { playLightReminder(context) }) {
                         Icon(Icons.Default.VolumeUp,
                             contentDescription = stringResource(R.string.light_reminder_test_cd))
-                    }
-                    IconButton(onClick = onNavigateToSetup) {
-                        Icon(Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.setup_cd))
                     }
                     IconButton(onClick = onNavigateToDebug) {
                         Icon(Icons.Default.BugReport,

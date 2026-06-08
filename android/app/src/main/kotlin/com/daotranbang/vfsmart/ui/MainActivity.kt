@@ -26,7 +26,6 @@ import com.daotranbang.vfsmart.ui.screens.DebugScreen
 import com.daotranbang.vfsmart.ui.screens.HomeScreen
 import com.daotranbang.vfsmart.ui.screens.MirrorScreen
 import com.daotranbang.vfsmart.ui.screens.RedLightDetectorScreen
-import com.daotranbang.vfsmart.ui.screens.SetupScreen
 import com.daotranbang.vfsmart.ui.screens.TpmsCalibrationScreen
 import com.daotranbang.vfsmart.ui.theme.VF3SmartTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -92,21 +91,10 @@ class MainActivity : ComponentActivity() {
                     startDestination = "mirror",
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    composable("setup") {
-                        SetupScreen(
-                            onSetupComplete = {
-                                navController.navigate("home") {
-                                    popUpTo("setup") { inclusive = true }
-                                }
-                            }
-                        )
-                    }
-
                     composable("home") {
                         HomeScreen(
                             onNavigateToControls = { navController.navigate("controls") },
                             onNavigateToDebug    = { navController.navigate("debug") },
-                            onNavigateToSetup    = { navController.navigate("setup") },
                             onNavigateToMirror   = {
                                 navController.navigate("mirror") {
                                     popUpTo("mirror") { inclusive = false }

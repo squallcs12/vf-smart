@@ -100,11 +100,7 @@ dependencies {
     // Android Auto
     implementation(libs.androidx.car.app)
 
-    // Networking
-    implementation(libs.retrofit)
-    implementation(libs.retrofit.gson)
-    implementation(libs.okhttp)
-    implementation(libs.okhttp.logging)
+    // JSON annotations (@SerializedName on the car-status models)
     implementation(libs.gson)
 
     // Dependency Injection

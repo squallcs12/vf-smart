@@ -1,14 +1,16 @@
 # VF3-Smart Android Auto App
 
-Android application for controlling the VF3-Smart ESP32 car control device with Android Auto projection support.
+Android application for controlling the VF3-Smart car control device with Android Auto projection support.
+
+The app talks to the car **entirely over Bluetooth Low Energy (BLE)** — the ESP32 no longer runs an HTTP webserver. The phone acts as the BLE peripheral (GATT server); the ESP32 connects as a client, pushes status, and receives commands.
 
 ## Features
 
 - **Full-featured phone app** with all car controls
 - **Android Auto projection** for read-only status monitoring while driving
-- **Real-time WebSocket updates** (1-second refresh)
-- **UDP device discovery** for easy setup
-- **Secure API key storage** using EncryptedSharedPreferences
+- **Real-time car status over BLE** (delta updates pushed by the car)
+- **Commands over BLE** (lock, windows, buzzer, mirrors, …)
+- **No pairing/onboarding** — the app advertises and the car connects automatically
 
 ## Project Structure
 
@@ -16,19 +18,17 @@ Android application for controlling the VF3-Smart ESP32 car control device with 
 android/
 ├── app/
 │   ├── src/main/
-│   │   ├── kotlin/com/vinfast/vf3smart/
+│   │   ├── kotlin/com/daotranbang/vfsmart/
 │   │   │   ├── VF3Application.kt
 │   │   │   ├── data/
 │   │   │   │   ├── model/          # Data models (CarStatus, etc.)
-│   │   │   │   ├── network/        # Retrofit, WebSocket, UDP discovery
-│   │   │   │   ├── repository/     # Repository pattern
-│   │   │   │   └── local/          # Secure preferences
-│   │   │   ├── viewmodel/          # ViewModels (Setup, Status, Control)
+│   │   │   │   ├── repository/     # VF3Repository — single source of truth
+│   │   │   │   └── local/          # SecurePreferences (RTSP URL only)
+│   │   │   ├── navigation/
+│   │   │   │   └── VF3GattServer.kt # BLE GATT server (status in + commands out)
+│   │   │   ├── viewmodel/          # ViewModels (Status, Control, TPMS)
 │   │   │   ├── di/                 # Hilt dependency injection
 │   │   │   ├── ui/                 # Jetpack Compose UI
-│   │   │   │   ├── screens/        # Setup, Home, Control screens
-│   │   │   │   ├── components/     # Reusable UI components
-│   │   │   │   └── theme/          # Material Design 3 theme
 │   │   │   └── auto/               # Android Auto service
 │   │   └── AndroidManifest.xml
 │   └── build.gradle.kts
@@ -40,142 +40,85 @@ android/
 
 - **Pattern**: MVVM + Repository + Hilt DI
 - **UI**: Jetpack Compose with Material Design 3
-- **Networking**: Retrofit + OkHttp + WebSocket
+- **Transport**: BLE GATT (`VF3GattServer`) — no HTTP/WebSocket/UDP
 - **Async**: Kotlin Coroutines + StateFlow
-- **Security**: EncryptedSharedPreferences
+- **Storage**: EncryptedSharedPreferences (RTSP camera URL only)
+
+## BLE Protocol
+
+The phone advertises service `A1B2C3D4-E5F6-7890-ABCD-EF1234567890`. The ESP32 connects and uses four characteristics:
+
+| Characteristic | UUID suffix | Direction | Properties |
+|---|---|---|---|
+| TPMS | `…893` | ESP32 → phone | WRITE |
+| Speed limit | `…894` | ESP32 → phone | WRITE |
+| Car status (delta) | `…895` | ESP32 → phone | WRITE |
+| **Command** | `…896` | phone → ESP32 | **NOTIFY** (+ CCCD) |
+
+Wire formats for the inbound status characteristics are documented in `VF3GattServer.kt`.
+
+### Command channel
+
+Commands are UTF-8 strings pushed as notifications on the Command characteristic. The ESP32 subscribes via the CCCD to receive them. Format is `verb[:args]` with comma-separated args:
+
+```
+lock                       unlock
+acc:on | acc:off | acc:toggle
+cameras:toggle
+windows:close | windows:stop
+window:down,left,on        (up|down, side, on|off)
+buzzer:beep,500 | buzzer:on | buzzer:off
+light-reminder:toggle
+charger-unlock
+mirrors:open | mirrors:close
+odo:toggle  armrest:toggle  dashcam:toggle
+tpms:reset  tpms:swap,fl,fr
+```
+
+Commands are **fire-and-forget**: a success result means the notification was dispatched to a subscribed client, not that the car confirmed the action. There is no read-back channel.
 
 ## Build & Run
 
 ### Prerequisites
 
 - Android Studio Ladybug | 2024.2.1 or later
-- Android SDK 35
-- Minimum SDK: 28 (Android 9.0)
-- Gradle 8.11
+- Android SDK 35, minimum SDK 23
+- The two target devices: **Samsung Galaxy S20+** (primary) and the **armeabi-v7a head unit** (see `CLAUDE.md`)
 
-### Build
+### Build / Install / Test
 
 ```bash
 cd /home/bang/bang/vf3-smart/android
-./gradlew build
-```
-
-### Install on Device
-
-```bash
+./gradlew assembleDebug
 ./gradlew installDebug
-```
-
-### Run Tests
-
-```bash
 ./gradlew test
 ```
-
-## Setup Instructions
-
-1. **Connect to WiFi**: Ensure your phone is on the same network as the ESP32 device
-2. **Launch app**: Open VF3 Smart app
-3. **Auto-discover**: Tap "Discover Device" (waits up to 30 seconds for UDP broadcast)
-   - Alternative: Enter device IP manually (e.g., `192.168.4.1`)
-4. **Enter API key**: Input your API key configured during ESP32 onboarding
-5. **Test connection**: App will test connection before saving
-6. **Success**: Navigate to home screen with real-time car status
 
 ## Usage
 
 ### Phone App
 
 - **Home Screen**: Real-time dashboard with car status and quick actions
-- **Controls**: Detailed controls for lock, windows, accessories, buzzer, charger
-- **Real-time Updates**: WebSocket connection provides 1-second status updates
+- **Controls**: Lock, windows, accessories, buzzer, mirrors, charger, dashcam, TPMS
+- **Real-time updates**: pushed by the car over BLE as state changes
 
 ### Android Auto
 
-- **Status monitoring only**: Read-only display due to Android Auto restrictions
-- **Safe while driving**: Large icons, minimal text, no complex controls
-- **Use phone for controls**: Full control features remain on phone
-
-## API Endpoints Used
-
-All endpoints defined in `VF3ApiService.kt`:
-
-- `GET /car/status` - Get complete car status (no auth)
-- `POST /car/lock` - Lock the car
-- `POST /car/unlock` - Unlock the car
-- `POST /car/windows/close` - Start auto-close (30s timer)
-- `POST /car/windows/stop` - Stop window operation
-- `POST /car/windows/down` - Roll down windows
-- `POST /car/buzzer` - Control horn/buzzer
-- `POST /car/accessory-power` - Toggle accessory power
-- `POST /car/inside-cameras` - Toggle inside cameras
-- `POST /car/light-reminder` - Toggle light reminder
-- `POST /car/charger-unlock` - Unlock charger port
-
-## WebSocket
-
-- **Endpoint**: `ws://<device-ip>/ws`
-- **Update frequency**: Every 1 second
-- **No authentication**: Read-only real-time monitoring
-- **Auto-reconnect**: 5-second delay with exponential backoff
-
-## UDP Discovery
-
-- **Port**: 8888
-- **Protocol**: UDP broadcast
-- **Message format**: `{"device":"VF3-Smart","type":"car-control","ip":"...","mac":"...","hostname":"..."}`
-- **Confirmation**: Sends `{"command":"confirm"}` to stop broadcasting
+- **Status monitoring only**: read-only display due to Android Auto restrictions
+- **Use phone for controls**: full control features remain on phone
 
 ## Security
 
-- **API Key**: Required for all control operations
-- **Secure Storage**: EncryptedSharedPreferences with AES256-GCM
-- **No plaintext storage**: Device IP and API key are encrypted at rest
-- **Network**: HTTP only (local network, no internet exposure)
-
-## TODO: Remaining UI Implementation
-
-The core architecture is complete. Remaining tasks:
-
-1. **UI Screens** (Jetpack Compose):
-   - `SetupScreen.kt` - Device discovery and configuration UI
-   - `HomeScreen.kt` - Main dashboard with status cards
-   - `ControlScreen.kt` - Detailed control UI with categories
-
-2. **UI Components**:
-   - `StatusCard.kt` - Reusable status display card
-   - `ControlButton.kt` - Large touch-friendly control buttons
-   - `LoadingIndicator.kt` - Loading state UI
-   - `ErrorDialog.kt` - Error handling UI
-
-3. **Android Auto**:
-   - `VF3AutoService.kt` - CarAppService implementation
-   - `VF3AutoSession.kt` - Session management
-   - `StatusScreen.kt` - Read-only status display with GridTemplate
-
-## Testing
-
-Connect to ESP32 device and verify:
-
-- [ ] UDP device discovery (10-30 seconds)
-- [ ] Manual IP entry fallback
-- [ ] API key authentication
-- [ ] WebSocket connection and real-time updates
-- [ ] Lock/unlock car
-- [ ] Close windows (30s timer)
-- [ ] Stop windows
-- [ ] Beep horn
-- [ ] Toggle accessory power
-- [ ] Android Auto projection (status only)
-- [ ] Error handling (wrong API key, network failure, timeout)
+- BLE link only; no IP/API key to manage
+- **Secure Storage**: EncryptedSharedPreferences with AES256-GCM (RTSP URL)
 
 ## Troubleshooting
 
-- **Device not found**: Ensure phone and ESP32 are on same WiFi network
-- **401 Unauthorized**: Check API key is correct
-- **Connection timeout**: Verify ESP32 is powered on and connected to WiFi
-- **WebSocket disconnects**: Check network stability, app will auto-reconnect
+- **"Car not connected"**: the ESP32 hasn't connected to the phone's GATT server, or hasn't subscribed to the Command characteristic. Check Bluetooth is on and `BLUETOOTH_CONNECT`/`BLUETOOTH_ADVERTISE` are granted.
+- **Status not updating**: confirm the car is connected (connection indicator) and advertising started (`VF3GattServer` logs, tag `VF3GattServer`).
+- **Commands ignored**: check logcat for `notifyCommand(...) dispatched=` — `false` means no subscribed client.
 
 ## License
 
 Part of the VF3-Smart project.
+</content>

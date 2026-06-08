@@ -3,6 +3,13 @@
 This file covers the Android companion app for VF3 Smart (Kotlin/Compose).
 ESP32 firmware and REST API docs are in the root `CLAUDE.md`.
 
+## Target Devices
+
+This app is built for two devices: **Samsung Galaxy S20+** and an **armeabi-v7a (32-bit ARM) head unit**.
+The app is **primarily for the S20+** — default to focusing on the S20+ unless the
+user explicitly says to target the ARM device. Optimize layouts, screen sizes, and
+device-specific behavior for the S20+ first.
+
 ## UI Language
 
 **All UI strings are Vietnamese** (default locale). Use Android string resources:
@@ -11,27 +18,65 @@ ESP32 firmware and REST API docs are in the root `CLAUDE.md`.
 - Non-Composable code (Services, ViewModels) uses `getString(R.string.xxx)` via Context
 - `NavDirectionParser.label()` returns hardcoded Vietnamese strings (no Context available)
 
+## Transport: BLE only (no ESP32 webserver)
+
+**The ESP32 no longer runs an HTTP webserver, WebSocket, or UDP discovery.** All
+car communication goes over Bluetooth Low Energy via `navigation/VF3GattServer.kt`:
+
+- The **phone is the GATT server / peripheral**; the **ESP32 connects as a client**.
+- **Inbound** (car → phone): TPMS, speed-limit, and delta car-status are *written*
+  by the ESP32 to three characteristics and surfaced as `StateFlow`s.
+- **Outbound** (phone → car): commands are pushed as **notifications** on the
+  Command characteristic (`…896`). `VF3GattServer.sendCommand("lock")` is the
+  single send path; `VF3Repository` wraps it into typed methods returning
+  `Result<Unit>`. Commands are **fire-and-forget** (no read-back).
+- There is **no Setup/onboarding** screen, IP, or API key. `SecurePreferences`
+  stores only the RTSP camera URL.
+
+Command wire format and the full characteristic table live in `VF3GattServer.kt`
+and `README.md`. The `GOOGLE_ASSISTANT.md` voice flow ends at `VF3Repository`,
+which now emits a BLE command instead of an HTTP request.
+
+> The HTTP/WebSocket/UDP code samples in the sections below are **historical** —
+> they describe the removed transport and are kept only to illustrate the
+> Google Assistant deep-link layer (which is unchanged). Ignore the `VF3ApiClient`
+> / OkHttp / `ws://` / port-8888 details; the real transport is `VF3GattServer`.
+
+## AutoLink Auto-Connect (head unit)
+
+The head unit auto-connects to AutoLink Pro screen mirroring hands-free: when the user
+gets in the car, the app launches AutoLink Pro and drives its UI through an accessibility
+service to select the device and dismiss the "Start now" capture dialog. This is handled by
+`autolink/AutoLinkService` (foreground service: triggers, debounce, verification, side
+features) and `autolink/AutoLinkAccessibilityService` (drives the AutoLink Pro UI).
+
+**See [`app/src/main/kotlin/com/daotranbang/vfsmart/autolink/AUTOLINK_FLOW.md`](app/src/main/kotlin/com/daotranbang/vfsmart/autolink/AUTOLINK_FLOW.md)**
+for the full flow: the four launch triggers, the accessibility state machine, the
+connection verification/retry loop, side features (driving tracker, light reminder),
+exposed `StateFlow`s, and key constants. This flow assumes a **rooted head unit** and does
+not run on the S20+.
+
 ## Google Assistant Integration (Android Auto)
 
 The VF3 Smart system supports Google Assistant voice control through the Android Auto mobile app. The integration architecture is:
 
-**Voice Command → Android App → ESP32 HTTP API → Car Action**
+**Voice Command → Android App → BLE command → Car Action**
 
 ### Integration Architecture
 
 ```
 ┌─────────────────┐      ┌──────────────────┐      ┌──────────────┐
-│  Google         │      │  Android Auto    │      │  ESP32       │
-│  Assistant      │─────▶│  App             │─────▶│  VF3 Smart   │
-│  (Voice)        │      │  (HTTP Client)   │      │  (REST API)  │
+│  Google         │      │  Android App     │      │  ESP32       │
+│  Assistant      │─────▶│  VF3GattServer   │─────▶│  VF3 Smart   │
+│  (Voice)        │      │  (BLE peripheral)│      │  (BLE client)│
 └─────────────────┘      └──────────────────┘      └──────────────┘
 ```
 
 1. **User speaks command** to Google Assistant (in car or on phone)
-2. **Android Auto app intercepts** the voice command
-3. **App translates command** to appropriate HTTP API endpoint
-4. **ESP32 executes action** and returns response
-5. **App provides voice feedback** to user
+2. **Android app intercepts** the voice command (deep link → `AssistantCommandHandler`)
+3. **App translates command** to a `VF3Repository` call
+4. **`VF3GattServer.sendCommand(...)`** pushes a BLE notification to the ESP32
+5. **App provides voice feedback** to user (fire-and-forget — no car response)
 
 ### Implementation Approaches
 
@@ -206,22 +251,22 @@ class VoiceCommandHandler(private val context: Context) {
 
 ### Supported Voice Commands
 
-Map Google Assistant voice commands to VF3 Smart API endpoints:
+Map Google Assistant voice commands to VF3 Smart BLE commands (sent via
+`VF3Repository` → `VF3GattServer.sendCommand`):
 
-| Voice Command | API Endpoint | Action |
-|--------------|--------------|--------|
-| "Lock my car" | `POST /car/lock` | Lock the car |
-| "Unlock my car" | `POST /car/unlock` | Unlock the car |
-| "Close the windows" | `POST /car/windows/close` | Close all windows (30s) |
-| "Stop the windows" | `POST /car/windows/stop` | Stop window operation |
-| "Open the mirrors" | `POST /car/side-mirrors` (action=open) | Open side mirrors |
-| "Close the mirrors" | `POST /car/side-mirrors` (action=close) | Close side mirrors |
-| "Honk the horn" | `POST /car/buzzer` (state=beep) | Beep buzzer |
-| "Turn on accessory power" | `POST /car/accessory-power` (state=on) | Enable accessories |
-| "Turn off accessory power" | `POST /car/accessory-power` (state=off) | Disable accessories |
-| "Unlock the charger" | `POST /car/charger-unlock` | Unlock charging port |
-| "Open the frunk" | `POST /car/frunk/open` | Unlock and open front trunk |
-| "Turn on dashcam" | `POST /car/dashcam` (state=on) | Enable dashcam |
+| Voice Command | BLE Command | Action |
+|--------------|-------------|--------|
+| "Lock my car" | `lock` | Lock the car |
+| "Unlock my car" | `unlock` | Unlock the car |
+| "Close the windows" | `windows:close` | Close all windows (30s) |
+| "Stop the windows" | `windows:stop` | Stop window operation |
+| "Open the mirrors" | `mirrors:open` | Open side mirrors |
+| "Close the mirrors" | `mirrors:close` | Close side mirrors |
+| "Honk the horn" | `buzzer:beep,1000` | Beep buzzer |
+| "Turn on accessory power" | `acc:on` | Enable accessories |
+| "Turn off accessory power" | `acc:off` | Disable accessories |
+| "Unlock the charger" | `charger-unlock` | Unlock charging port |
+| "Turn on dashcam" | `dashcam:on` | Enable dashcam |
 
 ### Real-Time Status Feedback
 

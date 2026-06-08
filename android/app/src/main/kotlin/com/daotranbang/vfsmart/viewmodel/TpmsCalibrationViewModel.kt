@@ -11,6 +11,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * TPMS calibration.
+ *
+ * Reset/swap are fire-and-forget BLE commands — the ESP32 has no webserver, so
+ * there is no read-back of sensor-ID assignments. Live tire pressures still flow
+ * in via the car status (TPMS) characteristic. [assignments] stays null.
+ */
 @HiltViewModel
 class TpmsCalibrationViewModel @Inject constructor(
     private val repository: VF3Repository
@@ -29,30 +36,19 @@ class TpmsCalibrationViewModel @Inject constructor(
     private val _assignments = MutableStateFlow<TpmsSensorAssignments?>(null)
     val assignments: StateFlow<TpmsSensorAssignments?> = _assignments.asStateFlow()
 
-    init { load() }
-
+    /** No read-back over BLE — kept so the refresh action has something to call. */
     fun load() {
-        viewModelScope.launch {
-            _state.value = State.Loading
-            repository.getTpmsCalibration().fold(
-                onSuccess = { resp ->
-                    _assignments.value = resp.sensors
-                    _state.value = State.Idle
-                },
-                onFailure = {
-                    _state.value = State.Error(it.message ?: "Failed to load")
-                }
-            )
-        }
+        _state.value = State.Idle
     }
 
     fun reset() {
         viewModelScope.launch {
             _state.value = State.Loading
             repository.tpmsReset().fold(
-                onSuccess = { resp ->
-                    _assignments.value = resp.sensors
-                    _state.value = State.Success("All assignments cleared. Drive near each tire to re-learn.", resp.sensors)
+                onSuccess = {
+                    _state.value = State.Success(
+                        "All assignments cleared. Drive near each tire to re-learn.", null
+                    )
                 },
                 onFailure = {
                     _state.value = State.Error(it.message ?: "Reset failed")
@@ -65,11 +61,9 @@ class TpmsCalibrationViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = State.Loading
             repository.tpmsSwap(posA, posB).fold(
-                onSuccess = { resp ->
-                    _assignments.value = resp.sensors
+                onSuccess = {
                     _state.value = State.Success(
-                        "${posA.uppercase()} ↔ ${posB.uppercase()} swapped",
-                        resp.sensors
+                        "${posA.uppercase()} ↔ ${posB.uppercase()} swapped", null
                     )
                 },
                 onFailure = {

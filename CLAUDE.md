@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is an ESP32-based MCU control system for a VinFast VF3 electric car. The project uses PlatformIO with the Arduino framework to manage vehicle sensors, controls, and safety features.
 
+The ESP32 talks to the companion Android app **exclusively over Bluetooth Low Energy (BLE)**. There is **no webserver, WebSocket, UDP discovery, WiFi onboarding, or API key** — those were removed. The Android app is the BLE **peripheral / GATT server**; the ESP32 is the BLE **client**. See [BLE Communication](#ble-communication) and the Android side in `android/app/.../navigation/VF3GattServer.kt`.
+
 ## Build Commands
 
 ```bash
@@ -14,12 +16,6 @@ pio run
 
 # Upload firmware to ESP32 device
 pio run --target upload
-
-# Upload filesystem (HTML files) to ESP32
-pio run --target uploadfs
-
-# Full deployment (firmware + filesystem)
-pio run --target uploadfs && pio run --target upload
 
 # Clean build files
 pio run --target clean
@@ -31,8 +27,6 @@ pio device monitor
 pio run --target upload && pio device monitor
 ```
 
-**Note**: The filesystem must be uploaded separately using `uploadfs`. HTML files are stored in the `data/` directory and served via LittleFS.
-
 ## System Architecture
 
 ### Hardware Platform
@@ -40,8 +34,7 @@ pio run --target upload && pio device monitor
 - **Framework**: Arduino (via espressif32 platform)
 - **Serial Communication**: 9600 baud
 - **Control Loop**: 50ms cycle time (20Hz)
-- **WiFi**: Access Point mode (SSID: VF3_SMART)
-- **Web Server**: AsyncWebServer on port 80
+- **Connectivity**: BLE client (connects to the Android app's GATT server)
 
 ### Pin Assignment Architecture
 
@@ -62,7 +55,8 @@ The main loop follows a read-process-act pattern:
 1. Read all analog sensor values
 2. Read all digital sensor states
 3. Execute control logic through dedicated handler functions
-4. Delay 50ms before next cycle
+4. Push status changes over BLE; apply any received BLE commands
+5. Delay 50ms before next cycle
 
 ### Function Organization
 
@@ -91,6 +85,7 @@ When modifying pin assignments:
 4. Create a dedicated handler function (e.g., `handleNewFeature()`)
 5. Call the handler function from `loop()`
 6. Read sensor inputs before processing logic in the loop
+7. If the feature exposes state or a command, add it to the BLE status/command protocol below
 
 ## Timer-Based Logic
 
@@ -134,9 +129,9 @@ battery_voltage = (adc_value / 4095.0) * 3.3V * 4.0
 ### Change Detection
 
 The system uses a 0.1V threshold to filter noise:
-- Only broadcasts WebSocket update if voltage changes by ±0.1V
+- Only sends a BLE status delta if voltage changes by ±0.1V
 - Prevents excessive updates from ADC noise
-- Updates occur every 50ms control loop cycle when threshold exceeded
+- Evaluated every 50ms control loop cycle
 
 ### Monitoring Battery Health
 
@@ -147,15 +142,8 @@ The system uses a 0.1V threshold to filter noise:
 - **<12.0V**: Low battery, needs charging
 - **<11.5V**: Critical, battery may be failing
 
-**API Access:**
-```bash
-# Get current battery voltage
-curl http://192.168.4.1/car/status | jq '.sensors.battery_voltage'
-
-# WebSocket real-time monitoring
-ws://192.168.4.1/ws
-# Returns: {"sensors": {"battery_voltage": "12.65", ...}}
-```
+The battery voltage is reported to the app in the `S` group of the car-status
+characteristic (`brake,steering,voltage,gear`) — see [Status uplink](#status-uplink-esp32--phone).
 
 ### Troubleshooting
 
@@ -174,970 +162,170 @@ ws://192.168.4.1/ws
 - Check for electrical noise sources
 - Increase change threshold from 0.1V to 0.2V in sensors.cpp
 
-## Web Server API
+## BLE Communication
 
-The system includes an async web server that exposes car status via HTTP endpoints.
+All car ↔ app communication is BLE GATT. **The Android app is the GATT server /
+peripheral and advertises the service; the ESP32 is the GATT client** that scans
+for the service, connects, writes status, and subscribes to receive commands.
 
-### Device Onboarding
+This contract is the source of truth shared with the Android app
+(`android/app/src/main/kotlin/com/daotranbang/vfsmart/navigation/VF3GattServer.kt`).
+Keep both sides in sync.
 
-On first boot, the device enters **onboarding mode** to allow configuration of WiFi credentials and API key.
+### Service and Characteristics
 
-#### Onboarding Process
+**Service UUID:** `A1B2C3D4-E5F6-7890-ABCD-EF1234567890`
 
-1. **Initial Boot** - Device creates an open WiFi network:
-   - **SSID**: `VF3-SETUP`
-   - **Password**: `setup123`
-   - **IP Address**: `192.168.4.1`
+| Characteristic | UUID | Direction | ESP32 operation |
+|---|---|---|---|
+| TPMS | `A1B2C3D4-E5F6-7890-ABCD-EF1234567893` | ESP32 → phone | **Write** |
+| Speed limit | `A1B2C3D4-E5F6-7890-ABCD-EF1234567894` | ESP32 → phone | **Write** |
+| Car status (delta) | `A1B2C3D4-E5F6-7890-ABCD-EF1234567895` | ESP32 → phone | **Write** |
+| Command | `A1B2C3D4-E5F6-7890-ABCD-EF1234567896` | phone → ESP32 | **Subscribe (notify)** |
 
-2. **Connect to Setup Network**
-   - Connect your phone/computer to `VF3-SETUP`
-   - Visit `http://192.168.4.1` in a web browser
+The Command characteristic carries a standard CCCD descriptor
+(`00002902-0000-1000-8000-00805f9b34fb`). The ESP32 must **write the CCCD to
+enable notifications** after connecting, or it will receive no commands.
 
-3. **Configure Device**
-   - Enter your desired WiFi SSID (network name)
-   - Enter WiFi password
-   - Create an API key (minimum 8 characters)
-   - **Important**: Save the API key securely - you'll need it for all control operations
+### Connection flow (ESP32 side)
 
-4. **Device Restart**
-   - Configuration is saved to flash memory
-   - Device automatically restarts
-   - After restart, device creates its own AP with your configured credentials
+1. Scan for the service UUID and connect to the Android app.
+2. Discover the four characteristics.
+3. Enable notifications on the Command characteristic (write CCCD = `0x0001`).
+4. On connect, send a **full** car-status frame (and current TPMS / speed limit).
+5. Thereafter, write status **deltas** whenever a value changes; send a full
+   frame periodically (e.g. every 60 s) as a heartbeat.
+6. Handle incoming command notifications (see [Command downlink](#command-downlink-phone--esp32)).
 
-#### Configuration Storage
-- All configuration is stored in ESP32 NVS (Non-Volatile Storage)
-- Survives power cycles and firmware updates
-- To reconfigure, you must erase flash or modify code to reset configuration
+All payloads are UTF-8 strings.
 
-### WiFi Configuration (After Onboarding)
-- **Mode**: Access Point (AP)
-- **SSID**: Configured during onboarding
-- **Password**: Configured during onboarding
-- **Default IP**: 192.168.4.1 (ESP32 AP default)
+### Status uplink (ESP32 → phone)
 
-### UDP Device Discovery
+#### TPMS characteristic
+```
+"FL_KPA,FL_TEMP,FL_ALARM|FR_KPA,FR_TEMP,FR_ALARM|RL_...|RR_..."
+```
+e.g. `225.5,28,0|227.0,29,0|220.0,27,0|221.5,28,1`
+(kPa float, temp °C int, alarm 0/1; four tires separated by `|`).
 
-When connected to WiFi in Station mode, the device broadcasts UDP messages for automatic network discovery.
+#### Speed limit characteristic
+The current speed limit in km/h as a plain integer string, e.g. `50`.
 
-**Discovery Configuration:**
-- **Port**: 8888 (UDP broadcast)
-- **Broadcast Address**: 255.255.255.255
-- **Interval**: Every 10 seconds
-- **Protocol**: JSON over UDP
-
-**Broadcast Message Format:**
-```json
-{
-  "device": "VF3-Smart",
-  "type": "car-control",
-  "ip": "192.168.1.100",
-  "mac": "AA:BB:CC:DD:EE:FF",
-  "hostname": "esp32-xxxxxx"
-}
+#### Car status characteristic — delta protocol
+```
+Full  (on connect, 60 s heartbeat):
+  "F|S:<s>|D:<d>|W:<w>|E:<e>|L:<l>|P:<p>|C:<c>|X:<x>"
+Delta (only changed groups):
+  "U|S:<s>|L:<l>|..."
 ```
 
-**Stopping Broadcast with Confirmation:**
+Group field formats (comma-separated):
 
-Once you discover the device, send a confirmation message to stop further broadcasts and reduce network traffic:
+| Group | Fields |
+|---|---|
+| `S` | brake, steering, voltage, gear |
+| `D` | fl, fr, trunk, locked |
+| `W` | left_state, right_state (0=unknown, 1=closed, 2=open) |
+| `E` | seat_flo, seat_fro, seatbelt_flo, seatbelt_fro |
+| `L` | demi, normal |
+| `P` | rear_l, rear_r |
+| `C` | brake_pressed, acc_power, cameras, car_lock, car_unlock |
+| `X` | charging, lock_state(0/1), wca, wcr_secs, lr, is_night |
 
-**Confirmation Message Format (either format works):**
-```json
-{"command": "confirm"}
-```
-or
-```json
-{"action": "discovered"}
-```
+(`wca` = window_close_active 0/1, `wcr_secs` = window_close_remaining seconds,
+`lr` = light_reminder_enabled 0/1.)
 
-**Listening for Discovery (Python Example):**
-```python
-import socket
-import json
+Send the full frame on connect; send `U|...` deltas containing only the groups
+whose values changed since the last send.
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-sock.bind(('', 8888))
+### Command downlink (phone → ESP32)
 
-print("Listening for VF3-Smart devices...")
-while True:
-    data, addr = sock.recvfrom(1024)
-    device_info = json.loads(data.decode())
-    if device_info.get('device') == 'VF3-Smart':
-        print(f"Found device at {device_info['ip']}")
-        print(f"MAC: {device_info['mac']}")
+Commands arrive as notifications on the Command characteristic — UTF-8 strings of
+the form `verb[:args]` with comma-separated args. The ESP32 parses the verb and
+acts; commands are **fire-and-forget** (no reply is expected, though state changes
+will naturally flow back as status deltas).
 
-        # Send confirmation to stop broadcasting
-        confirm = json.dumps({"command": "confirm"})
-        sock.sendto(confirm.encode(), (device_info['ip'], 8888))
-        print("Confirmation sent - device will stop broadcasting")
-        break
-```
+| Command | Action |
+|---|---|
+| `lock` / `unlock` | Lock / unlock the car |
+| `acc:on` / `acc:off` / `acc:toggle` | Accessory power |
+| `cameras:on` / `cameras:off` / `cameras:toggle` | Inside cameras |
+| `windows:close` | Start 30-second window auto-close |
+| `windows:stop` | Stop window operation |
+| `window:down,<side>,<on\|off>` | Roll window down (side: left/right/both) |
+| `window:up,<side>,<on\|off>` | Roll window up |
+| `buzzer:beep,<ms>` / `buzzer:on` / `buzzer:off` | Buzzer/horn |
+| `light-reminder:on` / `off` / `toggle` | Headlight reminder |
+| `charger-unlock` | Unlock charger port |
+| `mirrors:open` / `mirrors:close` | Side mirrors |
+| `odo:on` / `odo:off` / `odo:toggle` | ODO screen |
+| `armrest:on` / `armrest:off` / `armrest:toggle` | Armrest |
+| `dashcam:on` / `dashcam:off` / `dashcam:toggle` | Dashcam |
+| `tpms:reset` | Clear all TPMS sensor-ID assignments (re-learn) |
+| `tpms:swap,<a>,<b>` | Swap two tire positions (a/b: fl/fr/rl/rr) |
 
-**Listening for Discovery (Node.js Example):**
-```javascript
-const dgram = require('dgram');
-const server = dgram.createSocket('udp4');
+When adding a new command, update both this table and `VF3GattServer` /
+`VF3Repository` on the Android side.
 
-server.on('message', (msg, rinfo) => {
-  const deviceInfo = JSON.parse(msg.toString());
-  if (deviceInfo.device === 'VF3-Smart') {
-    console.log(`Found device at ${deviceInfo.ip}`);
-    console.log(`MAC: ${deviceInfo.mac}`);
+### Headlight reminder logic
 
-    // Send confirmation to stop broadcasting
-    const confirm = Buffer.from(JSON.stringify({command: 'confirm'}));
-    server.send(confirm, 8888, deviceInfo.ip, (err) => {
-      if (!err) {
-        console.log('Confirmation sent - device will stop broadcasting');
-      }
-    });
-  }
-});
-
-server.bind(8888);
-console.log('Listening for VF3-Smart devices...');
-```
-
-**Note**: UDP discovery only works when the device is in Station mode (connected to your WiFi network). It does not broadcast in AP (Access Point) mode.
-
-### API Authentication
-All control endpoints (POST requests) require API key authentication for security.
-
-**API Key**: Configured during onboarding (user-defined)
-
-**Authentication Methods:**
-1. **HTTP Header** (Recommended):
-   ```bash
-   curl -X POST http://192.168.4.1/car/lock \
-     -H "X-API-Key: YOUR_API_KEY"
-   ```
-
-2. **Query Parameter**:
-   ```bash
-   curl -X POST "http://192.168.4.1/car/lock?api_key=YOUR_API_KEY"
-   ```
-
-**Unauthorized Response** (401):
-```json
-{
-  "success": false,
-  "message": "Unauthorized - Invalid or missing API key"
-}
-```
-
-**Note**: Status endpoints (GET /car/status) do not require authentication.
-
-### API Endpoints
-
-#### Status Endpoints
-
-##### GET /car/status
-Returns complete car status as JSON.
-
-**Response Structure:**
-```json
-{
-  "sensors": {
-    "brake": 0,
-    "steering_angle": 0,
-    "battery_voltage": "12.65",
-    "gear_drive": 0
-  },
-  "doors": {
-    "front_left": 0,
-    "front_right": 0,
-    "trunk": 0,
-    "locked": 0
-  },
-  "seats": {
-    "front_left_occupied": 0,
-    "front_right_occupied": 0,
-    "front_left_seatbelt": 0,
-    "front_right_seatbelt": 0
-  },
-  "lights": {
-    "demi_light": 0,
-    "normal_light": 0
-  },
-  "proximity": {
-    "rear_left": 0,
-    "rear_right": 0
-  },
-  "controls": {
-    "brake_pressed": 0,
-    "accessory_power": 1,
-    "car_lock": 0,
-    "car_unlock": 0
-  },
-  "window_close_active": false,
-  "window_close_remaining_ms": 0,
-  "light_reminder_enabled": true
-}
-```
-
-##### GET /
-Returns a simple HTML info page with links to all API endpoints.
-
-#### Control Endpoints
-
-##### POST /car/lock
-Lock the car.
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Car locked",
-  "car_lock": 1,
-  "car_unlock": 0
-}
-```
-
-##### POST /car/unlock
-Unlock the car.
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Car unlocked",
-  "car_lock": 0,
-  "car_unlock": 1
-}
-```
-
-##### POST /car/accessory-power
-Control accessory power. Requires `state` parameter.
-
-**Parameters:**
-- `state` (required): `on`, `off`, or `toggle`
-
-**Example Request:**
-```bash
-curl -X POST http://192.168.4.1/car/accessory-power \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "state=on"
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Accessory power updated",
-  "accessory_power": 1
-}
-```
-
-##### POST /car/windows/close
-Start closing windows (30-second timer).
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Windows closing for 30 seconds",
-  "window_close_active": true,
-  "duration_ms": 30000
-}
-```
-
-##### POST /car/windows/stop
-Stop window operation immediately.
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Window operation stopped",
-  "window_close_active": false
-}
-```
-
-##### POST /car/buzzer
-Control the buzzer/alarm.
-
-**Parameters:**
-- `state` (required): `on`, `off`, or `beep`
-- `duration` (optional): Duration in milliseconds for `beep` mode
-
-**Example Requests:**
-```bash
-# Turn on buzzer
-curl -X POST http://192.168.4.1/car/buzzer \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "state=on"
-
-# Beep for 500ms
-curl -X POST http://192.168.4.1/car/buzzer \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "state=beep&duration=500"
-
-# Turn off buzzer
-curl -X POST http://192.168.4.1/car/buzzer \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "state=off"
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Buzzer control executed"
-}
-```
-
-##### POST /car/turn-signal
-Control turn signals.
-
-**Parameters:**
-- `side` (required): `left`, `right`, or `both`
-- `state` (required): `on` or `off`
-
-**Example Requests:**
-```bash
-# Turn on left turn signal
-curl -X POST http://192.168.4.1/car/turn-signal \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "side=left&state=on"
-
-# Turn off both turn signals
-curl -X POST http://192.168.4.1/car/turn-signal \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "side=both&state=off"
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Turn signal updated",
-  "side": "left",
-  "state": "on"
-}
-```
-
-##### POST /car/light-reminder
-Control the headlight reminder system. The light reminder beeps every 30 seconds when:
-- It's nighttime (6 PM - 6 AM)
+The light reminder beeps periodically when **all** of these hold:
+- It's nighttime (6 PM – 6 AM)
 - The gear is in Drive (D)
 - Normal headlights are off
-- Light reminder is enabled
+- Light reminder is enabled (`light-reminder:on`)
 
-**Parameters:**
-- `state` (required): `on`, `off`, `enable`, `disable`, or `toggle`
+(The Android app mirrors this logic for its own voice warning; keep them aligned.)
 
-**Example Requests:**
-```bash
-# Enable light reminder
-curl -X POST http://192.168.4.1/car/light-reminder \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "state=on"
+### Frunk safety / rate limiting
 
-# Disable light reminder
-curl -X POST http://192.168.4.1/car/light-reminder \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "state=off"
+If the firmware exposes a frunk-open command, keep the original safeguards:
+- **Disabled while the vehicle is in Drive (D).**
+- **2-second cooldown** between operations to protect the relay.
 
-# Toggle light reminder
-curl -X POST http://192.168.4.1/car/light-reminder \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "state=toggle"
-```
+## OTA Updates
 
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Light reminder enabled",
-  "light_reminder_enabled": true
-}
-```
-
-##### POST /car/charger-unlock
-Manually unlock the charger port. The charger port also automatically unlocks when charging stops.
-
-**Example Request:**
-```bash
-# Unlock charger port
-curl -X POST http://192.168.4.1/car/charger-unlock \
-  -H "X-API-Key: YOUR_API_KEY"
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Charger port unlocked"
-}
-```
-
-##### POST /car/frunk/open
-Unlock and open the front trunk (frunk).
-
-**Safety:** This endpoint is disabled when the vehicle is in Drive (D) gear.
-
-**Rate Limiting:** 2-second cooldown between operations to prevent relay damage.
-
-**Example Request:**
-```bash
-# Open front trunk
-curl -X POST http://192.168.4.1/car/frunk/open \
-  -H "X-API-Key: YOUR_API_KEY"
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Front trunk unlocked"
-}
-```
-
-**Error Responses:**
-```json
-// Vehicle in Drive
-{
-  "success": false,
-  "message": "Cannot open front trunk while vehicle is in Drive"
-}
-
-// Too many requests
-{
-  "success": false,
-  "message": "Too many requests - wait 2 seconds between operations"
-}
-```
-
-##### POST /car/side-mirrors
-Control side mirrors opening and closing.
-
-**Parameters:**
-- `action` (required): `open` or `close`
-
-**Example Requests:**
-```bash
-# Open side mirrors
-curl -X POST http://192.168.4.1/car/side-mirrors \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "action=open"
-
-# Close side mirrors
-curl -X POST http://192.168.4.1/car/side-mirrors \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "action=close"
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Side mirrors opening",
-  "action": "open"
-}
-```
-
-##### POST /car/dashcam
-Control the dashcam.
-
-**Parameters:**
-- `state` (required): `on`, `off`, or `toggle`
-
-**Example Requests:**
-```bash
-# Turn on dashcam
-curl -X POST http://192.168.4.1/car/dashcam \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "state=on"
-
-# Turn off dashcam
-curl -X POST http://192.168.4.1/car/dashcam \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "state=off"
-
-# Toggle dashcam
-curl -X POST http://192.168.4.1/car/dashcam \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d "state=toggle"
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Dashcam updated",
-  "dashcam": "on"
-}
-```
-
-#### OTA (Over-The-Air) Update Endpoints
-
-##### GET /ota/status
-Get the current OTA update status.
-
-**Response:**
-```json
-{
-  "ota_enabled": true,
-  "in_progress": false,
-  "progress_percent": 0,
-  "error": ""
-}
-```
-
-##### POST /ota/update
-Upload firmware or filesystem image via HTTP. Requires API key authentication.
-
-**Parameters:**
-- Upload a `.bin` file (firmware) or `.littlefs.bin` / `.spiffs.bin` file (filesystem)
-
-**Example Request (using curl):**
-```bash
-# Upload firmware
-curl -X POST http://192.168.4.1/ota/update \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -F "file=@firmware.bin"
-
-# Upload filesystem
-curl -X POST http://192.168.4.1/ota/update \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -F "file=@littlefs.bin"
-```
-
-**Response (Success):**
-```json
-{
-  "success": true,
-  "message": "Firmware update successful - Rebooting in 3 seconds"
-}
-```
-
-**Response (Error):**
-```json
-{
-  "success": false,
-  "message": "Firmware update failed",
-  "error": "Error description"
-}
-```
-
-**Note**: After a successful firmware update, the device will automatically reboot in 3 seconds.
-
-##### ArduinoOTA Support
-The system also supports ArduinoOTA for updates via Arduino IDE or PlatformIO:
+OTA via **ArduinoOTA** remains available when the ESP32 is joined to a WiFi
+network (it is independent of the removed webserver):
 
 - **Hostname**: `VF3-Smart`
 - **Port**: 3232 (default)
-- **Authentication**: None (use API key on HTTP endpoints)
 
-**Using PlatformIO:**
 ```bash
 # Upload firmware via OTA
 pio run --target upload --upload-port VF3-Smart.local
-
-# Or specify IP address
-pio run --target upload --upload-port 192.168.4.1
+# Or by IP
+pio run --target upload --upload-port <esp32-ip>
 ```
 
-**Using Arduino IDE:**
-1. Go to Tools > Port
-2. Select "VF3-Smart at 192.168.4.1" (Network Port)
-3. Click Upload
+If the ESP32 no longer joins WiFi at all in your build, OTA is unavailable —
+flash over USB with `pio run --target upload`.
 
-#### Configuration Endpoints
+## Factory Reset (Physical Button)
 
-##### POST /factory-reset
-Reset the device to factory defaults and return to onboarding mode.
-
-**⚠️ WARNING:** This endpoint permanently deletes all stored configuration (WiFi credentials and API key). The device will restart in onboarding mode (AP: VF3-SETUP / setup123).
-
-**Authentication:** Requires API key (header or query parameter)
-
-**Example Request:**
-```bash
-curl -X POST http://192.168.4.1/factory-reset \
-  -H "X-API-Key: YOUR_API_KEY"
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Factory reset initiated - Device will restart in onboarding mode"
-}
-```
-
-**What Happens:**
-1. All NVS (Non-Volatile Storage) data is cleared:
-   - WiFi SSID and password
-   - API key
-   - Configuration status
-2. Device automatically restarts
-3. Device enters onboarding mode:
-   - Creates AP: `VF3-SETUP` (password: `setup123`)
-   - IP: `192.168.4.1`
-   - Web interface available for reconfiguration
-
-**Use Cases:**
-- Selling or transferring the device to someone else
-- Changing WiFi network completely
-- Resetting after forgotten API key
-- Starting fresh after configuration errors
-
-**Recovery:**
-If you accidentally factory reset the device:
-1. Connect to WiFi: `VF3-SETUP` (password: `setup123`)
-2. Visit `http://192.168.4.1`
-3. Reconfigure WiFi credentials and API key
-4. Device will restart and connect to your WiFi
-
-##### Hardware Factory Reset (Physical Button)
-
-In addition to the HTTP endpoint, the device supports **hardware factory reset** via a physical button.
+With no webserver there is no HTTP factory-reset endpoint. Reset is via the
+**physical BOOT button** only.
 
 **Hardware Configuration:**
 - **Pin:** GPIO 0 (BOOT button on ESP32 Dev Module)
 - **Trigger:** Hold button for 10 seconds
-- **Button State:** Active LOW (button pressed = pin LOW)
+- **Button State:** Active LOW (pressed = LOW)
 - **Pull-up:** Internal pull-up enabled (INPUT_PULLUP)
 
 **How to Trigger:**
-1. Press and hold the BOOT button on the ESP32 dev board
-2. Keep holding for 10 seconds
-3. Serial monitor will show countdown:
-   ```
-   Factory reset button pressed - hold for 10 seconds to reset
-   Factory reset in 9 seconds... (release to cancel)
-   Factory reset in 8 seconds... (release to cancel)
-   ...
-   Factory reset in 1 seconds... (release to cancel)
+1. Press and hold BOOT for 10 seconds
+2. Serial monitor shows a countdown (release to cancel)
+3. The device clears stored configuration (NVS) and restarts
 
-   ===========================================
-   FACTORY RESET TRIGGERED VIA HARDWARE BUTTON
-   ===========================================
-   ```
-4. Device will clear all configuration and restart in onboarding mode
+**Why a hardware reset:** no network or app needed, physical access required,
+always available as a last resort.
 
-**Cancel Factory Reset:**
-- Release the button before 10 seconds elapse
-- Serial monitor will show: `Factory reset cancelled (button released after X seconds)`
+**Wiring (custom PCB):** momentary push button between GPIO 0 and GND (internal
+pull-up).
 
-**Why Hardware Reset?**
-- **No API key needed:** Works even if you forgot the API key
-- **No network needed:** Works when WiFi is not configured or unreachable
-- **Physical access required:** Prevents remote unauthorized resets
-- **Fail-safe recovery:** Always available as last resort
+## Dependencies
 
-**Use Cases:**
-- Forgot API key and can't access HTTP endpoint
-- WiFi not connecting and can't reconfigure
-- Device in unknown state - need to start fresh
-- Physical security: person with device access can reset it
-
-**Wiring (if not using dev board BOOT button):**
-```
-┌─────────────┐
-│   ESP32     │
-│             │
-│   GPIO 0 ───┼─────┬───── GND
-│             │     │
-│             │   [Button]
-│             │     │
-│   (3.3V) ───┼─────┘
-└─────────────┘
-  (Internal
-   pull-up)
-```
-
-**Note:** GPIO 0 is the BOOT button on most ESP32 development boards. On custom PCB designs, connect a momentary push button between GPIO 0 and GND.
-
-### Testing the API
-
-```bash
-# Connect to your configured WiFi network
-# Set your configured API key
-API_KEY="YOUR_CONFIGURED_API_KEY"
-
-# Get car status (no auth required)
-curl http://192.168.4.1/car/status
-
-# Lock the car
-curl -X POST http://192.168.4.1/car/lock \
-  -H "X-API-Key: $API_KEY"
-
-# Unlock the car
-curl -X POST http://192.168.4.1/car/unlock \
-  -H "X-API-Key: $API_KEY"
-
-# Toggle accessory power
-curl -X POST http://192.168.4.1/car/accessory-power \
-  -H "X-API-Key: $API_KEY" \
-  -d "state=toggle"
-
-# Close windows
-curl -X POST http://192.168.4.1/car/windows/close \
-  -H "X-API-Key: $API_KEY"
-
-# Stop windows
-curl -X POST http://192.168.4.1/car/windows/stop \
-  -H "X-API-Key: $API_KEY"
-
-# Beep buzzer for 1 second
-curl -X POST http://192.168.4.1/car/buzzer \
-  -H "X-API-Key: $API_KEY" \
-  -d "state=beep&duration=1000"
-
-# Turn on left turn signal
-curl -X POST http://192.168.4.1/car/turn-signal \
-  -H "X-API-Key: $API_KEY" \
-  -d "side=left&state=on"
-
-# Disable light reminder (stops nighttime headlight reminders)
-curl -X POST http://192.168.4.1/car/light-reminder \
-  -H "X-API-Key: $API_KEY" \
-  -d "state=off"
-
-# Enable light reminder
-curl -X POST http://192.168.4.1/car/light-reminder \
-  -H "X-API-Key: $API_KEY" \
-  -d "state=on"
-
-# Unlock charger port
-curl -X POST http://192.168.4.1/car/charger-unlock \
-  -H "X-API-Key: $API_KEY"
-
-# Open front trunk (frunk)
-curl -X POST http://192.168.4.1/car/frunk/open \
-  -H "X-API-Key: $API_KEY"
-
-# Open side mirrors
-curl -X POST http://192.168.4.1/car/side-mirrors \
-  -H "X-API-Key: $API_KEY" \
-  -d "action=open"
-
-# Close side mirrors
-curl -X POST http://192.168.4.1/car/side-mirrors \
-  -H "X-API-Key: $API_KEY" \
-  -d "action=close"
-
-# Toggle dashcam
-curl -X POST http://192.168.4.1/car/dashcam \
-  -H "X-API-Key: $API_KEY" \
-  -d "state=toggle"
-
-# Check OTA update status
-curl http://192.168.4.1/ota/status
-
-# Upload firmware update
-curl -X POST http://192.168.4.1/ota/update \
-  -H "X-API-Key: $API_KEY" \
-  -F "file=@.pio/build/esp32dev/firmware.bin"
-
-# Factory reset (⚠️ Clears all configuration and restarts in onboarding mode)
-curl -X POST http://192.168.4.1/factory-reset \
-  -H "X-API-Key: $API_KEY"
-
-# Alternative: Using query parameter for authentication
-curl -X POST "http://192.168.4.1/car/lock?api_key=$API_KEY"
-
-# View API documentation in browser
-open http://192.168.4.1
-```
-
-### Dependencies
-- **ESPAsyncWebServer-esphome**: Async web server for ESP32 (includes WebSocket support)
-- **ArduinoJson**: JSON serialization/deserialization
-
-## WebSocket Real-Time Communication
-
-The system provides a WebSocket server for **real-time status monitoring only**.
-
-**⚠️ Important: WebSocket is for monitoring, not for sending commands.**
-- Use **HTTP API endpoints** (POST requests) to trigger commands and control the car
-- Use **WebSocket** only to receive real-time status updates
-
-### WebSocket Connection
-
-- **Endpoint**: `ws://192.168.4.1/ws`
-- **Protocol**: WebSocket (RFC 6455)
-- **Auto-broadcast**: Status updates sent every 1 second to all connected clients
-- **No Authentication Required**: WebSocket is read-only for status monitoring
-
-### Connection Behavior
-
-1. **On Connect**: Server immediately sends current car status as JSON
-2. **Periodic Updates**: Status broadcast every 1 second to all clients
-3. **Status Format**: Same JSON structure as `GET /car/status` endpoint
-
-### Status Message Format
-
-The WebSocket sends car status updates as JSON with the same structure as `GET /car/status`:
-
-```json
-{
-  "sensors": {
-    "brake": 0,
-    "steering_angle": 0,
-    "battery_voltage": "12.65",
-    "gear_drive": 0
-  },
-  "doors": {
-    "front_left": 0,
-    "front_right": 0,
-    "trunk": 0,
-    "locked": 0
-  },
-  "seats": {
-    "front_left_occupied": 0,
-    "front_right_occupied": 0,
-    "front_left_seatbelt": 0,
-    "front_right_seatbelt": 0
-  },
-  "lights": {
-    "demi_light": 0,
-    "normal_light": 0
-  },
-  "proximity": {
-    "rear_left": 0,
-    "rear_right": 0
-  },
-  "controls": {
-    "brake_pressed": 0,
-    "accessory_power": 1,
-    "car_lock": 0,
-    "car_unlock": 0
-  },
-  "window_close_active": false,
-  "window_close_remaining_ms": 0,
-  "light_reminder_enabled": true,
-  "time": {
-    "synced": true,
-    "current_time": "2026-02-04 10:30:15",
-    "boot_time": "2026-02-04 08:00:00",
-    "is_night": false
-  }
-}
-```
-
-### JavaScript WebSocket Client Example
-
-```javascript
-// Connect to WebSocket for real-time status monitoring
-const ws = new WebSocket('ws://192.168.4.1/ws');
-
-// Handle connection open
-ws.onopen = function() {
-  console.log('Connected to VF3 Smart - Monitoring status');
-};
-
-// Handle incoming status updates (received every 1 second)
-ws.onmessage = function(event) {
-  const status = JSON.parse(event.data);
-
-  // Update your UI with real-time status
-  console.log('Speed:', status.sensors.vehicle_speed);
-  console.log('Car locked:', status.controls.car_lock === 1);
-  console.log('Lights on:', status.lights.normal_light === 1);
-
-  // Example: Display warnings
-  if (status.time && status.time.is_night && status.lights.normal_light === 0) {
-    console.warn('⚠️ Nighttime - headlights are off!');
-  }
-
-  // Example: Monitor window closing
-  if (status.window_close_active) {
-    console.log(`Windows closing... ${status.window_close_remaining_ms}ms remaining`);
-  }
-};
-
-// Handle errors
-ws.onerror = function(error) {
-  console.error('WebSocket error:', error);
-};
-
-// Handle disconnection
-ws.onclose = function() {
-  console.log('Disconnected from VF3 Smart');
-  // Optionally implement reconnection logic
-  setTimeout(() => location.reload(), 3000);
-};
-
-// To send commands, use HTTP API instead:
-async function lockCar() {
-  const response = await fetch('http://192.168.4.1/car/lock', {
-    method: 'POST',
-    headers: {'X-API-Key': 'YOUR_API_KEY'}
-  });
-  const result = await response.json();
-  console.log(result);
-}
-```
-
-### Python WebSocket Client Example
-
-```python
-import asyncio
-import websockets
-import json
-import requests
-
-async def monitor_car():
-    """Monitor car status in real-time via WebSocket"""
-    uri = "ws://192.168.4.1/ws"
-
-    async with websockets.connect(uri) as websocket:
-        print("Connected to VF3 Smart - Monitoring status")
-
-        # Receive and process status updates (sent every 1 second)
-        while True:
-            try:
-                status_json = await websocket.recv()
-                status = json.loads(status_json)
-
-                # Process real-time status
-                speed = status['sensors']['vehicle_speed']
-                is_locked = status['controls']['car_lock'] == 1
-                gear_drive = status['sensors']['gear_drive'] == 1
-
-                print(f"Speed: {speed}, Locked: {is_locked}, Drive: {gear_drive}")
-
-                # Example: Check for alerts
-                if status['time']['is_night'] and status['lights']['normal_light'] == 0:
-                    print("⚠️ Warning: Nighttime but headlights are off!")
-
-            except websockets.exceptions.ConnectionClosed:
-                print("Connection closed, reconnecting...")
-                break
-
-# To send commands, use HTTP API with requests:
-def lock_car(api_key):
-    """Send lock command via HTTP API"""
-    response = requests.post(
-        'http://192.168.4.1/car/lock',
-        headers={'X-API-Key': api_key}
-    )
-    return response.json()
-
-# Run the monitor
-asyncio.run(monitor_car())
-```
-
-### WebSocket vs HTTP API
-
-**Use WebSocket for:**
-- ✅ Real-time status monitoring and dashboards
-- ✅ Live updates for mobile apps and web interfaces
-- ✅ Continuous data streaming (updated every 1 second)
-- ✅ Displaying real-time sensor data
-
-**Use HTTP API for:**
-- ✅ Sending commands and controlling the car
-- ✅ Triggering actions (lock, unlock, windows, buzzer, etc.)
-- ✅ Authentication and authorization
-- ✅ One-off operations and testing with curl/Postman
-- ✅ Integration with automation systems
-
-**Architecture:**
-- **WebSocket** = Read-only, no authentication, real-time monitoring
-- **HTTP API** = Command/control, requires API key authentication
-
+- **NimBLE-Arduino** (or the ESP32 Arduino BLE library) — BLE GATT client
+- **ArduinoJson** — only if still used internally; the BLE wire format above is
+  delimited text, not JSON, so JSON is no longer required for app communication
+</content>
