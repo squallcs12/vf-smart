@@ -8,6 +8,7 @@
     <string name="a11y_disclosure_body">VF3 Smart sử dụng dịch vụ Trợ năng (Accessibility Service) của Android để tự động kết nối màn hình AutoLink Pro khi bạn lên xe — ứng dụng sẽ thay bạn chọn thiết bị và bấm các nút trên màn hình AutoLink Pro.\n\nDịch vụ chỉ đọc và thao tác trên nội dung màn hình của ứng dụng AutoLink Pro. VF3 Smart KHÔNG thu thập, lưu trữ hay chia sẻ bất kỳ dữ liệu cá nhân hoặc nhạy cảm nào; mọi thao tác diễn ra ngay trên thiết bị.\n\nBạn có thể tắt quyền này bất cứ lúc nào trong Cài đặt → Trợ năng.</string>
     <string name="a11y_disclosure_agree">Đồng ý</string>
     <string name="a11y_disclosure_decline">Không, cảm ơn</string>
+    <string name="a11y_enable_hint">Bật \"VF3 Smart\" trong danh sách Trợ năng</string>
 
     <!-- Common -->
     <string name="back">Quay lại</string>

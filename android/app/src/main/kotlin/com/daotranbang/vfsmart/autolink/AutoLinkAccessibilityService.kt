@@ -12,6 +12,8 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.Toast
+import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.ui.MainActivity
 
 class AutoLinkAccessibilityService : AccessibilityService() {
@@ -148,6 +150,8 @@ class AutoLinkAccessibilityService : AccessibilityService() {
         /** Opens the system Accessibility settings so the user can enable the service manually. */
         fun openAccessibilitySettings(context: Context) {
             try {
+                // Toast floats over the Settings screen, telling the user what to tap.
+                Toast.makeText(context, R.string.a11y_enable_hint, Toast.LENGTH_LONG).show()
                 context.startActivity(
                     Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
