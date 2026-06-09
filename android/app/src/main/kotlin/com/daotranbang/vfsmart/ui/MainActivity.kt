@@ -19,6 +19,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.daotranbang.vfsmart.autolink.AutoLinkService
+import com.daotranbang.vfsmart.billing.BillingManager
 import com.daotranbang.vfsmart.navigation.DrivingState
 import com.daotranbang.vfsmart.ui.screens.CameraPreviewScreen
 import com.daotranbang.vfsmart.ui.screens.RtspCaptureScreen
@@ -31,13 +32,21 @@ import com.daotranbang.vfsmart.ui.screens.TpmsCalibrationScreen
 import com.daotranbang.vfsmart.ui.theme.VF3SmartTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.MutableStateFlow
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+    @Inject lateinit var billingManager: BillingManager
+
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {}
+
+    /** Opens the Play subscription sheet for the "premium" plan. Hook to a buy button. */
+    fun purchasePremium() {
+        billingManager.launchPurchaseFlow(this)
+    }
 
     private val navigateToMirror = MutableStateFlow(false)
 
@@ -51,6 +60,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Connect to Play Billing and restore the "premium" subscription entitlement.
+        billingManager.start()
         Thread {
             try {
                 Runtime.getRuntime().exec(arrayOf("su", "-c",

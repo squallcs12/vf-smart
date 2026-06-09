@@ -108,6 +108,9 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
 
+    // Google Play Billing — auto-renewing "premium" subscription
+    implementation(libs.billing.ktx)
+
     // Security
     implementation(libs.androidx.security.crypto)
 

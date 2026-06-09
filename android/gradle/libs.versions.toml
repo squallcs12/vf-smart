@@ -18,6 +18,7 @@ gson = "2.11.0"
 tensorflow-lite = "2.16.1"
 ffmpegkit = "6.1.4"
 media3 = "1.5.1"
+billing = "7.1.1"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
@@ -56,6 +57,9 @@ tensorflow-lite-gpu = { module = "org.tensorflow:tensorflow-lite-gpu", version.r
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
 hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version = "1.2.0" }
+
+# Google Play Billing (subscriptions) — KTX adds coroutine suspend extensions
+billing-ktx = { module = "com.android.billingclient:billing-ktx", version.ref = "billing" }
 
 # Security
 androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "security-crypto" }
