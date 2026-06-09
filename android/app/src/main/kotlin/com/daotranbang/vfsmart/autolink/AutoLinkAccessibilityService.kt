@@ -2,10 +2,12 @@ package com.daotranbang.vfsmart.autolink
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
@@ -129,7 +131,38 @@ class AutoLinkAccessibilityService : AccessibilityService() {
         private const val POLL_INTERVAL_MS = 500L
         private const val USB_SWITCH_MAX_RETRIES = 6
 
-        fun enableViaRoot(context: Context) {
+        /** The flattened component name of this accessibility service. */
+        private fun component(context: Context): String =
+            ComponentName(context, AutoLinkAccessibilityService::class.java).flattenToString()
+
+        /** Whether this accessibility service is currently enabled in system settings. */
+        fun isServiceEnabled(context: Context): Boolean {
+            if (instance != null) return true
+            val enabled = Settings.Secure.getString(
+                context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            ) ?: return false
+            val self = component(context)
+            return enabled.split(':').any { it.equals(self, ignoreCase = true) }
+        }
+
+        /** Opens the system Accessibility settings so the user can enable the service manually. */
+        fun openAccessibilitySettings(context: Context) {
+            try {
+                context.startActivity(
+                    Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not open accessibility settings", e)
+            }
+        }
+
+        /**
+         * Tries to enable the service silently via root (rooted head unit). On a
+         * non-rooted device the `su` call fails; [onRootUnavailable] is then invoked
+         * on the main thread so the caller can fall back to a manual enable flow.
+         */
+        fun enableViaRoot(context: Context, onRootUnavailable: (() -> Unit)? = null) {
             if (instance != null) return
             // Play policy: do not activate the accessibility service until the user
             // has seen the prominent disclosure and agreed (see AccessibilityDisclosure).
@@ -137,8 +170,9 @@ class AutoLinkAccessibilityService : AccessibilityService() {
                 Log.i(TAG, "Accessibility disclosure not yet accepted — skipping enable")
                 return
             }
-            val component = "${context.packageName}/${AutoLinkAccessibilityService::class.java.name}"
+            val component = component(context)
             Thread {
+                var rooted = false
                 try {
                     val process = Runtime.getRuntime().exec("su")
                     val writer = process.outputStream.bufferedWriter()
@@ -146,8 +180,11 @@ class AutoLinkAccessibilityService : AccessibilityService() {
                     writer.write("settings put secure accessibility_enabled 1\n")
                     writer.flush()
                     writer.close()
-                    process.waitFor()
+                    rooted = process.waitFor() == 0
                 } catch (_: Exception) {}
+                if (!rooted && onRootUnavailable != null) {
+                    Handler(Looper.getMainLooper()).post(onRootUnavailable)
+                }
             }.start()
         }
     }

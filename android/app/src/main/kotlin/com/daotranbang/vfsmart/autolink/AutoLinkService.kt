@@ -285,8 +285,8 @@ class AutoLinkService : Service() {
             })
         }
 
-        fun start(context: Context) {
-            AutoLinkAccessibilityService.enableViaRoot(context)
+        fun start(context: Context, onRootUnavailable: (() -> Unit)? = null) {
+            AutoLinkAccessibilityService.enableViaRoot(context, onRootUnavailable)
             val intent = Intent(context, AutoLinkService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)

@@ -22,6 +22,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.daotranbang.vfsmart.autolink.AccessibilityDisclosure
+import com.daotranbang.vfsmart.autolink.AutoLinkAccessibilityService
 import com.daotranbang.vfsmart.autolink.AutoLinkService
 import com.daotranbang.vfsmart.billing.BillingManager
 import com.daotranbang.vfsmart.navigation.DrivingState
@@ -201,7 +202,13 @@ class MainActivity : ComponentActivity() {
                         onAgree = {
                             AccessibilityDisclosure.setAccepted(this@MainActivity, true)
                             showA11yDisclosure = false
-                            AutoLinkService.start(this@MainActivity)
+                            // Enable via root (head unit); on a non-rooted device the
+                            // root attempt fails, so guide the user to enable it manually.
+                            AutoLinkService.start(this@MainActivity) {
+                                if (!AutoLinkAccessibilityService.isServiceEnabled(this@MainActivity)) {
+                                    AutoLinkAccessibilityService.openAccessibilitySettings(this@MainActivity)
+                                }
+                            }
                         },
                         onDecline = { showA11yDisclosure = false },
                     )
