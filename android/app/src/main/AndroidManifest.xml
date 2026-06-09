@@ -2,6 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- The app does not use the advertising ID. Firebase Analytics adds these
+         permissions transitively; remove them so we can declare "No" for the
+         advertising-ID question in the Play Data Safety form. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_ADSERVICES_AD_ID" tools:node="remove" />
+
     <!-- Launcher: start on boot -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
