@@ -5,6 +5,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
+    alias(libs.plugins.firebase.crashlytics)
 }
 
 android {
@@ -110,6 +112,12 @@ dependencies {
 
     // Google Play Billing — auto-renewing "premium" subscription
     implementation(libs.billing.ktx)
+
+    // Firebase Crashlytics — crash & non-fatal reporting. BOM pins versions;
+    // Analytics is recommended alongside Crashlytics for richer session data.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.crashlytics)
+    implementation(libs.firebase.analytics)
 
     // Security
     implementation(libs.androidx.security.crypto)

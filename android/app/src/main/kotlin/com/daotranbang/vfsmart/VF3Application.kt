@@ -6,8 +6,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
+import android.os.Build
 import android.util.Log
 import com.daotranbang.vfsmart.autolink.AutoLinkService
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
@@ -33,6 +35,16 @@ class VF3Application : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        // Crashlytics auto-initializes via its ContentProvider; here we attach
+        // diagnostics so reports tell us which of the two target devices crashed
+        // (S20+ vs the armeabi-v7a head unit) and the ABI.
+        FirebaseCrashlytics.getInstance().apply {
+            setCustomKey("device_model", Build.MODEL)
+            setCustomKey("primary_abi", Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown")
+            setCustomKey("android_api", Build.VERSION.SDK_INT)
+        }
+
         registerReceiver(powerReceiver, IntentFilter().apply {
             addAction(Intent.ACTION_POWER_CONNECTED)
             addAction(Intent.ACTION_POWER_DISCONNECTED)
