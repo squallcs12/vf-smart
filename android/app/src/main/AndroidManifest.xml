@@ -35,11 +35,6 @@
     <!-- BLE hardware — not required so app runs on non-BLE devices -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 
-    <!-- Android Auto feature (optional) -->
-    <uses-feature
-        android:name="android.hardware.type.automotive"
-        android:required="false" />
-
     <application
         android:name=".VF3Application"
         android:allowBackup="true"
@@ -146,16 +141,6 @@
         <meta-data
             android:name="com.google.android.gms.car.distractionOptimized"
             android:value="true" />
-
-        <!-- Google App Actions metadata -->
-        <meta-data
-            android:name="com.google.android.actions"
-            android:resource="@xml/actions" />
-
-        <!-- Google Assistant entity sets -->
-        <meta-data
-            android:name="com.google.android.actions.APP_ACTION_CAPABILITY"
-            android:resource="@xml/entities" />
     </application>
 
 </manifest>

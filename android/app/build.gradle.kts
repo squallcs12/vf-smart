@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -9,6 +10,12 @@ plugins {
     alias(libs.plugins.firebase.crashlytics)
 }
 
+// Release signing credentials live in local.properties (gitignored), not in VCS.
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
 android {
     namespace = "com.daotranbang.vfsmart"
     compileSdk = 35
@@ -16,9 +23,9 @@ android {
     defaultConfig {
         applicationId = "com.daotranbang.vfsmart"
         minSdk = 23
-        targetSdk = 33
-        versionCode = 1
-        versionName = "1.0.0"
+        targetSdk = 35
+        versionCode = 4
+        versionName = "1.0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -38,8 +45,21 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            val storePathProp = localProps.getProperty("KEYSTORE_PATH")
+            if (storePathProp != null) {
+                storeFile = rootProject.file(storePathProp)
+                storePassword = localProps.getProperty("KEYSTORE_PASSWORD")
+                keyAlias = localProps.getProperty("KEY_ALIAS")
+                keyPassword = localProps.getProperty("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

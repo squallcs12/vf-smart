@@ -41,3 +41,9 @@
 
 # Android Auto
 -keep class androidx.car.app.** { *; }
+
+# TensorFlow Lite — GPU delegate references optional classes not present unless
+# the GPU plugin is bundled; suppress R8 missing-class warnings.
+-keep class org.tensorflow.lite.** { *; }
+-dontwarn org.tensorflow.lite.gpu.GpuDelegateFactory$Options$GpuBackend
+-dontwarn org.tensorflow.lite.gpu.GpuDelegateFactory$Options
