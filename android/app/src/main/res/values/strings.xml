@@ -10,6 +10,19 @@
     <string name="a11y_disclosure_decline">Không, cảm ơn</string>
     <string name="a11y_enable_hint">Bật \"VF3 Smart\" trong danh sách Trợ năng</string>
 
+    <!-- Runtime permission rationale prompt -->
+    <string name="perm_rationale_title">Cấp quyền cho VF3 Smart</string>
+    <string name="perm_rationale_intro">Ứng dụng cần các quyền sau để hoạt động:</string>
+    <string name="perm_bluetooth_title">Bluetooth</string>
+    <string name="perm_bluetooth_reason">Kết nối và điều khiển xe VF3 qua BLE</string>
+    <string name="perm_camera_title">Máy ảnh</string>
+    <string name="perm_camera_reason">Xem camera hành trình và nhận diện đèn đỏ</string>
+    <string name="perm_location_title">Vị trí</string>
+    <string name="perm_location_reason">Theo dõi hành trình và phục vụ kết nối Bluetooth</string>
+    <string name="perm_notification_title">Thông báo</string>
+    <string name="perm_notification_reason">Hiển thị trạng thái dịch vụ nền của ứng dụng</string>
+    <string name="perm_rationale_continue">Tiếp tục</string>
+
     <!-- Common -->
     <string name="back">Quay lại</string>
     <string name="try_again">Thử lại</string>

@@ -27,6 +27,7 @@ import com.daotranbang.vfsmart.autolink.AutoLinkService
 import com.daotranbang.vfsmart.billing.BillingManager
 import com.daotranbang.vfsmart.navigation.DrivingState
 import com.daotranbang.vfsmart.ui.screens.AccessibilityDisclosureDialog
+import com.daotranbang.vfsmart.ui.screens.PermissionsRationaleDialog
 import com.daotranbang.vfsmart.ui.screens.CameraPreviewScreen
 import com.daotranbang.vfsmart.ui.screens.RtspCaptureScreen
 import com.daotranbang.vfsmart.ui.screens.ControlScreen
@@ -47,7 +48,11 @@ class MainActivity : ComponentActivity() {
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) {}
+    ) {
+        // Once the runtime permissions are resolved, prompt for notification access
+        // (used to read Google Maps turn-by-turn directions for the ODO screen).
+        requestNotificationListenerAccess()
+    }
 
     /** Opens the Play subscription sheet for the "premium" plan. Hook to a buy button. */
     fun purchasePremium() {
@@ -74,8 +79,6 @@ class MainActivity : ComponentActivity() {
                     "appops set com.link.autolink.pro PROJECT_MEDIA allow"))
             } catch (_: Exception) {}
         }.start()
-        requestNotificationListenerAccess()
-        requestRuntimePermissions()
 
         setContent {
             VF3SmartTheme {
@@ -192,12 +195,26 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Prominent disclosure for the accessibility service (Play policy).
-                // Shown until the user agrees; agreeing activates AutoLink automation.
+                // First-launch prompts, shown one at a time: explain the runtime
+                // permissions before requesting them, then the accessibility disclosure.
+                var showPermsRationale by remember {
+                    mutableStateOf(needsRuntimePermissions())
+                }
                 var showA11yDisclosure by remember {
                     mutableStateOf(!AccessibilityDisclosure.isAccepted(this@MainActivity))
                 }
-                if (showA11yDisclosure) {
+                if (showPermsRationale) {
+                    PermissionsRationaleDialog(
+                        onContinue = {
+                            showPermsRationale = false
+                            // Launch the system permission dialogs. If nothing needs
+                            // requesting, still chain to the notification-access prompt.
+                            if (!requestRuntimePermissions()) {
+                                requestNotificationListenerAccess()
+                            }
+                        },
+                    )
+                } else if (showA11yDisclosure) {
                     AccessibilityDisclosureDialog(
                         onAgree = {
                             AccessibilityDisclosure.setAccepted(this@MainActivity, true)
@@ -224,25 +241,33 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestRuntimePermissions() {
-        val perms = buildList {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                add(Manifest.permission.BLUETOOTH_CONNECT)
-                add(Manifest.permission.BLUETOOTH_ADVERTISE)
-                add(Manifest.permission.BLUETOOTH_SCAN)
-            }
-            add(Manifest.permission.CAMERA)
-            add(Manifest.permission.ACCESS_FINE_LOCATION)
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                add(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }.filter { checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
-
-        if (perms.isNotEmpty()) {
-            permissionLauncher.launch(perms.toTypedArray())
+    /** Runtime permissions the app needs, by SDK level. The phone is a BLE
+     *  peripheral (advertises, never scans), so BLUETOOTH_SCAN is not required. */
+    private fun runtimePermissions(): List<String> = buildList {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            add(Manifest.permission.BLUETOOTH_CONNECT)
+            add(Manifest.permission.BLUETOOTH_ADVERTISE)
         }
+        add(Manifest.permission.CAMERA)
+        add(Manifest.permission.ACCESS_FINE_LOCATION)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    private fun missingPermissions(): List<String> = runtimePermissions()
+        .filter { checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
+
+    private fun needsRuntimePermissions(): Boolean = missingPermissions().isNotEmpty()
+
+    /** Launches the system permission dialogs. Returns true if a request was made. */
+    private fun requestRuntimePermissions(): Boolean {
+        val perms = missingPermissions()
+        if (perms.isEmpty()) return false
+        permissionLauncher.launch(perms.toTypedArray())
+        return true
     }
 }
