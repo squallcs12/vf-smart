@@ -12,15 +12,20 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.daotranbang.vfsmart.autolink.AccessibilityDisclosure
 import com.daotranbang.vfsmart.autolink.AutoLinkService
 import com.daotranbang.vfsmart.billing.BillingManager
 import com.daotranbang.vfsmart.navigation.DrivingState
+import com.daotranbang.vfsmart.ui.screens.AccessibilityDisclosureDialog
 import com.daotranbang.vfsmart.ui.screens.CameraPreviewScreen
 import com.daotranbang.vfsmart.ui.screens.RtspCaptureScreen
 import com.daotranbang.vfsmart.ui.screens.ControlScreen
@@ -184,6 +189,22 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     }
+                }
+
+                // Prominent disclosure for the accessibility service (Play policy).
+                // Shown until the user agrees; agreeing activates AutoLink automation.
+                var showA11yDisclosure by remember {
+                    mutableStateOf(!AccessibilityDisclosure.isAccepted(this@MainActivity))
+                }
+                if (showA11yDisclosure) {
+                    AccessibilityDisclosureDialog(
+                        onAgree = {
+                            AccessibilityDisclosure.setAccepted(this@MainActivity, true)
+                            showA11yDisclosure = false
+                            AutoLinkService.start(this@MainActivity)
+                        },
+                        onDecline = { showA11yDisclosure = false },
+                    )
                 }
             }
         }

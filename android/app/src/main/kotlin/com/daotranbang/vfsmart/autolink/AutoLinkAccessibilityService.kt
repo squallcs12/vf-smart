@@ -131,6 +131,12 @@ class AutoLinkAccessibilityService : AccessibilityService() {
 
         fun enableViaRoot(context: Context) {
             if (instance != null) return
+            // Play policy: do not activate the accessibility service until the user
+            // has seen the prominent disclosure and agreed (see AccessibilityDisclosure).
+            if (!AccessibilityDisclosure.isAccepted(context)) {
+                Log.i(TAG, "Accessibility disclosure not yet accepted — skipping enable")
+                return
+            }
             val component = "${context.packageName}/${AutoLinkAccessibilityService::class.java.name}"
             Thread {
                 try {
