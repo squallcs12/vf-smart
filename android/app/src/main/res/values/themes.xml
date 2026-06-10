@@ -5,7 +5,8 @@
         <item name="android:colorPrimary">@color/vf3_blue</item>
         <item name="android:colorPrimaryDark">@color/vf3_dark_blue</item>
         <item name="android:colorAccent">@color/vf3_accent</item>
-        <item name="android:statusBarColor">@color/vf3_blue</item>
-        <item name="android:navigationBarColor">@color/black</item>
+        <!-- statusBarColor / navigationBarColor were deprecated in API 35 and have
+             no effect under edge-to-edge (enableEdgeToEdge() in MainActivity). The
+             system bars draw transparent; content draws behind them. -->
     </style>
 </resources>
