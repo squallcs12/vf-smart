@@ -24,6 +24,7 @@ import androidx.navigation.compose.rememberNavController
 import com.daotranbang.vfsmart.autolink.AccessibilityDisclosure
 import com.daotranbang.vfsmart.autolink.AutoLinkAccessibilityService
 import com.daotranbang.vfsmart.autolink.AutoLinkService
+import com.daotranbang.vfsmart.autolink.RootPermissionGranter
 import com.daotranbang.vfsmart.billing.BillingManager
 import com.daotranbang.vfsmart.navigation.DrivingState
 import com.daotranbang.vfsmart.ui.screens.AccessibilityDisclosureDialog
@@ -61,6 +62,10 @@ class MainActivity : ComponentActivity() {
 
     private val navigateToMirror = MutableStateFlow(false)
 
+    /** Outcome of the startup root-grant attempt; gates the fallback dialogs. */
+    private enum class RootGrant { PENDING, GRANTED, UNAVAILABLE }
+    private val rootGrant = MutableStateFlow(RootGrant.PENDING)
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.getBooleanExtra(AutoLinkService.EXTRA_NAVIGATE_MIRROR, false)) {
@@ -73,11 +78,18 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         // Connect to Play Billing and restore the "premium" subscription entitlement.
         billingManager.start()
+        // On the rooted head unit, silently grant every permission (runtime, notification
+        // listener, accessibility, screen-capture) so no dialog ever appears. If root is
+        // unavailable (e.g. the S20+), fall back to the in-app prompts below.
         Thread {
-            try {
-                Runtime.getRuntime().exec(arrayOf("su", "-c",
-                    "appops set com.link.autolink.pro PROJECT_MEDIA allow"))
-            } catch (_: Exception) {}
+            val granted = RootPermissionGranter.grantAll(this, runtimePermissions())
+            if (granted) {
+                // Accessibility was enabled via root — record disclosure consent (Play
+                // policy gate) and kick off the AutoLink connect flow.
+                AccessibilityDisclosure.setAccepted(this, true)
+                AutoLinkService.start(this)
+            }
+            rootGrant.value = if (granted) RootGrant.GRANTED else RootGrant.UNAVAILABLE
         }.start()
 
         setContent {
@@ -197,13 +209,18 @@ class MainActivity : ComponentActivity() {
 
                 // First-launch prompts, shown one at a time: explain the runtime
                 // permissions before requesting them, then the accessibility disclosure.
+                // Only shown once the root grant has failed (non-rooted device); on the
+                // head unit root grants everything and these never appear.
+                val grant by rootGrant.collectAsStateWithLifecycle()
                 var showPermsRationale by remember {
                     mutableStateOf(needsRuntimePermissions())
                 }
                 var showA11yDisclosure by remember {
                     mutableStateOf(!AccessibilityDisclosure.isAccepted(this@MainActivity))
                 }
-                if (showPermsRationale) {
+                if (grant != RootGrant.UNAVAILABLE) {
+                    // Root grant still pending or succeeded — show no prompts.
+                } else if (showPermsRationale) {
                     PermissionsRationaleDialog(
                         onContinue = {
                             showPermsRationale = false
