@@ -805,27 +805,33 @@ private fun OdoChargingCell(
     modifier: Modifier = Modifier
 ) {
     val context    = LocalContext.current
-    var closest    by remember { mutableStateOf<NearbyStation?>(null) }
-    var statusText by remember { mutableStateOf("LOADING...") }
-    val scope      = rememberCoroutineScope()
+    var closest      by remember { mutableStateOf<NearbyStation?>(null) }
+    var statusText   by remember { mutableStateOf("LOADING...") }
+    var recalculating by remember { mutableStateOf(false) }
+    val scope        = rememberCoroutineScope()
 
     val currentLocation by rememberUpdatedState(location)
 
     // Recalculate the closest station now. When [refreshKml] is set, re-download the
-    // station list from the network first (used by the manual tap).
+    // station list from the network first and show a spinner (used by the manual tap).
     suspend fun recalc(refreshKml: Boolean) {
         val loc = currentLocation
         if (loc == null) { statusText = "NO GPS"; return }
+        if (refreshKml) recalculating = true
         statusText = "SEARCHING..."
-        val result = kotlinx.coroutines.withContext(Dispatchers.IO) {
-            if (refreshKml) refreshKmlFromNetwork(context)
-            findClosestStation(context, loc.latitude, loc.longitude)
-        }
-        closest    = result
-        statusText = when {
-            result != null -> "NEARBY"
-            java.io.File(context.cacheDir, KML_CACHE_FILE).exists() -> "NONE NEARBY"
-            else -> "LOADING..."
+        try {
+            val result = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                if (refreshKml) refreshKmlFromNetwork(context)
+                findClosestStation(context, loc.latitude, loc.longitude)
+            }
+            closest    = result
+            statusText = when {
+                result != null -> "NEARBY"
+                java.io.File(context.cacheDir, KML_CACHE_FILE).exists() -> "NONE NEARBY"
+                else -> "LOADING..."
+            }
+        } finally {
+            recalculating = false
         }
     }
 
@@ -844,9 +850,17 @@ private fun OdoChargingCell(
     }
 
     Column(modifier = modifier.fillMaxHeight()
-            .clickable { scope.launch { recalc(refreshKml = true) } },
+            .clickable(enabled = !recalculating) { scope.launch { recalc(refreshKml = true) } },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center) {
+        if (recalculating) {
+            CircularProgressIndicator(color = OdoGood,
+                strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
+            Spacer(Modifier.height(10.dp))
+            Text(text = "SEARCHING...", color = OdoInactive, fontSize = 10.sp,
+                letterSpacing = 1.sp, textAlign = TextAlign.Center)
+            return@Column
+        }
         Icon(Icons.Filled.Bolt, contentDescription = null,
             tint = if (closest != null) OdoGood else OdoInactive,
             modifier = Modifier.size(28.dp))
