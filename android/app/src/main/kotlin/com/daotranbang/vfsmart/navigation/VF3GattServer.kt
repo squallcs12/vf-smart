@@ -115,6 +115,9 @@ class VF3GattServer(private val context: Context) {
         private val _speedLimitState = MutableStateFlow<Int?>(null)
         val speedLimitState: StateFlow<Int?> = _speedLimitState.asStateFlow()
 
+        /** Clears the current speed limit (e.g. user dismissed it on the ODO screen). */
+        fun clearSpeedLimit() { _speedLimitState.value = null }
+
         private val _carStatusState = MutableStateFlow<CarStatus?>(null)
         val carStatusState: StateFlow<CarStatus?> = _carStatusState.asStateFlow()
 

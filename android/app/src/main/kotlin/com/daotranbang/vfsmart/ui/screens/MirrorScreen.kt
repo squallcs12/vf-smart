@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.location.LocationListener
 import android.location.LocationManager
+import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -255,7 +256,16 @@ private fun MirrorContent(
                         modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
                     OdoGpsSpeedCell(speedKmh = speedKmh, hasSpeed = hasSpeed,
-                        speedLimit = speedLimit, modifier = Modifier.weight(1f))
+                        speedLimit = speedLimit,
+                        onClick = {
+                            if (rtspUrl.isNullOrBlank()) {
+                                Toast.makeText(context, R.string.rtsp_error_not_configured,
+                                    Toast.LENGTH_SHORT).show()
+                            } else {
+                                manualVideo = true
+                            }
+                        },
+                        modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
                     OdoTripCell(tripText = tripText, onReset = onResetTrip,
                         modifier = Modifier.weight(1f))
@@ -269,7 +279,8 @@ private fun MirrorContent(
                     OdoVerticalDivider()
                     OdoTpmsCell(tpms = tpmsData, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
-                    OdoSpeedLimitCell(speedLimit = speedLimit, onClick = { manualVideo = true },
+                    OdoSpeedLimitCell(speedLimit = speedLimit,
+                        onClick = { VF3GattServer.clearSpeedLimit() },
                         modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
                     OdoClockCell(location = location, modifier = Modifier.weight(1f))
@@ -513,6 +524,7 @@ private fun OdoGpsSpeedCell(
     speedKmh: Float,
     hasSpeed: Boolean,
     speedLimit: Int? = null,
+    onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val speed          = speedKmh.toInt()
@@ -539,7 +551,7 @@ private fun OdoGpsSpeedCell(
         }
     }
 
-    Column(modifier = modifier.fillMaxHeight(),
+    Column(modifier = modifier.fillMaxHeight().clickable { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center) {
         Text(text = if (hasSpeed) "$speed" else "--", color = speedColor,
@@ -795,6 +807,27 @@ private fun OdoChargingCell(
     val context    = LocalContext.current
     var closest    by remember { mutableStateOf<NearbyStation?>(null) }
     var statusText by remember { mutableStateOf("LOADING...") }
+    val scope      = rememberCoroutineScope()
+
+    val currentLocation by rememberUpdatedState(location)
+
+    // Recalculate the closest station now. When [refreshKml] is set, re-download the
+    // station list from the network first (used by the manual tap).
+    suspend fun recalc(refreshKml: Boolean) {
+        val loc = currentLocation
+        if (loc == null) { statusText = "NO GPS"; return }
+        statusText = "SEARCHING..."
+        val result = kotlinx.coroutines.withContext(Dispatchers.IO) {
+            if (refreshKml) refreshKmlFromNetwork(context)
+            findClosestStation(context, loc.latitude, loc.longitude)
+        }
+        closest    = result
+        statusText = when {
+            result != null -> "NEARBY"
+            java.io.File(context.cacheDir, KML_CACHE_FILE).exists() -> "NONE NEARBY"
+            else -> "LOADING..."
+        }
+    }
 
     var foregroundKey by remember { mutableIntStateOf(0) }
     LifecycleEventEffect(Lifecycle.Event.ON_START) { foregroundKey++ }
@@ -803,29 +836,15 @@ private fun OdoChargingCell(
         kotlinx.coroutines.withContext(Dispatchers.IO) { refreshKmlFromNetwork(context) }
     }
 
-    val currentLocation by rememberUpdatedState(location)
     LaunchedEffect(Unit) {
         while (true) {
-            val loc = currentLocation
-            if (loc != null) {
-                statusText = "SEARCHING..."
-                val result = kotlinx.coroutines.withContext(Dispatchers.IO) {
-                    findClosestStation(context, loc.latitude, loc.longitude)
-                }
-                closest    = result
-                statusText = when {
-                    result != null -> "NEARBY"
-                    java.io.File(context.cacheDir, KML_CACHE_FILE).exists() -> "NONE NEARBY"
-                    else -> "LOADING..."
-                }
-            } else {
-                statusText = "NO GPS"
-            }
+            recalc(refreshKml = false)
             delay(60 * 1000L)
         }
     }
 
-    Column(modifier = modifier.fillMaxHeight(),
+    Column(modifier = modifier.fillMaxHeight()
+            .clickable { scope.launch { recalc(refreshKml = true) } },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center) {
         Icon(Icons.Filled.Bolt, contentDescription = null,
@@ -853,7 +872,7 @@ private fun OdoChargingCell(
 @Composable
 private fun OdoSpeedLimitCell(
     speedLimit: Int?,
-    onClick: () -> Unit,
+    onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val valueText = speedLimit?.toString() ?: "--"

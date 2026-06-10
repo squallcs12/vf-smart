@@ -188,6 +188,7 @@
     <string name="rtsp_saving">Đang lưu…</string>
     <string name="rtsp_saved">Đã lưu vào thư viện</string>
     <string name="rtsp_error_empty_url">Vui lòng nhập địa chỉ RTSP</string>
+    <string name="rtsp_error_not_configured">Chưa cấu hình camera RTSP</string>
     <string name="rtsp_error_save">Lỗi lưu video</string>
     <string name="rtsp_detect">Tự động tìm camera Imou</string>
     <string name="rtsp_detecting">Đang quét mạng…</string>
