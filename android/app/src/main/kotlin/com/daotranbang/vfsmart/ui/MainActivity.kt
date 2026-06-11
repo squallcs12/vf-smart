@@ -36,6 +36,7 @@ import com.daotranbang.vfsmart.ui.screens.DebugScreen
 import com.daotranbang.vfsmart.ui.screens.HomeScreen
 import com.daotranbang.vfsmart.ui.screens.MirrorScreen
 import com.daotranbang.vfsmart.ui.screens.RedLightDetectorScreen
+import com.daotranbang.vfsmart.ui.screens.TrafficLightLiveScreen
 import com.daotranbang.vfsmart.ui.screens.TpmsCalibrationScreen
 import com.daotranbang.vfsmart.ui.theme.VF3SmartTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -162,6 +163,9 @@ class MainActivity : ComponentActivity() {
                             onNavigateToRedLight = {
                                 navController.navigate("red_light")
                             },
+                            onNavigateToTrafficLight = {
+                                navController.navigate("traffic_light_live")
+                            },
                             onNavigateToRtspCapture = {
                                 navController.navigate("rtsp_capture")
                             }
@@ -170,6 +174,14 @@ class MainActivity : ComponentActivity() {
 
                     composable("red_light") {
                         RedLightDetectorScreen(
+                            onNavigateBack = {
+                                navController.popBackStack()
+                            }
+                        )
+                    }
+
+                    composable("traffic_light_live") {
+                        TrafficLightLiveScreen(
                             onNavigateBack = {
                                 navController.popBackStack()
                             }

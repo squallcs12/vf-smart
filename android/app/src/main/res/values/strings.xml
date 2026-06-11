@@ -195,11 +195,16 @@
     <string name="rtsp_detect_found">Đã tìm thấy camera: %1$s</string>
     <string name="rtsp_detect_not_found">Không tìm thấy camera Imou trong mạng</string>
 
-    <!-- RedLightDetectorScreen -->
-    <string name="red_light_title">Đếm giây đèn đỏ</string>
+    <!-- RedLightDetectorScreen (now: traffic-light detection on a still photo) -->
+    <string name="red_light_title">Nhận diện đèn (ảnh)</string>
     <string name="section_red_light">Đèn giao thông</string>
-    <string name="btn_red_light_detector">Đếm giây đèn đỏ</string>
-    <string name="red_light_instructions">Chọn hoặc chụp ảnh đèn giao thông có đồng hồ đếm ngược. Ứng dụng sẽ tự đọc số giây hiển thị trên đèn.</string>
+    <string name="btn_red_light_detector">Nhận diện đèn từ ảnh</string>
+    <string name="red_light_instructions">Chọn ảnh đèn giao thông. Ứng dụng sẽ nhận diện đèn đỏ/xanh và khung đếm ngược bằng mô hình của bạn.</string>
+    <string name="tl_photo_red_count">Đếm ngược đỏ</string>
+    <string name="tl_photo_green_count">Đếm ngược xanh</string>
+    <string name="tl_photo_yes">Có</string>
+    <string name="tl_photo_no">Không</string>
+    <string name="tl_photo_boxes">Số đối tượng phát hiện: %d</string>
     <string name="red_light_pick_image">Chọn ảnh</string>
     <string name="red_light_pick_another">Chọn ảnh khác</string>
     <string name="red_light_detecting">Đang nhận diện…</string>
@@ -209,4 +214,14 @@
     <string name="red_light_all_numbers">Các số nhận được: %s</string>
     <string name="red_light_error">Lỗi nhận diện: %s</string>
     <string name="red_light_image_cd">Ảnh đèn giao thông đã chọn</string>
+
+    <!-- Live traffic-light detector (RTSP) -->
+    <string name="traffic_light_live_title">Nhận diện đèn giao thông trực tiếp</string>
+    <string name="btn_traffic_light_live">Nhận diện trực tiếp (camera)</string>
+    <string name="traffic_light_no_url">Chưa cấu hình địa chỉ RTSP. Vào mục camera để nhập địa chỉ camera trước.</string>
+    <string name="traffic_light_state_red">Đèn đỏ</string>
+    <string name="traffic_light_state_green">Đèn xanh</string>
+    <string name="traffic_light_state_none">Không phát hiện đèn</string>
+    <string name="traffic_light_seconds">Còn %d giây</string>
+    <string name="traffic_light_confidence">Độ tin cậy: %d%%</string>
 </resources>

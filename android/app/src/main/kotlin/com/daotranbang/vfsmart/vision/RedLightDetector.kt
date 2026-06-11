@@ -72,6 +72,19 @@ object RedLightDetector {
         runDetection(interp, bitmap)
     }
 
+    /**
+     * Recognise the countdown digits already cropped into [bitmap] (e.g. a count
+     * box detected by [TrafficLightDetector]). Caller controls threading and owns
+     * [bitmap]. Throws [IllegalStateException] if the digit model asset is absent.
+     */
+    fun detect(context: Context, bitmap: Bitmap): Result {
+        val interp = obtainInterpreter(context.applicationContext)
+        return runDetection(interp, bitmap)
+    }
+
+    /** True once the digit model has been loaded (callers can skip OCR if false). */
+    val isLoaded: Boolean get() = interpreter != null
+
     // --- Interpreter lifecycle -------------------------------------------------
 
     private fun obtainInterpreter(context: Context): Interpreter {

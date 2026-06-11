@@ -20,27 +20,35 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.daotranbang.vfsmart.R
-import com.daotranbang.vfsmart.vision.RedLightDetector
+import com.daotranbang.vfsmart.vision.TrafficLightDetector
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private sealed interface DetectState {
     data object Idle : DetectState
     data object Detecting : DetectState
-    data class Success(val result: RedLightDetector.Result) : DetectState
+    data class Success(val result: TrafficLightDetector.Result) : DetectState
     data class Failure(val message: String) : DetectState
 }
 
@@ -66,12 +74,15 @@ fun RedLightDetectorScreen(
         }
     }
 
-    // Load the preview bitmap and run OCR whenever a new image is chosen.
+    // Load the preview bitmap and run traffic-light detection on each new image.
     LaunchedEffect(imageUri) {
         val uri = imageUri ?: return@LaunchedEffect
         try {
-            preview = withContext(Dispatchers.IO) { loadBitmap(context, uri).asImageBitmap() }
-            val result = RedLightDetector.detect(context, uri)
+            val bmp = withContext(Dispatchers.IO) { loadBitmap(context, uri) }
+            preview = bmp.asImageBitmap()
+            val result = withContext(Dispatchers.Default) {
+                TrafficLightDetector.detect(context, bmp)
+            }
             state = DetectState.Success(result)
         } catch (e: Exception) {
             state = DetectState.Failure(e.message ?: e.javaClass.simpleName)
@@ -136,17 +147,30 @@ fun RedLightDetectorScreen(
                 )
             }
 
-            // Selected image preview
+            // Selected image preview, with detected boxes overlaid. The Box uses the
+            // image's own aspect ratio so the bitmap fills it with no letterboxing —
+            // detections (normalised 0..1) then map straight onto the overlay.
             preview?.let { bmp ->
-                Image(
-                    bitmap = bmp,
-                    contentDescription = stringResource(R.string.red_light_image_cd),
-                    contentScale = ContentScale.Fit,
+                val aspect = (bmp.width.toFloat() / bmp.height.toFloat()).coerceIn(0.4f, 3f)
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 320.dp)
+                        .aspectRatio(aspect)
                         .clip(RoundedCornerShape(12.dp))
-                )
+                ) {
+                    Image(
+                        bitmap = bmp,
+                        contentDescription = stringResource(R.string.red_light_image_cd),
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.matchParentSize()
+                    )
+                    (state as? DetectState.Success)?.let { s ->
+                        DetectionOverlay(
+                            boxes = s.result.boxes,
+                            modifier = Modifier.matchParentSize()
+                        )
+                    }
+                }
             }
 
             // Result
@@ -189,7 +213,16 @@ fun RedLightDetectorScreen(
 }
 
 @Composable
-private fun ResultCard(result: RedLightDetector.Result) {
+private fun ResultCard(result: TrafficLightDetector.Result) {
+    val (label, color) = when (result.state) {
+        TrafficLightDetector.State.RED ->
+            stringResource(R.string.traffic_light_state_red) to androidx.compose.ui.graphics.Color(0xFFEF5350)
+        TrafficLightDetector.State.GREEN ->
+            stringResource(R.string.traffic_light_state_green) to androidx.compose.ui.graphics.Color(0xFF4CAF50)
+        TrafficLightDetector.State.NONE ->
+            stringResource(R.string.traffic_light_state_none) to MaterialTheme.colorScheme.error
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -203,52 +236,117 @@ private fun ResultCard(result: RedLightDetector.Result) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (result.seconds != null) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Timer, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary)
-                    Text(
-                        text = stringResource(R.string.red_light_result_label),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            Text(
+                text = label,
+                fontSize = 40.sp,
+                fontWeight = FontWeight.Bold,
+                color = color
+            )
+
+            if (result.state != TrafficLightDetector.State.NONE) {
                 Text(
-                    text = result.seconds.toString(),
-                    fontSize = 84.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = stringResource(R.string.red_light_seconds_format, result.seconds),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            } else {
-                Text(
-                    text = stringResource(R.string.red_light_no_number),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center
+                    text = stringResource(
+                        R.string.traffic_light_confidence,
+                        (result.confidence * 100).toInt()
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            if (result.allNumbers.isNotEmpty()) {
-                Text(
-                    text = stringResource(
-                        R.string.red_light_all_numbers,
-                        result.allNumbers.joinToString(", ")
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
+            // Count-box presence — what the "Red count" / "Green count" classes found.
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                modifier = Modifier.padding(top = 4.dp)
+            ) {
+                CountChip(
+                    label = stringResource(R.string.tl_photo_red_count),
+                    present = result.hasRedCount
+                )
+                CountChip(
+                    label = stringResource(R.string.tl_photo_green_count),
+                    present = result.hasGreenCount
                 )
             }
+
+            Text(
+                text = stringResource(R.string.tl_photo_boxes, result.boxes.size),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
         }
     }
+}
+
+@Composable
+private fun CountChip(label: String, present: Boolean) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = if (present) stringResource(R.string.tl_photo_yes)
+                   else stringResource(R.string.tl_photo_no),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = if (present) androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** Draws the model's detected boxes (normalised coords) over the preview image. */
+@Composable
+private fun DetectionOverlay(
+    boxes: List<TrafficLightDetector.Box>,
+    modifier: Modifier = Modifier
+) {
+    val measurer = rememberTextMeasurer()
+    Canvas(modifier = modifier) {
+        for (b in boxes) {
+            val color = boxColor(b.cls)
+            val left = b.left * size.width
+            val top = b.top * size.height
+            val w = (b.right - b.left) * size.width
+            val h = (b.bottom - b.top) * size.height
+            drawRect(
+                color = color,
+                topLeft = Offset(left, top),
+                size = Size(w, h),
+                style = Stroke(width = 3.dp.toPx())
+            )
+            // Class + confidence tag above the box.
+            val tag = "${boxLabel(b.cls)} ${(b.score * 100).toInt()}%"
+            val measured = measurer.measure(
+                tag,
+                style = TextStyle(color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            )
+            val tagW = measured.size.width.toFloat() + 8f
+            val tagH = measured.size.height.toFloat()
+            val tagTop = (top - tagH).coerceAtLeast(0f)
+            drawRect(color = color, topLeft = Offset(left, tagTop), size = Size(tagW, tagH))
+            drawText(measured, topLeft = Offset(left + 4f, tagTop))
+        }
+    }
+}
+
+private fun boxColor(cls: Int): Color = when (cls) {
+    0 -> Color(0xFF4CAF50)   // Green
+    1 -> Color(0xFF81C784)   // Green count
+    2 -> Color(0xFFEF5350)   // Red
+    3 -> Color(0xFFE57373)   // Red count
+    else -> Color.Yellow
+}
+
+private fun boxLabel(cls: Int): String = when (cls) {
+    0 -> "Green"
+    1 -> "G.count"
+    2 -> "Red"
+    3 -> "R.count"
+    else -> "?"
 }
 
 /** Decode a content [uri] into a Bitmap, applying EXIF orientation. */

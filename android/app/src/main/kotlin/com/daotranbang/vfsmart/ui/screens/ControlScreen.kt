@@ -29,6 +29,7 @@ fun ControlScreen(
     onNavigateToTpmsCalibration: () -> Unit = {},
     onNavigateToCamera: () -> Unit = {},
     onNavigateToRedLight: () -> Unit = {},
+    onNavigateToTrafficLight: () -> Unit = {},
     onNavigateToRtspCapture: () -> Unit = {},
     modifier: Modifier = Modifier,
     statusViewModel: CarStatusViewModel = hiltViewModel(),
@@ -311,6 +312,12 @@ fun ControlScreen(
                     onClick = onNavigateToRedLight,
                     modifier = Modifier.fillMaxWidth(),
                     icon = { Icon(Icons.Default.Timer, contentDescription = null) }
+                )
+                ControlButton(
+                    text = stringResource(R.string.btn_traffic_light_live),
+                    onClick = onNavigateToTrafficLight,
+                    modifier = Modifier.fillMaxWidth(),
+                    icon = { Icon(Icons.Default.Traffic, contentDescription = null) }
                 )
             }
 
