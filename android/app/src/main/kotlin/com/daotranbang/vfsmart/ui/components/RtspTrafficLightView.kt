@@ -47,7 +47,7 @@ private const val ANALYSIS_H = 360
  * [TrafficLightDetector] / [TrafficLightAnalyzer] on sampled frames and draws an
  * overlay: bounding boxes plus a RED/GREEN state badge with the OCR'd seconds.
  *
- * Frames are sampled at [fps] (default 3) to keep the GPU/CPU cool. Each reading
+ * Frames are sampled at [fps] (default 1, matching the camera's stream rate). Each reading
  * is also pushed to [onReading] so a ViewModel can expose it as a StateFlow.
  */
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -55,7 +55,7 @@ private const val ANALYSIS_H = 360
 fun RtspTrafficLightView(
     url: String,
     modifier: Modifier = Modifier,
-    fps: Int = 3,
+    fps: Int = 1,
     showBoxes: Boolean = true,
     onReading: (TrafficLightAnalyzer.Reading) -> Unit = {}
 ) {

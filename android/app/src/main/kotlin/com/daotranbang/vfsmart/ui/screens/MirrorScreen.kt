@@ -55,6 +55,7 @@ import com.daotranbang.vfsmart.navigation.GpsState
 import com.daotranbang.vfsmart.navigation.NavigationNotificationService
 import com.daotranbang.vfsmart.navigation.NavigationState
 import com.daotranbang.vfsmart.navigation.VF3GattServer
+import com.daotranbang.vfsmart.ui.components.RtspTrafficLightView
 import com.daotranbang.vfsmart.ui.components.RtspVideoPlayer
 import com.daotranbang.vfsmart.util.RtspRecorder
 import com.daotranbang.vfsmart.util.playLightReminder
@@ -243,7 +244,11 @@ private fun MirrorContent(
     }
     val isStopped = hasSpeed && speedKmh < 1f
     val autoShow  = isStopped && hasMovedOnce && !dismissedThisStop
-    val showVideo = !rtspUrl.isNullOrBlank() && (manualVideo || autoShow)
+    // Auto (car stopped) shows the camera inline inside the speed cell; manual
+    // (tapping the speed cell) shows it full-screen.
+    val inlineVideo     = !rtspUrl.isNullOrBlank() && autoShow
+    val fullscreenVideo = !rtspUrl.isNullOrBlank() && manualVideo
+    val showVideo = inlineVideo || fullscreenVideo
 
     Box(modifier = modifier.fillMaxSize().background(OdoBg)) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -257,6 +262,8 @@ private fun MirrorContent(
                     OdoVerticalDivider()
                     OdoGpsSpeedCell(speedKmh = speedKmh, hasSpeed = hasSpeed,
                         speedLimit = speedLimit,
+                        showVideo = inlineVideo,
+                        rtspUrl = rtspUrl,
                         onClick = {
                             if (rtspUrl.isNullOrBlank()) {
                                 Toast.makeText(context, R.string.rtsp_error_not_configured,
@@ -265,6 +272,7 @@ private fun MirrorContent(
                                 manualVideo = true
                             }
                         },
+                        onDismissVideo = { dismissedThisStop = true },
                         modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
                     OdoTripCell(tripText = tripText, onReset = onResetTrip,
@@ -291,14 +299,20 @@ private fun MirrorContent(
             OdoStatusBar(carStatus = carStatus)
         }
 
-        // Full-screen live camera overlay (auto when stopped, or manual via the
-        // speed-limit cell). Tap anywhere on it to dismiss. While it's visible the
-        // stream is also recorded to the library; the clip is saved on dismissal.
+        // While the live camera is visible (inline in the speed cell when stopped,
+        // or full-screen when opened manually) the stream is also recorded to the
+        // library; the clip is saved when the camera is dismissed.
         if (showVideo) {
             DisposableEffect(Unit) {
                 recorder.start(rtspUrl!!)
                 onDispose { recorder.stop() }
             }
+        }
+
+        // Full-screen live camera overlay — only for a manual open. The auto
+        // (car-stopped) view renders inline inside the speed cell instead. Tap
+        // anywhere on the overlay to dismiss.
+        if (fullscreenVideo) {
             Box(modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
@@ -524,7 +538,10 @@ private fun OdoGpsSpeedCell(
     speedKmh: Float,
     hasSpeed: Boolean,
     speedLimit: Int? = null,
+    showVideo: Boolean = false,
+    rtspUrl: String? = null,
     onClick: () -> Unit = {},
+    onDismissVideo: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val speed          = speedKmh.toInt()
@@ -549,6 +566,20 @@ private fun OdoGpsSpeedCell(
                 playLightReminder(context)
             }
         }
+    }
+
+    // When the car is stopped, the green/red traffic-light detector takes over this
+    // cell — it shows the annotated detection video (bounding boxes + RED/GREEN
+    // badge) rather than the raw stream. Tap it to dismiss until the car moves and
+    // stops again.
+    if (showVideo && !rtspUrl.isNullOrBlank()) {
+        Box(modifier = modifier
+            .fillMaxHeight()
+            .background(Color.Black)
+            .clickable { onDismissVideo() }) {
+            RtspTrafficLightView(url = rtspUrl, modifier = Modifier.fillMaxSize())
+        }
+        return
     }
 
     Column(modifier = modifier.fillMaxHeight().clickable { onClick() },
