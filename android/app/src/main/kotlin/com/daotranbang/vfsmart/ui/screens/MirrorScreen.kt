@@ -577,7 +577,7 @@ private fun OdoGpsSpeedCell(
             .fillMaxHeight()
             .background(Color.Black)
             .clickable { onDismissVideo() }) {
-            RtspTrafficLightView(url = rtspUrl, modifier = Modifier.fillMaxSize())
+            RtspTrafficLightView(url = rtspUrl, cropToLight = true, modifier = Modifier.fillMaxSize())
         }
         return
     }
