@@ -54,7 +54,8 @@
       "PowerShell(python \"C:\\\\Users\\\\daotr\\\\AppData\\\\Local\\\\Temp\\\\probe_mp4.py\" \"$env:TEMP\\\\vf3_rec.mp4\")",
       "Bash(./gradlew -q app:dependencies --configuration releaseRuntimeClasspath)",
       "Bash(./gradlew *)",
-      "Bash(/tmp/vf3venv/bin/python *)"
+      "Bash(/tmp/vf3venv/bin/python *)",
+      "PowerShell(git add *)"
     ]
   }
 }
