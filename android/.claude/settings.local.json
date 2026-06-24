@@ -55,7 +55,8 @@
       "Bash(./gradlew -q app:dependencies --configuration releaseRuntimeClasspath)",
       "Bash(./gradlew *)",
       "Bash(/tmp/vf3venv/bin/python *)",
-      "PowerShell(git add *)"
+      "PowerShell(git add *)",
+      "Read(//c/Users/daotr/Downloads/**)"
     ]
   }
 }
