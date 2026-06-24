@@ -215,10 +215,12 @@
     <string name="red_light_error">Lỗi nhận diện: %s</string>
     <string name="red_light_image_cd">Ảnh đèn giao thông đã chọn</string>
 
-    <!-- Live traffic-light detector (RTSP) -->
-    <string name="traffic_light_live_title">Nhận diện đèn giao thông trực tiếp</string>
-    <string name="btn_traffic_light_live">Nhận diện trực tiếp (camera)</string>
-    <string name="traffic_light_no_url">Chưa cấu hình địa chỉ RTSP. Vào mục camera để nhập địa chỉ camera trước.</string>
+    <!-- Traffic-light detector (video from library) -->
+    <string name="traffic_light_live_title">Nhận diện đèn giao thông từ video</string>
+    <string name="btn_traffic_light_live">Nhận diện đèn (từ video)</string>
+    <string name="traffic_light_pick_video">Chọn video từ thư viện</string>
+    <string name="traffic_light_pick_other_video">Chọn video khác</string>
+    <string name="traffic_light_no_video">Chưa chọn video. Nhấn nút phía trên để chọn một video từ thư viện và chạy nhận diện đèn.</string>
     <string name="traffic_light_state_red">Đèn đỏ</string>
     <string name="traffic_light_state_green">Đèn xanh</string>
     <string name="traffic_light_state_none">Không phát hiện đèn</string>

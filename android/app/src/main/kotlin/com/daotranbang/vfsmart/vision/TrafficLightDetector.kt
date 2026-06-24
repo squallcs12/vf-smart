@@ -39,7 +39,8 @@ import kotlin.math.roundToInt
  * available, multi-threaded CPU otherwise).
  *
  * ## Wiring the model
- *  - Trained on the Roboflow "vietnam-traffic-light-f0zoa" YOLOv11 export.
+ *  - Trained on the Roboflow "vietnam-traffic-light-f0zoa" YOLOv11 export,
+ *    augmented with Imou-camera footage (`best_float16_with_imou.tflite`).
  *  - `yolo export model=best.pt format=tflite half=True imgsz=640`
  *  - Dropped at `app/src/main/assets/traffic_light.tflite`.
  */

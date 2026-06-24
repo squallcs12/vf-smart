@@ -59,6 +59,10 @@ private const val ANALYSIS_H = 360
  * union of the light + countdown boxes, with a little context padding) so only the
  * light fills the view instead of the whole frame. The zoom animates smoothly and
  * falls back to the full frame whenever nothing is detected.
+ *
+ * [url] is an RTSP stream by default; set [rtsp] = false to play a regular media
+ * source instead (e.g. a `content://` video picked from the library), in which case
+ * the clip loops so detection keeps running.
  */
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
@@ -68,6 +72,7 @@ fun RtspTrafficLightView(
     fps: Int = 1,
     showBoxes: Boolean = true,
     cropToLight: Boolean = false,
+    rtsp: Boolean = true,
     onReading: (TrafficLightAnalyzer.Reading) -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -76,19 +81,25 @@ fun RtspTrafficLightView(
     var reading by remember { mutableStateOf(TrafficLightAnalyzer.Reading.EMPTY) }
     val textureView = remember { TextureView(context) }
 
-    val exoPlayer = remember(url) {
-        val mediaSource = RtspMediaSource.Factory()
-            .setForceUseRtpTcp(true)
-            .createMediaSource(MediaItem.fromUri(url))
+    val exoPlayer = remember(url, rtsp) {
         ExoPlayer.Builder(context).build().apply {
-            setMediaSource(mediaSource)
-            repeatMode = Player.REPEAT_MODE_OFF
+            if (rtsp) {
+                val mediaSource = RtspMediaSource.Factory()
+                    .setForceUseRtpTcp(true)
+                    .createMediaSource(MediaItem.fromUri(url))
+                setMediaSource(mediaSource)
+                repeatMode = Player.REPEAT_MODE_OFF
+            } else {
+                // Local/library video: loop it so the detection sampler keeps running.
+                setMediaItem(MediaItem.fromUri(url))
+                repeatMode = Player.REPEAT_MODE_ONE
+            }
             playWhenReady = true
             setVideoTextureView(textureView)
             prepare()
         }
     }
-    DisposableEffect(url) {
+    DisposableEffect(url, rtsp) {
         onDispose { exoPlayer.release() }
     }
 
