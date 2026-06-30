@@ -34,6 +34,9 @@ void setupWebServer() {
   registerOTAEndpoint(server);
   registerTpmsEndpoint(server);
 
+  // Real-time car status stream (full + delta frames, 60 s heartbeat)
+  setupWebSocket(server);
+
   // Handle 404
   server.onNotFound([](AsyncWebServerRequest *request){
     request->send(404, "text/plain", "Not found");

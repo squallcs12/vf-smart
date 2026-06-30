@@ -7,8 +7,8 @@
 #include "controls.h"
 #include "time_sync.h"
 #include "storage.h"
-#include "ble_server.h"
 #include "webserver.h"
+#include "websocket.h"
 #include "discovery.h"
 #include "ota.h"
 #include "tpms.h"
@@ -114,15 +114,11 @@ void setup() {
     // Setup onboarding web server
     setupOnboardingServer();
   }
-
-  // Initialize BLE server — advertises so the phone can connect (works
-  // independently of WiFi mode).
-  initBleServer();
 }
 
 void loop() {
-  // Handle BLE server (notify subscribed phone with delta car status)
-  handleBleServer();
+  // Stream car status to subscribed WebSocket clients (full + delta, heartbeat)
+  handleWebSocket();
 
   // Handle OTA updates
   handleOTA();
