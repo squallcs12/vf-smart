@@ -63,6 +63,9 @@ fun RedLightDetectorScreen(
     var imageUri by remember { mutableStateOf<Uri?>(null) }
     var preview by remember { mutableStateOf<ImageBitmap?>(null) }
     var state by remember { mutableStateOf<DetectState>(DetectState.Idle) }
+    // Bumped on every pick so re-selecting the *same* image still reloads + re-detects
+    // (keying the effect on imageUri alone wouldn't fire when the URI is unchanged).
+    var pickId by remember { mutableStateOf(0) }
 
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
@@ -71,11 +74,12 @@ fun RedLightDetectorScreen(
             imageUri = uri
             preview = null
             state = DetectState.Detecting
+            pickId++
         }
     }
 
-    // Load the preview bitmap and run traffic-light detection on each new image.
-    LaunchedEffect(imageUri) {
+    // Load the preview bitmap and run traffic-light detection on each pick.
+    LaunchedEffect(pickId) {
         val uri = imageUri ?: return@LaunchedEffect
         try {
             val bmp = withContext(Dispatchers.IO) { loadBitmap(context, uri) }

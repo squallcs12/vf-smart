@@ -6,7 +6,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
-import org.tensorflow.lite.gpu.GpuDelegate
 import java.io.FileInputStream
 import java.io.IOException
 import java.nio.ByteBuffer
@@ -37,10 +36,9 @@ import kotlin.math.roundToInt
  * (see [RedLightDetector]).
  *
  * Designed to run on live RTSP frames: [detect] takes a [Bitmap], is fully offline,
- * and reuses a single cached interpreter (GPU-accelerated when available,
- * multi-threaded CPU otherwise). Note [detect] runs the model once **per tile**
- * ([TILE_ROWS]×[TILE_COLS] = 16 inferences per frame), so the caller should sample
- * frames slowly rather than analysing every frame.
+ * and reuses a single cached multi-threaded CPU interpreter. Note [detect] runs the
+ * model once **per tile** ([TILE_ROWS]×[TILE_COLS] = 16 inferences per frame), so the
+ * caller should sample frames slowly rather than analysing every frame.
  *
  * ## Wiring the model
  *  - Trained on the Roboflow "vietnam-traffic-light-f0zoa" YOLOv11 export
@@ -90,7 +88,6 @@ object TrafficLightDetector {
     }
 
     @Volatile private var interpreter: Interpreter? = null
-    @Volatile private var gpuDelegate: GpuDelegate? = null
     private val initLock = Any()
 
     /** True once a model has been loaded (so callers can show a "no model" hint). */
@@ -144,13 +141,11 @@ object TrafficLightDetector {
         return summarise(nms(all))
     }
 
-    /** Release the interpreter and GPU delegate. Call when detection stops. */
+    /** Release the interpreter. Call when detection stops. */
     fun close() {
         synchronized(initLock) {
             interpreter?.close()
             interpreter = null
-            gpuDelegate?.close()
-            gpuDelegate = null
         }
     }
 
@@ -169,18 +164,18 @@ object TrafficLightDetector {
         }
     }
 
-    /** Try GPU (fast on the S20+'s Mali GPU), fall back to multi-threaded CPU. */
+    /**
+     * Build the CPU interpreter, multi-threaded across cores. The GPU delegate is
+     * intentionally NOT used: on the Android emulator it hangs (the inference thread
+     * parks on a GL fence and never returns — observed as all app threads sleeping at
+     * 0% CPU with no TFLite output). yolo11n is small enough that multi-threaded CPU is
+     * fine, and TFLite's numThreads already parallelises each tile across all cores —
+     * a pool of interpreters was tried and reverted (it ~4×'d native memory and
+     * thrashed/hung without being any faster, since cores are the real bottleneck).
+     */
     private fun buildInterpreter(model: MappedByteBuffer): Interpreter {
-        try {
-            val delegate = GpuDelegate()
-            val interp = Interpreter(model, Interpreter.Options().addDelegate(delegate))
-            gpuDelegate = delegate
-            return interp
-        } catch (t: Throwable) {
-            gpuDelegate?.close()
-            gpuDelegate = null
-        }
-        return Interpreter(model, Interpreter.Options().setNumThreads(4))
+        val cpuThreads = Runtime.getRuntime().availableProcessors().coerceIn(2, 6)
+        return Interpreter(model, Interpreter.Options().setNumThreads(cpuThreads))
     }
 
     // --- Inference -------------------------------------------------------------
