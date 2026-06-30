@@ -8,14 +8,14 @@ The VF3 Smart app integrates with Google Assistant using **Google App Actions**,
 
 **Architecture:**
 ```
-Voice Command → Google Assistant → App Actions → VoiceAssistantActivity → AssistantCommandHandler → VF3Repository → BLE command → ESP32
+Voice Command → Google Assistant → App Actions → VoiceAssistantActivity → AssistantCommandHandler → VF3Repository → HTTP command → ESP32
 ```
 
-The final hop is a BLE notification on the Command characteristic (see `VF3GattServer`), not an HTTP request — the ESP32 has no webserver.
+The final hop is an HTTP POST to the ESP32 webserver via `VF3ApiService` (status changes flow back over the `/ws` WebSocket).
 
 ## Supported Voice Commands
 
-| Voice Command | Action | BLE Command |
+| Voice Command | Action | Command |
 |--------------|--------|-------------|
 | "Hey Google, lock my car" | Lock the car | `lock` |
 | "Hey Google, unlock my car" | Unlock the car | `unlock` |
@@ -153,7 +153,7 @@ The app provides voice feedback for all commands:
 
 ❌ **Error feedback:**
 - "Failed to lock car: Car not connected"
-- "Failed to unlock car: Car not connected" (BLE link down or client not subscribed)
+- "Failed to unlock car: Car not connected" (WiFi/WebSocket down or wrong IP/API key)
 
 ## Requirements
 
@@ -174,10 +174,8 @@ dependencies {
 
 ### Permissions
 
-Car control uses BLE, so the relevant permissions in `AndroidManifest.xml` are:
-- `android.permission.BLUETOOTH_ADVERTISE` / `BLUETOOTH_CONNECT` (API 31+) — GATT server + commands
-- `android.permission.BLUETOOTH` / `BLUETOOTH_ADMIN` (API ≤ 30)
-- `android.permission.INTERNET` / `ACCESS_NETWORK_STATE` — used only for RTSP camera streaming
+Car control uses WiFi, so the relevant permissions in `AndroidManifest.xml` are:
+- `android.permission.INTERNET` / `ACCESS_NETWORK_STATE` — HTTP commands + `/ws` status (and RTSP camera streaming)
 
 ### Device Requirements
 
@@ -189,8 +187,8 @@ Car control uses BLE, so the relevant permissions in `AndroidManifest.xml` are:
 
 ### For Users
 
-1. Install VF3 Smart app (no WiFi/API-key setup — the car connects over BLE automatically)
-2. Make sure Bluetooth is on and permissions are granted
+1. Install VF3 Smart app and run setup (Settings → Setup) to discover the car and save its IP + API key
+2. Make sure the phone is on the car's WiFi
 3. Say "Hey Google" to activate Assistant
 4. Try voice commands: "Lock my car", "Close the windows", etc.
 5. Assistant will automatically discover available commands from the app
@@ -248,15 +246,15 @@ Car control uses BLE, so the relevant permissions in `AndroidManifest.xml` are:
 ┌─────────────────────────────────────────────────────────────────┐
 │ VF3Repository                                                    │
 │ - Calls repository.lockCar()                                    │
-│ - VF3GattServer.sendCommand("lock") → BLE notify                │
+│ - VF3ApiService.lockCar() → HTTP POST /car/lock                 │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ ESP32 VF3 Smart Device                                          │
-│ - Receives "lock" notification on Command characteristic        │
+│ - Webserver handles POST /car/lock                              │
 │ - Triggers relay to lock car                                    │
-│ (fire-and-forget — no response channel)                         │
+│ (status change streams back over /ws)                           │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ▼
@@ -272,7 +270,7 @@ Car control uses BLE, so the relevant permissions in `AndroidManifest.xml` are:
 The integration handles errors gracefully:
 
 ### Connection Errors
-- **Scenario:** car not connected over BLE / not subscribed to the Command characteristic
+- **Scenario:** car not reachable over WiFi (WebSocket down or wrong IP)
 - **Feedback:** "Failed to <action>: Car not connected"
 
 ### Unknown Commands
@@ -280,7 +278,7 @@ The integration handles errors gracefully:
 - **Feedback:** "Unknown command: <action>"
 
 ### Command Errors
-- **Scenario:** BLE notify failed to dispatch
+- **Scenario:** HTTP command failed (network error or non-2xx response)
 - **Feedback:** "Failed to <action>: <error message>"
 
 ## Android Auto Integration
@@ -306,7 +304,7 @@ Voice commands work seamlessly in Android Auto:
    - Use TextToSpeech efficiently
 
 3. **Security:**
-   - Car control is over the local BLE link only (no API key, no internet exposure)
+   - Car control is over the local WiFi link only (API-key auth, private-IP device)
    - Validate all input parameters
 
 4. **Testing:**

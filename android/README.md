@@ -2,15 +2,15 @@
 
 Android application for controlling the VF3-Smart car control device with Android Auto projection support.
 
-The app talks to the car **entirely over Bluetooth Low Energy (BLE)** — the ESP32 no longer runs an HTTP webserver. The phone acts as the BLE peripheral (GATT server); the ESP32 connects as a client, pushes status, and receives commands.
+The app talks to the car **over WiFi**: real-time status streams from the ESP32's `ws://<ip>/ws` WebSocket, and commands are HTTP POSTs to the ESP32 webserver. The device is found via UDP discovery and set up once (IP + API key).
 
 ## Features
 
 - **Full-featured phone app** with all car controls
 - **Android Auto projection** for read-only status monitoring while driving
-- **Real-time car status over BLE** (delta updates pushed by the car)
-- **Commands over BLE** (lock, windows, buzzer, mirrors, …)
-- **No pairing/onboarding** — the app advertises and the car connects automatically
+- **Real-time car status over WebSocket** (delta updates pushed by the car)
+- **Commands over HTTP** (lock, windows, buzzer, mirrors, …)
+- **UDP discovery + one-time setup** (device IP + API key)
 
 ## Project Structure
 
@@ -22,10 +22,10 @@ android/
 │   │   │   ├── VF3Application.kt
 │   │   │   ├── data/
 │   │   │   │   ├── model/          # Data models (CarStatus, etc.)
+│   │   │   │   ├── network/        # VF3ApiService, WebSocketManager, UdpDiscoveryService
 │   │   │   │   ├── repository/     # VF3Repository — single source of truth
-│   │   │   │   └── local/          # SecurePreferences (RTSP URL only)
-│   │   │   ├── navigation/
-│   │   │   │   └── VF3GattServer.kt # BLE GATT server (status in + commands out)
+│   │   │   │   └── local/          # SecurePreferences (device IP/key + RTSP URL)
+│   │   │   ├── navigation/        # Nav/GPS notification listener
 │   │   │   ├── viewmodel/          # ViewModels (Status, Control, TPMS)
 │   │   │   ├── di/                 # Hilt dependency injection
 │   │   │   ├── ui/                 # Jetpack Compose UI
@@ -40,42 +40,46 @@ android/
 
 - **Pattern**: MVVM + Repository + Hilt DI
 - **UI**: Jetpack Compose with Material Design 3
-- **Transport**: BLE GATT (`VF3GattServer`) — no HTTP/WebSocket/UDP
+- **Transport**: WiFi — HTTP commands (`VF3ApiService`) + `ws://<ip>/ws` status (`WebSocketManager`)
 - **Async**: Kotlin Coroutines + StateFlow
-- **Storage**: EncryptedSharedPreferences (RTSP camera URL only)
+- **Storage**: EncryptedSharedPreferences (device IP + API key, RTSP camera URL)
 
-## BLE Protocol
+## Protocol (HTTP + WebSocket)
 
-The phone advertises service `A1B2C3D4-E5F6-7890-ABCD-EF1234567890`. The ESP32 connects and uses four characteristics:
+### Car status — `ws://<ip>/ws`
 
-| Characteristic | UUID suffix | Direction | Properties |
-|---|---|---|---|
-| TPMS | `…893` | ESP32 → phone | WRITE |
-| Speed limit | `…894` | ESP32 → phone | WRITE |
-| Car status (delta) | `…895` | ESP32 → phone | WRITE |
-| **Command** | `…896` | phone → ESP32 | **NOTIFY** (+ CCCD) |
-
-Wire formats for the inbound status characteristics are documented in `VF3GattServer.kt`.
-
-### Command channel
-
-Commands are UTF-8 strings pushed as notifications on the Command characteristic. The ESP32 subscribes via the CCCD to receive them. Format is `verb[:args]` with comma-separated args:
+`WebSocketManager` connects to the ESP32's WebSocket and reads the **delta protocol**:
 
 ```
-lock                       unlock
-acc:on | acc:off | acc:toggle
-cameras:toggle
-windows:close | windows:stop
-window:down,left,on        (up|down, side, on|off)
-buzzer:beep,500 | buzzer:on | buzzer:off
-light-reminder:toggle
-charger-unlock
-mirrors:open | mirrors:close
-odo:toggle  armrest:toggle  dashcam:toggle
-tpms:reset  tpms:swap,fl,fr
+F|S:<s>|D:<d>|W:<w>|E:<e>|L:<l>|P:<p>|C:<c>|X:<x>   full frame (on connect + 60 s heartbeat)
+U|S:<s>|L:<l>|...                                   delta (only changed groups)
 ```
 
-Commands are **fire-and-forget**: a success result means the notification was dispatched to a subscribed client, not that the car confirmed the action. There is no read-back channel.
+Groups: `S` sensors, `D` doors, `W` windows, `E` seats, `L` lights, `P` proximity,
+`C` controls, `X` misc (charging, lock, window-close, light-reminder, night). Frames
+merge into a single `CarStatus` (`VF3Repository.carStatus`). The stream is read-only
+(no auth). Live TPMS pressures and a speed limit are **not** carried by `/ws`.
+
+### Commands — HTTP POST
+
+Commands are typed `VF3Repository` methods backed by Retrofit (`VF3ApiService`),
+POSTed to the ESP32 webserver with an `X-API-Key` header:
+
+| Repository call | Endpoint |
+|---|---|
+| `lockCar()` / `unlockCar()` | `POST /car/lock` / `/car/unlock` |
+| `toggle/setAccessoryPower()` | `POST /car/accessory-power` (`state=on\|off\|toggle`) |
+| `toggle/setInsideCameras()` | `POST /car/inside-cameras` |
+| `closeWindows()` / `stopWindows()` | `POST /car/windows/close` / `/stop` |
+| `controlWindowDown/Up(side,on)` | `POST /car/windows/down` / `/up` (`side`,`state`) |
+| `beepHorn(ms)` / `setBuzzer(on)` | `POST /car/buzzer` (`state`,`duration`) |
+| `toggle/setLightReminder()` | `POST /car/light-reminder` |
+| `unlockCharger()` | `POST /car/charger-unlock` |
+| `open/closeSideMirrors()` | `POST /car/side-mirrors` (`action=open\|close`) |
+| `tpmsReset()` / `tpmsSwap(a,b)` | `POST /tpms/calibrate` (`action=reset\|swap`) |
+
+Discovery: the ESP32 UDP-broadcasts on port 8888; `UdpDiscoveryService` finds it
+and `SetupScreen` saves the IP + API key.
 
 ## Build & Run
 
@@ -100,7 +104,7 @@ cd /home/bang/bang/vf3-smart/android
 
 - **Home Screen**: Real-time dashboard with car status and quick actions
 - **Controls**: Lock, windows, accessories, buzzer, mirrors, charger, dashcam, TPMS
-- **Real-time updates**: pushed by the car over BLE as state changes
+- **Real-time updates**: streamed by the car over the `/ws` WebSocket
 
 ### Android Auto
 
@@ -109,14 +113,14 @@ cd /home/bang/bang/vf3-smart/android
 
 ## Security
 
-- BLE link only; no IP/API key to manage
-- **Secure Storage**: EncryptedSharedPreferences with AES256-GCM (RTSP URL)
+- **API key** sent as `X-API-Key` on every command; cleartext HTTP is scoped to the local IoT device (`network_security_config.xml`)
+- **Secure Storage**: EncryptedSharedPreferences with AES256-GCM (device IP + API key, RTSP URL)
 
 ## Troubleshooting
 
-- **"Car not connected"**: the ESP32 hasn't connected to the phone's GATT server, or hasn't subscribed to the Command characteristic. Check Bluetooth is on and `BLUETOOTH_CONNECT`/`BLUETOOTH_ADVERTISE` are granted.
-- **Status not updating**: confirm the car is connected (connection indicator) and advertising started (`VF3GattServer` logs, tag `VF3GattServer`).
-- **Commands ignored**: check logcat for `notifyCommand(...) dispatched=` — `false` means no subscribed client.
+- **"Car not connected" / disconnected indicator**: the phone can't reach `ws://<ip>/ws`. Confirm the phone and ESP32 are on the same WiFi and the device IP is set (Settings → Setup). Check `WebSocketManager` logs (tag `WebSocketManager`).
+- **Commands fail with "Unauthorized"**: the saved API key doesn't match the ESP32's `configured_api_key` (set it via the ESP32 `/configure` page).
+- **Status not updating**: the WebSocket may be reconnecting — `WebSocketManager` retries with backoff; verify the ESP32 webserver is up (`GET /car/status`).
 
 ## License
 

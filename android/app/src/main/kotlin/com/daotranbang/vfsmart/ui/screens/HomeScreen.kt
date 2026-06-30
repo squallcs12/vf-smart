@@ -18,7 +18,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.data.model.CarStatus
-import com.daotranbang.vfsmart.navigation.VF3GattServer
+import com.daotranbang.vfsmart.data.network.ConnectionState
 import com.daotranbang.vfsmart.ui.components.ControlButton
 import com.daotranbang.vfsmart.ui.components.StatusCard
 import com.daotranbang.vfsmart.util.playLightReminder
@@ -30,6 +30,7 @@ fun HomeScreen(
     onNavigateToControls: () -> Unit = {},
     onNavigateToDebug: () -> Unit = {},
     onNavigateToMirror: () -> Unit = {},
+    onNavigateToSetup: () -> Unit = {},
     modifier: Modifier = Modifier,
     statusViewModel: CarStatusViewModel = hiltViewModel(),
     controlViewModel: ControlViewModel = hiltViewModel()
@@ -53,6 +54,7 @@ fun HomeScreen(
         onNavigateToControls = onNavigateToControls,
         onNavigateToDebug    = onNavigateToDebug,
         onNavigateToMirror   = onNavigateToMirror,
+        onNavigateToSetup    = onNavigateToSetup,
         modifier             = modifier.fillMaxSize()
     )
 }
@@ -62,12 +64,13 @@ fun HomeScreen(
 @Composable
 private fun FullContent(
     carStatus: CarStatus?,
-    connectionState: VF3GattServer.BleConnectionState,
+    connectionState: ConnectionState,
     operationState: ControlViewModel.OperationState,
     controlViewModel: ControlViewModel,
     onNavigateToControls: () -> Unit,
     onNavigateToDebug: () -> Unit,
     onNavigateToMirror: () -> Unit,
+    onNavigateToSetup: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -98,6 +101,10 @@ private fun FullContent(
                 ),
                 actions = {
                     ConnectionIndicator(connectionState)
+                    IconButton(onClick = onNavigateToSetup) {
+                        Icon(Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.setup_title))
+                    }
                     IconButton(onClick = onNavigateToMirror) {
                         Icon(Icons.Default.Fullscreen,
                             contentDescription = stringResource(R.string.mirror_mode_cd))
@@ -116,7 +123,7 @@ private fun FullContent(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        val isConnected = connectionState == VF3GattServer.BleConnectionState.Connected
+        val isConnected = connectionState == ConnectionState.Connected
         val isLoading   = operationState is ControlViewModel.OperationState.Loading
         val enabled     = isConnected && !isLoading
 
@@ -342,18 +349,18 @@ private fun QuickActionsCard(
 
 @Composable
 private fun ConnectionIndicator(
-    connectionState: VF3GattServer.BleConnectionState,
+    connectionState: ConnectionState,
     modifier: Modifier = Modifier
 ) {
     Row(modifier = modifier.padding(end = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically) {
         val (icon, label, color) = when (connectionState) {
-            VF3GattServer.BleConnectionState.Connected ->
+            ConnectionState.Connected ->
                 Triple(Icons.Default.CheckCircle,
                     stringResource(R.string.connected),
                     MaterialTheme.colorScheme.primary)
-            VF3GattServer.BleConnectionState.Disconnected ->
+            ConnectionState.Disconnected ->
                 Triple(Icons.Default.Cancel,
                     stringResource(R.string.offline),
                     MaterialTheme.colorScheme.error)
@@ -365,7 +372,7 @@ private fun ConnectionIndicator(
 
 @Composable
 private fun DisconnectedBanner(
-    connectionState: VF3GattServer.BleConnectionState,
+    connectionState: ConnectionState,
     modifier: Modifier = Modifier
 ) {
     Card(

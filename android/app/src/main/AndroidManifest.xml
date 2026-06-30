@@ -32,15 +32,6 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- BLE GATT server: car status in + commands out (API < 31) -->
-    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-    <!-- BLE GATT server: car status in + commands out (API 31+) -->
-    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <!-- BLE hardware — not required so app runs on non-BLE devices -->
-    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
-
     <application
         android:name=".VF3Application"
         android:allowBackup="true"

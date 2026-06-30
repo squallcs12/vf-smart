@@ -125,6 +125,12 @@ dependencies {
     // JSON annotations (@SerializedName on the car-status models)
     implementation(libs.gson)
 
+    // Car HTTP command API + ws://<ip>/ws car-status stream
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.gson)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
+
     // Dependency Injection
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

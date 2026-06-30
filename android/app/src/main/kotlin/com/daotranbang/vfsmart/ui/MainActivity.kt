@@ -36,6 +36,7 @@ import com.daotranbang.vfsmart.ui.screens.DebugScreen
 import com.daotranbang.vfsmart.ui.screens.HomeScreen
 import com.daotranbang.vfsmart.ui.screens.MirrorScreen
 import com.daotranbang.vfsmart.ui.screens.RedLightDetectorScreen
+import com.daotranbang.vfsmart.ui.screens.SetupScreen
 import com.daotranbang.vfsmart.ui.screens.TrafficLightLiveScreen
 import com.daotranbang.vfsmart.ui.screens.TpmsCalibrationScreen
 import com.daotranbang.vfsmart.ui.theme.VF3SmartTheme
@@ -134,7 +135,14 @@ class MainActivity : ComponentActivity() {
                                     popUpTo("mirror") { inclusive = false }
                                     launchSingleTop = true
                                 }
-                            }
+                            },
+                            onNavigateToSetup    = { navController.navigate("setup") }
+                        )
+                    }
+
+                    composable("setup") {
+                        SetupScreen(
+                            onSetupComplete = { navController.popBackStack() }
                         )
                     }
 
@@ -270,13 +278,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Runtime permissions the app needs, by SDK level. The phone is a BLE
-     *  peripheral (advertises, never scans), so BLUETOOTH_SCAN is not required. */
+    /** Runtime permissions the app needs, by SDK level. Car comms are over WiFi
+     *  (HTTP + WebSocket), so no Bluetooth permissions are required. */
     private fun runtimePermissions(): List<String> = buildList {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            add(Manifest.permission.BLUETOOTH_CONNECT)
-            add(Manifest.permission.BLUETOOTH_ADVERTISE)
-        }
         add(Manifest.permission.CAMERA)
         add(Manifest.permission.ACCESS_FINE_LOCATION)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {

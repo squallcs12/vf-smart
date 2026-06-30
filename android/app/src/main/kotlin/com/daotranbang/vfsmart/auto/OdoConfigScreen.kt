@@ -7,7 +7,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.daotranbang.vfsmart.data.model.CarStatus
 import com.daotranbang.vfsmart.data.repository.VF3Repository
-import com.daotranbang.vfsmart.navigation.VF3GattServer
+import com.daotranbang.vfsmart.data.network.ConnectionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -23,7 +23,7 @@ class OdoConfigScreen(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var currentStatus: CarStatus? = repository.carStatus.value
-    private var connectionState: VF3GattServer.BleConnectionState = repository.connectionState.value
+    private var connectionState: ConnectionState = repository.connectionState.value
 
     init {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
@@ -49,25 +49,11 @@ class OdoConfigScreen(
     }
 
     override fun onGetTemplate(): Template {
-        val isConnected = connectionState == VF3GattServer.BleConnectionState.Connected
+        val isConnected = connectionState == ConnectionState.Connected
         val status = currentStatus
-        val odoOn = status?.controls?.odoScreen == 1
         val cameraOn = status?.controls?.insideCameras == 1
-        val dashcamOn = status?.controls?.dashcam == 1
 
         val listBuilder = ItemList.Builder()
-
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("ODO Screen")
-                .addText(if (odoOn) "Đang bật" else "Đang tắt")
-                .setToggle(Toggle.Builder { isChecked ->
-                    if (isConnected) {
-                        scope.launch { repository.setOdoScreen(isChecked) }
-                    }
-                }.setChecked(odoOn).build())
-                .build()
-        )
 
         listBuilder.addItem(
             Row.Builder()
@@ -78,18 +64,6 @@ class OdoConfigScreen(
                         scope.launch { repository.setInsideCameras(isChecked) }
                     }
                 }.setChecked(cameraOn).build())
-                .build()
-        )
-
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("Dashcam")
-                .addText(if (dashcamOn) "Đang bật" else "Đang tắt")
-                .setToggle(Toggle.Builder { isChecked ->
-                    if (isConnected) {
-                        scope.launch { repository.setDashcam(isChecked) }
-                    }
-                }.setChecked(dashcamOn).build())
                 .build()
         )
 

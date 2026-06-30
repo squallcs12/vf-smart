@@ -54,7 +54,7 @@ import com.daotranbang.vfsmart.navigation.DrivingState
 import com.daotranbang.vfsmart.navigation.GpsState
 import com.daotranbang.vfsmart.navigation.NavigationNotificationService
 import com.daotranbang.vfsmart.navigation.NavigationState
-import com.daotranbang.vfsmart.navigation.VF3GattServer
+import com.daotranbang.vfsmart.data.network.ConnectionState
 import com.daotranbang.vfsmart.ui.components.RtspTrafficLightView
 import com.daotranbang.vfsmart.ui.components.RtspVideoPlayer
 import com.daotranbang.vfsmart.util.RtspRecorder
@@ -85,8 +85,9 @@ fun MirrorScreen(
     val connectionState by statusViewModel.connectionState.collectAsStateWithLifecycle()
     val navigationState by NavigationNotificationService.navigationState.collectAsStateWithLifecycle()
     val gpsState        = rememberPhoneGpsState()
-    val tpmsData        by VF3GattServer.tpmsState.collectAsStateWithLifecycle()
-    val speedLimit      by VF3GattServer.speedLimitState.collectAsStateWithLifecycle()
+    // TPMS rides on the car-status stream; speed-limit has no car source.
+    val tpmsData        = carStatus?.tpms
+    val speedLimit: Int? = null
 
     // Trip clock — resets each time screen comes to foreground
     var foregroundTime by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -100,21 +101,6 @@ fun MirrorScreen(
 
     // Home screen — back button does nothing
     BackHandler {}
-
-    // Start GATT server; retry on every resume so it starts after permission grant
-    val context = LocalContext.current
-    val gattServer = remember { VF3GattServer(context) }
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) gattServer.start()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            gattServer.stop()
-        }
-    }
 
     // Hide system bars; restore on exit
     val view = LocalView.current
@@ -211,7 +197,7 @@ private fun rememberPhoneGpsState(): GpsState {
 @Composable
 private fun MirrorContent(
     carStatus: CarStatus?,
-    connectionState: VF3GattServer.BleConnectionState,
+    connectionState: ConnectionState,
     navigationState: NavigationState,
     gpsState: GpsState,
     tpmsData: TpmsData?,
@@ -288,7 +274,7 @@ private fun MirrorContent(
                     OdoTpmsCell(tpms = tpmsData, modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
                     OdoSpeedLimitCell(speedLimit = speedLimit,
-                        onClick = { VF3GattServer.clearSpeedLimit() },
+                        onClick = {},
                         modifier = Modifier.weight(1f))
                     OdoVerticalDivider()
                     OdoClockCell(location = location, modifier = Modifier.weight(1f))
@@ -1017,12 +1003,12 @@ private fun OdoHorizontalDivider() {
 
 @Composable
 private fun ConnectionDot(
-    connectionState: VF3GattServer.BleConnectionState,
+    connectionState: ConnectionState,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.size(8.dp).background(
         color = when (connectionState) {
-            VF3GattServer.BleConnectionState.Connected -> Color(0xFF4CAF50)
+            ConnectionState.Connected -> Color(0xFF4CAF50)
             else -> Color(0xFFEF5350)
         },
         shape = CircleShape

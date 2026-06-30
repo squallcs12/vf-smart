@@ -71,6 +71,9 @@ class SetupViewModel @Inject constructor(
             )
             securePreferences.saveDeviceConfig(config)
 
+            // Open the car-status WebSocket to the freshly-saved device.
+            repository.connect(config.deviceIp)
+
             // Jump to success immediately as per request, skipping connection test
             _configurationState.value = ConfigurationState.Success
         }

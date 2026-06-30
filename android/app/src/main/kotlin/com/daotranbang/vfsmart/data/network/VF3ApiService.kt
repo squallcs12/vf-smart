@@ -130,36 +130,6 @@ interface VF3ApiService {
     ): ControlResponse
 
     /**
-     * Control ODO screen (requires API key)
-     * @param state: "on", "off", or "toggle"
-     */
-    @FormUrlEncoded
-    @POST("/car/odo-screen")
-    suspend fun controlOdoScreen(
-        @Field("state") state: String
-    ): ControlResponse
-
-    /**
-     * Control armrest (requires API key)
-     * @param state: "on", "off", or "toggle"
-     */
-    @FormUrlEncoded
-    @POST("/car/armrest")
-    suspend fun controlArmrest(
-        @Field("state") state: String
-    ): ControlResponse
-
-    /**
-     * Control dashcam (requires API key)
-     * @param state: "on", "off", or "toggle"
-     */
-    @FormUrlEncoded
-    @POST("/car/dashcam")
-    suspend fun controlDashcam(
-        @Field("state") state: String
-    ): ControlResponse
-
-    /**
      * Get TPMS sensor ID assignments (no auth required)
      */
     @GET("/tpms/calibrate")

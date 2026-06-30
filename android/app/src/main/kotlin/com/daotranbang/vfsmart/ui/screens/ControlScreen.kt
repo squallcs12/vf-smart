@@ -16,7 +16,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.data.model.CarStatus
-import com.daotranbang.vfsmart.navigation.VF3GattServer
+import com.daotranbang.vfsmart.data.network.ConnectionState
 import com.daotranbang.vfsmart.ui.components.ControlButton
 import com.daotranbang.vfsmart.ui.components.OutlinedControlButton
 import com.daotranbang.vfsmart.ui.components.ToggleControlButton
@@ -39,7 +39,7 @@ fun ControlScreen(
     val connectionState by statusViewModel.connectionState.collectAsStateWithLifecycle()
     val operationState by controlViewModel.operationState.collectAsStateWithLifecycle()
 
-    val isConnected = connectionState == VF3GattServer.BleConnectionState.Connected
+    val isConnected = connectionState == ConnectionState.Connected
 
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(operationState) {
@@ -377,7 +377,7 @@ private fun windowStateText(state: Int): String = when (state) {
 
 @Composable
 private fun ConnectionStatusIndicator(
-    connectionState: VF3GattServer.BleConnectionState,
+    connectionState: ConnectionState,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -386,12 +386,12 @@ private fun ConnectionStatusIndicator(
         verticalAlignment = Alignment.CenterVertically
     ) {
         when (connectionState) {
-            VF3GattServer.BleConnectionState.Connected ->
+            ConnectionState.Connected ->
                 Icon(Icons.Default.CheckCircle,
                     contentDescription = stringResource(R.string.connected),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp))
-            VF3GattServer.BleConnectionState.Disconnected ->
+            ConnectionState.Disconnected ->
                 Icon(Icons.Default.Cancel,
                     contentDescription = stringResource(R.string.offline),
                     tint = MaterialTheme.colorScheme.error,
@@ -402,7 +402,7 @@ private fun ConnectionStatusIndicator(
 
 @Composable
 private fun DisconnectedWarningBanner(
-    connectionState: VF3GattServer.BleConnectionState,
+    connectionState: ConnectionState,
     modifier: Modifier = Modifier
 ) {
     Card(

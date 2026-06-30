@@ -11,8 +11,13 @@ import android.util.Log
 import com.daotranbang.vfsmart.autolink.AutoLinkService
 import com.daotranbang.vfsmart.data.ImouScanner
 import com.daotranbang.vfsmart.data.local.SecurePreferences
+import com.daotranbang.vfsmart.data.repository.VF3Repository
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import dagger.hilt.EntryPoint
+import dagger.hilt.EntryPoints
+import dagger.hilt.InstallIn
 import dagger.hilt.android.HiltAndroidApp
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -22,6 +27,17 @@ import kotlinx.coroutines.launch
 
 @HiltAndroidApp
 class VF3Application : Application() {
+
+    /** Hilt entry point so the Application (not an @AndroidEntryPoint) can reach the repo. */
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface RepositoryEntryPoint {
+        fun repository(): VF3Repository
+    }
+
+    private val repository: VF3Repository by lazy {
+        EntryPoints.get(this, RepositoryEntryPoint::class.java).repository()
+    }
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var cameraScanJob: Job? = null
@@ -36,6 +52,7 @@ class VF3Application : Application() {
                     Log.i(TAG, "Power connected — starting AutoLinkService")
                     AutoLinkService.start(context)
                     startCameraDetection(context)
+                    repository.connectIfConfigured()
                 }
                 Intent.ACTION_POWER_DISCONNECTED -> {
                     Log.i(TAG, "Power disconnected — stopping AutoLinkService")
@@ -86,6 +103,8 @@ class VF3Application : Application() {
             addAction(Intent.ACTION_POWER_CONNECTED)
             addAction(Intent.ACTION_POWER_DISCONNECTED)
         })
+        // Open the car-status WebSocket if a device has already been set up.
+        repository.connectIfConfigured()
         // Start immediately if the device is already on power at launch.
         if (isOnPower()) {
             Log.i(TAG, "Already on power at startup — starting AutoLinkService")

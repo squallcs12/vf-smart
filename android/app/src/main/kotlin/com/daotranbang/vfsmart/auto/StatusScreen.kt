@@ -9,7 +9,7 @@ import androidx.lifecycle.LifecycleOwner
 import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.data.model.*
 import com.daotranbang.vfsmart.data.repository.VF3Repository
-import com.daotranbang.vfsmart.navigation.VF3GattServer
+import com.daotranbang.vfsmart.data.network.ConnectionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,7 +29,7 @@ class StatusScreen(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var currentStatus: CarStatus? = null
-    private var connectionState: VF3GattServer.BleConnectionState = VF3GattServer.BleConnectionState.Disconnected
+    private var connectionState: ConnectionState = ConnectionState.Disconnected
 
     init {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
@@ -80,12 +80,9 @@ class StatusScreen(
 
     private fun buildControlsTemplate(status: CarStatus): Template {
         val gridItemListBuilder = ItemList.Builder()
-        val isConnected = connectionState == VF3GattServer.BleConnectionState.Connected
+        val isConnected = connectionState == ConnectionState.Connected
 
         val accessoryPowerOn = status.controls.accessoryPower == 1
-        val odoScreenOn = status.controls.odoScreen == 1
-        val armrestOn = status.controls.armrest == 1
-        val dashcamOn = status.controls.dashcam == 1
 
         // 1. Close Left Window
         gridItemListBuilder.addItem(
@@ -202,53 +199,7 @@ class StatusScreen(
                 .build()
         )
 
-        // 6. ODO Screen
-        gridItemListBuilder.addItem(
-            GridItem.Builder()
-                .setTitle(if (odoScreenOn) "ODO Off" else "ODO On")
-                .setText(if (odoScreenOn) "ODO Screen On" else "ODO Screen Off")
-                .setImage(
-                    CarIcon.Builder(
-                        IconCompat.createWithResource(
-                            carContext,
-                            R.drawable.ic_odo_screen
-                        )
-                    ).setTint(if (isConnected) (if (odoScreenOn) CarColor.GREEN else CarColor.DEFAULT) else CarColor.DEFAULT).build()
-                )
-                .setOnClickListener {
-                    if (isConnected) {
-                        scope.launch {
-                            repository.toggleOdoScreen()
-                        }
-                    }
-                }
-                .build()
-        )
-
-        // 7. Armrest
-        gridItemListBuilder.addItem(
-            GridItem.Builder()
-                .setTitle(if (armrestOn) "Armrest Off" else "Armrest On")
-                .setText(if (armrestOn) "Armrest On" else "Armrest Off")
-                .setImage(
-                    CarIcon.Builder(
-                        IconCompat.createWithResource(
-                            carContext,
-                            R.drawable.ic_armrest
-                        )
-                    ).setTint(if (isConnected) (if (armrestOn) CarColor.GREEN else CarColor.DEFAULT) else CarColor.DEFAULT).build()
-                )
-                .setOnClickListener {
-                    if (isConnected) {
-                        scope.launch {
-                            repository.toggleArmrest()
-                        }
-                    }
-                }
-                .build()
-        )
-
-        // 8. Open Right Window
+        // 6. Open Right Window
         gridItemListBuilder.addItem(
             GridItem.Builder()
                 .setTitle("Open Right")
@@ -271,30 +222,7 @@ class StatusScreen(
                 .build()
         )
 
-        // 9. Dashcam
-        gridItemListBuilder.addItem(
-            GridItem.Builder()
-                .setTitle(if (dashcamOn) "Dashcam Off" else "Dashcam On")
-                .setText(if (dashcamOn) "Dashcam On" else "Dashcam Off")
-                .setImage(
-                    CarIcon.Builder(
-                        IconCompat.createWithResource(
-                            carContext,
-                            R.drawable.ic_dashcam
-                        )
-                    ).setTint(if (isConnected) (if (dashcamOn) CarColor.GREEN else CarColor.DEFAULT) else CarColor.DEFAULT).build()
-                )
-                .setOnClickListener {
-                    if (isConnected) {
-                        scope.launch {
-                            repository.toggleDashcam()
-                        }
-                    }
-                }
-                .build()
-        )
-
-        // 10. ODO Config
+        // 7. ODO Config
         gridItemListBuilder.addItem(
             GridItem.Builder()
                 .setTitle("ODO Config")
@@ -309,8 +237,8 @@ class StatusScreen(
         )
 
         val connectionText = when (connectionState) {
-            VF3GattServer.BleConnectionState.Connected -> "Connected"
-            VF3GattServer.BleConnectionState.Disconnected -> "Disconnected"
+            ConnectionState.Connected -> "Connected"
+            ConnectionState.Disconnected -> "Disconnected"
         }
 
         return GridTemplate.Builder()

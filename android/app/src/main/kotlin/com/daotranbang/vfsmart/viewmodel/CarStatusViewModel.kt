@@ -4,8 +4,8 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.daotranbang.vfsmart.data.model.CarStatus
+import com.daotranbang.vfsmart.data.network.ConnectionState
 import com.daotranbang.vfsmart.data.repository.VF3Repository
-import com.daotranbang.vfsmart.navigation.VF3GattServer
 import com.daotranbang.vfsmart.util.VoiceWarningManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -41,12 +41,12 @@ class CarStatusViewModel @Inject constructor(
         initialValue = null
     )
 
-    // BLE connection state
-    val connectionState: StateFlow<VF3GattServer.BleConnectionState> =
+    // Car connection state (ws://<ip>/ws stream)
+    val connectionState: StateFlow<ConnectionState> =
         repository.connectionState.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = VF3GattServer.BleConnectionState.Disconnected
+            initialValue = ConnectionState.Disconnected
         )
 
     init {

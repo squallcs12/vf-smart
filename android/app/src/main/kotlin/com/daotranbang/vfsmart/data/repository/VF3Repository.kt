@@ -1,146 +1,170 @@
 package com.daotranbang.vfsmart.data.repository
 
 import android.util.Log
-import com.daotranbang.vfsmart.data.model.CarStatus
-import com.daotranbang.vfsmart.navigation.VF3GattServer
+import com.daotranbang.vfsmart.data.local.SecurePreferences
+import com.daotranbang.vfsmart.data.model.*
+import com.daotranbang.vfsmart.data.network.ConnectionState
+import com.daotranbang.vfsmart.data.network.UdpDiscoveryService
+import com.daotranbang.vfsmart.data.network.VF3ApiService
+import com.daotranbang.vfsmart.data.network.WebSocketManager
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
+import retrofit2.HttpException
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Repository - single source of truth for VF3-Smart data.
+ * Repository — single source of truth for VF3-Smart data.
  *
- * All car communication goes over BLE (the ESP32 has no webserver):
- *  - Inbound status arrives on [VF3GattServer]'s status characteristics and is
- *    exposed here as [carStatus] / [connectionState].
- *  - Outbound commands are pushed via [VF3GattServer.sendCommand] over the
- *    COMMAND notify characteristic. Commands are fire-and-forget: a success
- *    result means the notification was dispatched, not that the car acted.
+ * Transport:
+ *  - Real-time status arrives on the ws://<ip>/ws stream (delta protocol) and is
+ *    exposed here as [carStatus] / [connectionState] via [WebSocketManager].
+ *  - Commands are HTTP POSTs to the ESP32 webserver (API-key auth) via
+ *    [VF3ApiService]; the dynamic host comes from [SecurePreferences].
+ *  - The device is found on the LAN with [UdpDiscoveryService] and persisted.
  */
 @Singleton
 class VF3Repository @Inject constructor(
+    private val apiService: VF3ApiService,
+    private val webSocketManager: WebSocketManager,
+    private val udpDiscoveryService: UdpDiscoveryService,
+    private val securePreferences: SecurePreferences,
     private val ioDispatcher: CoroutineDispatcher
 ) {
     companion object {
         private const val TAG = "VF3Repository"
     }
 
-    // Real-time status from BLE
-    val carStatus: StateFlow<CarStatus?> = VF3GattServer.carStatusState
-    val connectionState: StateFlow<VF3GattServer.BleConnectionState> =
-        VF3GattServer.bleConnectionState
+    // Real-time status from the WebSocket stream
+    val carStatus: StateFlow<CarStatus?> = webSocketManager.statusFlow
+    val connectionState: StateFlow<ConnectionState> = webSocketManager.connectionState
+
+    // ── Connection lifecycle ─────────────────────────────────────────────────────
+
+    /** Open the status WebSocket using the saved device IP, if configured. */
+    fun connectIfConfigured() {
+        val ip = securePreferences.getDeviceIp()
+        if (ip.isNullOrBlank()) {
+            Log.d(TAG, "connectIfConfigured() — no device configured yet")
+            return
+        }
+        webSocketManager.connect(ip)
+    }
+
+    /** (Re)open the status WebSocket to an explicit IP (e.g. right after setup). */
+    fun connect(deviceIp: String) = webSocketManager.connect(deviceIp)
+
+    fun disconnect() = webSocketManager.disconnect()
+
+    /** Discover the VF3-Smart device on the local network via UDP. */
+    suspend fun discoverDevice(timeoutMs: Long = 30000L): Result<DeviceInfo> =
+        udpDiscoveryService.discoverDevice(timeoutMs)
+
+    // ── Status (HTTP fallback) ───────────────────────────────────────────────────
+
+    /** One-shot status fetch (HTTP fallback when the WebSocket isn't streaming). */
+    suspend fun getCarStatus(): Result<CarStatus> = safeApiCall { apiService.getCarStatus() }
 
     // ── Commands ───────────────────────────────────────────────────────────────
 
-    /** Lock the car */
-    suspend fun lockCar(): Result<Unit> = sendCommand("lock")
+    suspend fun lockCar(): Result<LockResponse> = safeApiCall { apiService.lockCar() }
 
-    /** Unlock the car */
-    suspend fun unlockCar(): Result<Unit> = sendCommand("unlock")
+    suspend fun unlockCar(): Result<LockResponse> = safeApiCall { apiService.unlockCar() }
 
-    /** Toggle accessory power */
-    suspend fun toggleAccessoryPower(): Result<Unit> = sendCommand("acc:toggle")
+    suspend fun toggleAccessoryPower(): Result<ControlResponse> = safeApiCall {
+        apiService.controlAccessoryPower("toggle")
+    }
 
-    /** Set accessory power on/off */
-    suspend fun setAccessoryPower(on: Boolean): Result<Unit> =
-        sendCommand(if (on) "acc:on" else "acc:off")
+    suspend fun setAccessoryPower(on: Boolean): Result<ControlResponse> = safeApiCall {
+        apiService.controlAccessoryPower(if (on) "on" else "off")
+    }
 
-    /** Toggle inside cameras */
-    suspend fun toggleInsideCameras(): Result<Unit> = sendCommand("cameras:toggle")
+    suspend fun toggleInsideCameras(): Result<ControlResponse> = safeApiCall {
+        apiService.controlInsideCameras("toggle")
+    }
 
-    /** Set inside cameras on/off */
-    suspend fun setInsideCameras(on: Boolean): Result<Unit> =
-        sendCommand(if (on) "cameras:on" else "cameras:off")
+    suspend fun setInsideCameras(on: Boolean): Result<ControlResponse> = safeApiCall {
+        apiService.controlInsideCameras(if (on) "on" else "off")
+    }
 
-    /** Start closing windows (30-second timer) */
-    suspend fun closeWindows(): Result<Unit> = sendCommand("windows:close")
+    suspend fun closeWindows(): Result<WindowResponse> = safeApiCall { apiService.closeWindows() }
 
-    /** Stop window operation immediately */
-    suspend fun stopWindows(): Result<Unit> = sendCommand("windows:stop")
+    suspend fun stopWindows(): Result<WindowResponse> = safeApiCall { apiService.stopWindows() }
 
-    /**
-     * Control window down operation
-     * @param side "left", "right", or "both"
-     * @param on true to roll down, false to stop
-     */
-    suspend fun controlWindowDown(side: String, on: Boolean): Result<Unit> =
-        sendCommand("window:down,$side,${if (on) "on" else "off"}")
+    /** @param side "left", "right", or "both" */
+    suspend fun controlWindowDown(side: String, on: Boolean): Result<WindowResponse> = safeApiCall {
+        apiService.controlWindowsDown(side, if (on) "on" else "off")
+    }
 
-    /**
-     * Control window up operation
-     * @param side "left", "right", or "both"
-     * @param on true to roll up, false to stop
-     */
-    suspend fun controlWindowUp(side: String, on: Boolean): Result<Unit> =
-        sendCommand("window:up,$side,${if (on) "on" else "off"}")
+    /** @param side "left", "right", or "both" */
+    suspend fun controlWindowUp(side: String, on: Boolean): Result<WindowResponse> = safeApiCall {
+        apiService.controlWindowsUp(side, if (on) "on" else "off")
+    }
 
-    /** Beep horn/buzzer for [durationMs] milliseconds */
-    suspend fun beepHorn(durationMs: Int = 500): Result<Unit> =
-        sendCommand("buzzer:beep,$durationMs")
+    suspend fun beepHorn(durationMs: Int = 500): Result<BuzzerResponse> = safeApiCall {
+        apiService.controlBuzzer("beep", durationMs)
+    }
 
-    /** Turn buzzer on/off */
-    suspend fun setBuzzer(on: Boolean): Result<Unit> =
-        sendCommand(if (on) "buzzer:on" else "buzzer:off")
+    suspend fun setBuzzer(on: Boolean): Result<BuzzerResponse> = safeApiCall {
+        apiService.controlBuzzer(if (on) "on" else "off")
+    }
 
-    /** Toggle light reminder */
-    suspend fun toggleLightReminder(): Result<Unit> = sendCommand("light-reminder:toggle")
+    suspend fun toggleLightReminder(): Result<ControlResponse> = safeApiCall {
+        apiService.controlLightReminder("toggle")
+    }
 
-    /** Enable/disable light reminder */
-    suspend fun setLightReminder(enabled: Boolean): Result<Unit> =
-        sendCommand(if (enabled) "light-reminder:on" else "light-reminder:off")
+    suspend fun setLightReminder(enabled: Boolean): Result<ControlResponse> = safeApiCall {
+        apiService.controlLightReminder(if (enabled) "on" else "off")
+    }
 
-    /** Unlock charger port */
-    suspend fun unlockCharger(): Result<Unit> = sendCommand("charger-unlock")
+    suspend fun unlockCharger(): Result<ChargerResponse> = safeApiCall { apiService.unlockCharger() }
 
-    /** Open side mirrors */
-    suspend fun openSideMirrors(): Result<Unit> = sendCommand("mirrors:open")
+    suspend fun openSideMirrors(): Result<ControlResponse> = safeApiCall {
+        apiService.controlSideMirrors("open")
+    }
 
-    /** Close side mirrors */
-    suspend fun closeSideMirrors(): Result<Unit> = sendCommand("mirrors:close")
+    suspend fun closeSideMirrors(): Result<ControlResponse> = safeApiCall {
+        apiService.controlSideMirrors("close")
+    }
 
-    /** Toggle ODO screen */
-    suspend fun toggleOdoScreen(): Result<Unit> = sendCommand("odo:toggle")
+    /** Get current TPMS sensor-ID assignments. */
+    suspend fun getTpmsCalibration(): Result<TpmsCalibrationResponse> = safeApiCall {
+        apiService.getTpmsCalibration()
+    }
 
-    /** Set ODO screen on/off */
-    suspend fun setOdoScreen(on: Boolean): Result<Unit> =
-        sendCommand(if (on) "odo:on" else "odo:off")
+    /** Reset all TPMS sensor assignments (drive near each tire to re-learn). */
+    suspend fun tpmsReset(): Result<TpmsCalibrationResponse> = safeApiCall {
+        apiService.tpmsCalibrate("reset")
+    }
 
-    /** Toggle armrest */
-    suspend fun toggleArmrest(): Result<Unit> = sendCommand("armrest:toggle")
-
-    /** Set armrest on/off */
-    suspend fun setArmrest(on: Boolean): Result<Unit> =
-        sendCommand(if (on) "armrest:on" else "armrest:off")
-
-    /** Toggle dashcam */
-    suspend fun toggleDashcam(): Result<Unit> = sendCommand("dashcam:toggle")
-
-    /** Set dashcam on/off */
-    suspend fun setDashcam(on: Boolean): Result<Unit> =
-        sendCommand(if (on) "dashcam:on" else "dashcam:off")
-
-    /** Reset all TPMS sensor assignments (drive near each tire to re-learn) */
-    suspend fun tpmsReset(): Result<Unit> = sendCommand("tpms:reset")
-
-    /** Swap two TPMS tire positions (posA/posB: "fl", "fr", "rl", "rr") */
-    suspend fun tpmsSwap(posA: String, posB: String): Result<Unit> =
-        sendCommand("tpms:swap,$posA,$posB")
+    /** Swap two TPMS tire positions (posA/posB: "fl", "fr", "rl", "rr"). */
+    suspend fun tpmsSwap(posA: String, posB: String): Result<TpmsCalibrationResponse> = safeApiCall {
+        apiService.tpmsCalibrate("swap", posA, posB)
+    }
 
     // ── Transport ────────────────────────────────────────────────────────────────
 
-    /**
-     * Dispatch a command over the BLE COMMAND characteristic.
-     * Fails if no car is connected/subscribed.
-     */
-    private suspend fun sendCommand(command: String): Result<Unit> =
+    private suspend fun <T> safeApiCall(apiCall: suspend () -> T): Result<T> =
         withContext(ioDispatcher) {
-            if (VF3GattServer.sendCommand(command)) {
-                Result.success(Unit)
-            } else {
-                Log.e(TAG, "Failed to send command: $command")
-                Result.failure(Exception("Car not connected"))
+            try {
+                Result.success(apiCall())
+            } catch (e: IOException) {
+                Log.e(TAG, "Network error", e)
+                Result.failure(Exception("Network error: ${e.message}"))
+            } catch (e: HttpException) {
+                Log.e(TAG, "HTTP error: ${e.code()}", e)
+                val message = when (e.code()) {
+                    401 -> "Unauthorized - Invalid API key"
+                    404 -> "Endpoint not found"
+                    500 -> "Server error"
+                    else -> "HTTP ${e.code()}: ${e.message()}"
+                }
+                Result.failure(Exception(message))
+            } catch (e: Exception) {
+                Log.e(TAG, "Unknown error", e)
+                Result.failure(Exception("Error: ${e.message}"))
             }
         }
 }

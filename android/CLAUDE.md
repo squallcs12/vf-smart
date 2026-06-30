@@ -18,29 +18,43 @@ device-specific behavior for the S20+ first.
 - Non-Composable code (Services, ViewModels) uses `getString(R.string.xxx)` via Context
 - `NavDirectionParser.label()` returns hardcoded Vietnamese strings (no Context available)
 
-## Transport: BLE only (no ESP32 webserver)
+## Transport: WiFi (HTTP commands + WebSocket status)
 
-**The ESP32 no longer runs an HTTP webserver, WebSocket, or UDP discovery.** All
-car communication goes over Bluetooth Low Energy via `navigation/VF3GattServer.kt`:
+**BLE was removed** — the ESP32 can't run BLE and WiFi at once, so it serves its
+HTTP webserver again plus a `/ws` WebSocket for real-time car status (firmware
+commit "Replace BLE server with WebSocket car-status stream"). The phone is now
+a plain WiFi client:
 
-- The **phone is the GATT server / peripheral**; the **ESP32 connects as a client**.
-- **Inbound** (car → phone): TPMS, speed-limit, and delta car-status are *written*
-  by the ESP32 to three characteristics and surfaced as `StateFlow`s.
-- **Outbound** (phone → car): commands are pushed as **notifications** on the
-  Command characteristic (`…896`). `VF3GattServer.sendCommand("lock")` is the
-  single send path; `VF3Repository` wraps it into typed methods returning
-  `Result<Unit>`. Commands are **fire-and-forget** (no read-back).
-- There is **no Setup/onboarding** screen, IP, or API key. `SecurePreferences`
-  stores only the RTSP camera URL.
+- **Inbound** (car → phone): real-time status streams over `ws://<ip>/ws`,
+  handled by `data/network/WebSocketManager.kt`. It speaks the **delta protocol**
+  (`F|...` full frame on connect + every 60 s; `U|...` deltas on change) and
+  merges it into a single `CarStatus` exposed as `WebSocketManager.statusFlow` /
+  `VF3Repository.carStatus`. Connection state is `VF3Repository.connectionState`
+  (`data/network/ConnectionState.{Connected,Disconnected}`).
+- **Outbound** (phone → car): commands are **HTTP POSTs** to the ESP32 webserver
+  via Retrofit `data/network/VF3ApiService.kt`. `AuthInterceptor` adds the
+  `X-API-Key` header; `DynamicBaseUrlInterceptor` rewrites the host to the saved
+  device IP. `VF3Repository` wraps each call into a typed `suspend` method
+  returning `Result<…Response>`.
+- **Discovery / setup**: the ESP32 UDP-broadcasts on port 8888;
+  `UdpDiscoveryService` finds it, and `SetupScreen` / `SetupViewModel` save the
+  IP + API key into `SecurePreferences` (which also keeps the RTSP camera URL).
+  `VF3Repository.connectIfConfigured()` opens the WebSocket on app start and on
+  power-connect (`VF3Application`).
+- **Connecting** is reached from the Home screen Settings icon → `setup` route.
 
-Command wire format and the full characteristic table live in `VF3GattServer.kt`
-and `README.md`. The `GOOGLE_ASSISTANT.md` voice flow ends at `VF3Repository`,
-which now emits a BLE command instead of an HTTP request.
+The car-status delta wire format lives in `WebSocketManager.kt`; the HTTP command
+table lives in `VF3ApiService.kt` / `VF3Repository.kt`. The `GOOGLE_ASSISTANT.md`
+voice flow ends at `VF3Repository`, which emits an HTTP command.
 
-> The HTTP/WebSocket/UDP code samples in the sections below are **historical** —
-> they describe the removed transport and are kept only to illustrate the
-> Google Assistant deep-link layer (which is unchanged). Ignore the `VF3ApiClient`
-> / OkHttp / `ws://` / port-8888 details; the real transport is `VF3GattServer`.
+> **Note:** the `/ws` stream carries only car-status — not live TPMS pressures or
+> a speed limit (those BLE characteristics are gone). `CarStatus.tpms` stays null;
+> TPMS reset/swap still work over `POST /tpms/calibrate`. The odo/armrest/dashcam
+> commands were dropped (no firmware HTTP route).
+
+> The `VF3ApiClient` / OkHttp code samples in the Google Assistant sections below
+> are illustrative — the real classes are `VF3ApiService` (Retrofit) and
+> `WebSocketManager`, not a hand-rolled `VF3ApiClient`.
 
 ## AutoLink Auto-Connect (head unit)
 
@@ -60,23 +74,23 @@ not run on the S20+.
 
 The VF3 Smart system supports Google Assistant voice control through the Android Auto mobile app. The integration architecture is:
 
-**Voice Command → Android App → BLE command → Car Action**
+**Voice Command → Android App → HTTP command → Car Action**
 
 ### Integration Architecture
 
 ```
 ┌─────────────────┐      ┌──────────────────┐      ┌──────────────┐
 │  Google         │      │  Android App     │      │  ESP32       │
-│  Assistant      │─────▶│  VF3GattServer   │─────▶│  VF3 Smart   │
-│  (Voice)        │      │  (BLE peripheral)│      │  (BLE client)│
+│  Assistant      │─────▶│  VF3ApiService   │─────▶│  VF3 Smart   │
+│  (Voice)        │      │  (HTTP client)   │      │  (webserver) │
 └─────────────────┘      └──────────────────┘      └──────────────┘
 ```
 
 1. **User speaks command** to Google Assistant (in car or on phone)
 2. **Android app intercepts** the voice command (deep link → `AssistantCommandHandler`)
 3. **App translates command** to a `VF3Repository` call
-4. **`VF3GattServer.sendCommand(...)`** pushes a BLE notification to the ESP32
-5. **App provides voice feedback** to user (fire-and-forget — no car response)
+4. **`VF3ApiService` POSTs** the command to the ESP32 webserver (X-API-Key auth)
+5. **App provides voice feedback** to user; status changes flow back over `/ws`
 
 ### Implementation Approaches
 
@@ -251,10 +265,10 @@ class VoiceCommandHandler(private val context: Context) {
 
 ### Supported Voice Commands
 
-Map Google Assistant voice commands to VF3 Smart BLE commands (sent via
-`VF3Repository` → `VF3GattServer.sendCommand`):
+Map Google Assistant voice commands to VF3 Smart HTTP commands (sent via
+`VF3Repository` → `VF3ApiService`):
 
-| Voice Command | BLE Command | Action |
+| Voice Command | Repository call | Action |
 |--------------|-------------|--------|
 | "Lock my car" | `lock` | Lock the car |
 | "Unlock my car" | `unlock` | Unlock the car |
