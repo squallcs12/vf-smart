@@ -6,16 +6,13 @@ import android.graphics.Canvas
 import android.graphics.Color
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
+import org.tensorflow.lite.gpu.GpuDelegate
 import java.io.FileInputStream
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
-import java.util.concurrent.Callable
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.LinkedBlockingQueue
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -39,11 +36,11 @@ import kotlin.math.roundToInt
  * read the countdown digits — that would need a second OCR pass on the count box
  * (see [RedLightDetector]).
  *
- * Designed to run on live RTSP frames: [detect] takes a [Bitmap] and is fully offline.
- * It runs the model once **per tile** ([TILE_ROWS]×[TILE_COLS] = 16 inferences per
- * frame); to keep that fast the tiles are inferred **in parallel** across a pool of
- * CPU interpreters (see [POOL_SIZE]). The caller should still sample frames slowly
- * rather than analysing every frame.
+ * Designed to run on live RTSP frames: [detect] takes a [Bitmap], is fully offline,
+ * and reuses a single cached interpreter (GPU-accelerated when available,
+ * multi-threaded CPU otherwise). Note [detect] runs the model once **per tile**
+ * ([TILE_ROWS]×[TILE_COLS] = 16 inferences per frame), so the caller should sample
+ * frames slowly rather than analysing every frame.
  *
  * ## Wiring the model
  *  - Trained on the Roboflow "vietnam-traffic-light-f0zoa" YOLOv11 export
@@ -92,18 +89,12 @@ object TrafficLightDetector {
         }
     }
 
-    // Parallelism for tiled inference. Interpreter.run() is not thread-safe, so each
-    // concurrent worker borrows its own interpreter from [pool]. Sized to the device's
-    // cores (capped to bound memory — each interpreter holds its own tensor arena).
-    private val POOL_SIZE = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
-
-    @Volatile private var interpreters: List<Interpreter>? = null
-    private val pool = LinkedBlockingQueue<Interpreter>()
-    @Volatile private var executor: ExecutorService? = null
+    @Volatile private var interpreter: Interpreter? = null
+    @Volatile private var gpuDelegate: GpuDelegate? = null
     private val initLock = Any()
 
-    /** True once the model has been loaded (so callers can show a "no model" hint). */
-    val isLoaded: Boolean get() = interpreters != null
+    /** True once a model has been loaded (so callers can show a "no model" hint). */
+    val isLoaded: Boolean get() = interpreter != null
 
     /**
      * Run detection on [frame] by splitting it into a [TILE_ROWS]×[TILE_COLS] grid,
@@ -112,23 +103,14 @@ object TrafficLightDetector {
      * Throws [IllegalStateException] if the model asset is missing.
      */
     fun detect(context: Context, frame: Bitmap): Result {
-        ensureReady(context.applicationContext)
+        val interp = obtainInterpreter(context.applicationContext)
 
         val tileW = frame.width / TILE_COLS
         val tileH = frame.height / TILE_ROWS
         // Frame too small to tile meaningfully — fall back to whole-frame detection.
-        if (tileW < 1 || tileH < 1) {
-            val interp = pool.take()
-            try {
-                return summarise(nms(detectBoxesIn(interp, frame)))
-            } finally {
-                pool.put(interp)
-            }
-        }
+        if (tileW < 1 || tileH < 1) return summarise(nms(detectBoxesIn(interp, frame)))
 
-        // Pre-crop all tiles on this thread (cheap pixel copies, no concurrent reads of
-        // [frame]); then infer them in parallel, each worker borrowing an interpreter.
-        val tasks = ArrayList<Callable<List<Box>>>(TILE_ROWS * TILE_COLS)
+        val all = ArrayList<Box>()
         for (ry in 0 until TILE_ROWS) {
             for (cx in 0 until TILE_COLS) {
                 val left = cx * tileW
@@ -136,78 +118,69 @@ object TrafficLightDetector {
                 // The last row/column extends to the edge so no remainder pixels are lost.
                 val w = if (cx == TILE_COLS - 1) frame.width - left else tileW
                 val h = if (ry == TILE_ROWS - 1) frame.height - top else tileH
-                val tile = Bitmap.createBitmap(frame, left, top, w, h)
 
-                // Tile→frame mapping for this tile's normalised boxes.
+                val tile = Bitmap.createBitmap(frame, left, top, w, h)
+                val boxes = detectBoxesIn(interp, tile)
+                tile.recycle()
+
+                // Map this tile's normalised boxes into full-frame normalised coords.
                 val ox = left.toFloat() / frame.width
                 val oy = top.toFloat() / frame.height
                 val fw = w.toFloat() / frame.width
                 val fh = h.toFloat() / frame.height
-
-                tasks.add(Callable {
-                    val interp = pool.take()
-                    val boxes = try {
-                        detectBoxesIn(interp, tile)
-                    } finally {
-                        pool.put(interp)
-                        tile.recycle()
-                    }
-                    boxes.map { b ->
+                for (b in boxes) {
+                    all.add(
                         b.copy(
                             left = ox + b.left * fw,
                             top = oy + b.top * fh,
                             right = ox + b.right * fw,
                             bottom = oy + b.bottom * fh
                         )
-                    }
-                })
+                    )
+                }
             }
         }
-
-        val all = ArrayList<Box>()
-        for (future in executor!!.invokeAll(tasks)) all.addAll(future.get())
         // Global NMS removes duplicates of the same light found in adjacent tiles.
         return summarise(nms(all))
     }
 
-    /** Release the interpreter pool and worker threads. Call when detection stops. */
+    /** Release the interpreter and GPU delegate. Call when detection stops. */
     fun close() {
         synchronized(initLock) {
-            executor?.shutdownNow()
-            executor = null
-            interpreters?.forEach { it.close() }
-            interpreters = null
-            pool.clear()
+            interpreter?.close()
+            interpreter = null
+            gpuDelegate?.close()
+            gpuDelegate = null
         }
     }
 
     // --- Interpreter lifecycle -------------------------------------------------
 
-    /**
-     * Lazily build the interpreter [pool] and worker [executor]. All [POOL_SIZE]
-     * interpreters share one read-only model buffer and run on CPU (XNNPACK) so the
-     * 16 tiles can be inferred in parallel — a single GPU delegate would serialise
-     * them, and multiple GPU delegates are memory-heavy and unstable.
-     */
-    private fun ensureReady(context: Context) {
-        if (interpreters != null) return
-        synchronized(initLock) {
-            if (interpreters != null) return
+    private fun obtainInterpreter(context: Context): Interpreter {
+        interpreter?.let { return it }
+        return synchronized(initLock) {
+            interpreter?.let { return it }
             val model = try {
                 loadModelFile(context, MODEL_ASSET)
             } catch (e: IOException) {
                 throw IllegalStateException("Chưa có model '$MODEL_ASSET' trong assets/")
             }
-            val built = ArrayList<Interpreter>(POOL_SIZE)
-            repeat(POOL_SIZE) {
-                // 2 threads/interpreter × POOL_SIZE workers ≈ one thread per core.
-                val interp = Interpreter(model, Interpreter.Options().setNumThreads(2))
-                built.add(interp)
-                pool.put(interp)
-            }
-            executor = Executors.newFixedThreadPool(POOL_SIZE)
-            interpreters = built
+            buildInterpreter(model).also { interpreter = it }
         }
+    }
+
+    /** Try GPU (fast on the S20+'s Mali GPU), fall back to multi-threaded CPU. */
+    private fun buildInterpreter(model: MappedByteBuffer): Interpreter {
+        try {
+            val delegate = GpuDelegate()
+            val interp = Interpreter(model, Interpreter.Options().addDelegate(delegate))
+            gpuDelegate = delegate
+            return interp
+        } catch (t: Throwable) {
+            gpuDelegate?.close()
+            gpuDelegate = null
+        }
+        return Interpreter(model, Interpreter.Options().setNumThreads(4))
     }
 
     // --- Inference -------------------------------------------------------------
