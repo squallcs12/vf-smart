@@ -12,10 +12,13 @@ void registerChargerEndpoint(AsyncWebServer& server) {
       return;
     }
 
-    // Trigger charger unlock (1 second pulse)
-    safeDigitalWrite(VF3_CHARGER_UNLOCK, WRITE_ON);
+    // Trigger charger unlock: pull pin 1s, then push pin 1s
+    safeDigitalWrite(VF3_CHARGER_UNLOCK_PULL, WRITE_ON);
     delay(1000);
-    safeDigitalWrite(VF3_CHARGER_UNLOCK, WRITE_OFF);
+    safeDigitalWrite(VF3_CHARGER_UNLOCK_PULL, WRITE_OFF);
+    safeDigitalWrite(VF3_CHARGER_UNLOCK_PUSH, WRITE_ON);
+    delay(1000);
+    safeDigitalWrite(VF3_CHARGER_UNLOCK_PUSH, WRITE_OFF);
 
     JsonDocument doc;
     doc["success"] = true;

@@ -75,7 +75,8 @@ void initializePins() {
   pcf8575.digitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_OFF);
   pcf8575.digitalWrite(SELF_SIDE_MIRRORS_OPEN, WRITE_OFF);
   pcf8575.digitalWrite(SELF_SIDE_MIRRORS_CLOSE, WRITE_OFF);
-  pcf8575.digitalWrite(VF3_CHARGER_UNLOCK, WRITE_OFF);
+  pcf8575.digitalWrite(VF3_CHARGER_UNLOCK_PULL, WRITE_OFF);
+  pcf8575.digitalWrite(VF3_CHARGER_UNLOCK_PUSH, WRITE_OFF);
 
   // Turn on accessory power on startup
   pcf8575.digitalWrite(SELF_ACCESSORY_POWER, WRITE_ON);
