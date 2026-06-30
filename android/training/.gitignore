@@ -1,0 +1,8 @@
+# Heavy / generated artifacts — not version-controlled.
+dataset/
+runs/
+*.pt
+*.tflite
+*.onnx
+*.log
+__pycache__/

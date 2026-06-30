@@ -1,0 +1,22 @@
+# Training + tflite-export dependencies (Python 3.12).
+#
+# torch/torchvision are NOT listed here because they must come from the CUDA
+# index matching your GPU. For an RTX 50-series (Blackwell) use CUDA 12.8:
+#
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+#
+# Then install the rest:
+#   pip install -r requirements.txt
+
+ultralytics==8.4.82
+
+# --- tflite export stack (pulled in by `yolo export format=tflite`) ---
+tensorflow==2.19.0
+tf_keras
+onnx
+onnxslim
+onnx_graphsurgeon
+sng4onnx
+onnx2tf>=1.26.3,<1.29.0
+ai-edge-litert
+pyyaml

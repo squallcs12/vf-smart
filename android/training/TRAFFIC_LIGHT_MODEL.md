@@ -2,8 +2,8 @@
 
 How `app/src/main/assets/traffic_light.tflite` is produced, configured, and
 consumed. The model is a custom **YOLOv11n** (Ultralytics) detector exported to
-TensorFlow Lite, used by [`TrafficLightDetector`](TrafficLightDetector.kt) /
-[`TrafficLightAnalyzer`](TrafficLightAnalyzer.kt).
+TensorFlow Lite, used by [`TrafficLightDetector`](../app/src/main/kotlin/com/daotranbang/vfsmart/vision/TrafficLightDetector.kt) /
+[`TrafficLightAnalyzer`](../app/src/main/kotlin/com/daotranbang/vfsmart/vision/TrafficLightAnalyzer.kt).
 
 ## Goal
 
@@ -92,7 +92,7 @@ Red-count 0.17; new model → **Red 0.69**, Red count 0.47.
 
 ## Inference (app side)
 
-[`TrafficLightDetector`](TrafficLightDetector.kt):
+[`TrafficLightDetector`](../app/src/main/kotlin/com/daotranbang/vfsmart/vision/TrafficLightDetector.kt):
 
 - **Tiling:** `detect()` splits each frame into `TILE_ROWS`×`TILE_COLS` = **4×4**,
   runs the model per tile, maps boxes back to full-frame coords, then global NMS.
@@ -107,12 +107,15 @@ Red-count 0.17; new model → **Red 0.69**, Red count 0.47.
   `numThreads` already uses all cores).
 - **Thresholds:** `CONF_THRESHOLD = 0.40`, `IOU_THRESHOLD = 0.45`.
 
-**Capture resolution:** [`RtspTrafficLightView`](../ui/components/RtspTrafficLightView.kt)
+**Capture resolution:** [`RtspTrafficLightView`](../app/src/main/kotlin/com/daotranbang/vfsmart/ui/components/RtspTrafficLightView.kt)
 samples frames at **1920×1080** (`ANALYSIS_W/H`) — tiling is pointless on a small
 capture, and the benefit is ultimately capped by the RTSP stream's own resolution.
 Because `detect()` does 16 inferences/frame, the live view samples slowly (~1 fps).
 
 ## How to retrain / reproduce
+
+The runnable pipeline (scripts, deps, step-by-step) is in this folder — see
+[`README.md`](README.md). Summary:
 
 1. **Edit dataset on Roboflow** (add images, fix labels, change preprocessing).
    To change tiling/resolution, generate a new version via the API:
