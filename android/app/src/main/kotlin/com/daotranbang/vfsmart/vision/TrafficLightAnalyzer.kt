@@ -9,9 +9,9 @@ import kotlin.math.roundToInt
 /**
  * Combines the two on-device models into one traffic-light [Reading]:
  *
- *  1. [TrafficLightDetector] finds the lit colour (RED/GREEN) and any countdown
- *     boxes on the full frame.
- *  2. If the active light has a countdown box, that box is cropped and handed to
+ *  1. [TrafficLightDetector] reports whether the **red** light is lit and any red
+ *     countdown box on the full frame (green is ignored).
+ *  2. If the red light has a countdown box, that box is cropped and handed to
  *     [RedLightDetector] (the digit OCR model) to read the remaining **seconds**.
  *
  * Step 2 is best-effort: if `digits.tflite` isn't bundled yet, [Reading.seconds]
@@ -49,10 +49,8 @@ object TrafficLightAnalyzer {
             return@withContext Reading(det.state, det.confidence, null, false, det.boxes)
         }
 
-        // The count box that belongs to the lit colour.
-        val countCls = if (det.state == TrafficLightDetector.State.RED)
-            CLS_RED_COUNT else CLS_GREEN_COUNT
-        val countBox = det.boxes.filter { it.cls == countCls }.maxByOrNull { it.score }
+        // The red countdown box (state is always RED here — green is ignored).
+        val countBox = det.boxes.filter { it.cls == CLS_RED_COUNT }.maxByOrNull { it.score }
 
         // Skip OCR entirely once we know the digit model isn't bundled.
         val seconds = if (digitModelMissing) null
@@ -98,7 +96,6 @@ object TrafficLightAnalyzer {
         return Bitmap.createBitmap(src, left, top, w, h)
     }
 
-    // Class indices mirrored from TrafficLightDetector / data.yaml order.
-    private const val CLS_GREEN_COUNT = 1
+    // Class index mirrored from TrafficLightDetector / data.yaml order.
     private const val CLS_RED_COUNT = 3
 }

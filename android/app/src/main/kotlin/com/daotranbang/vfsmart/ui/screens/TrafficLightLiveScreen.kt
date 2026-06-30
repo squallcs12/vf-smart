@@ -142,8 +142,6 @@ private fun ReadingCard(reading: com.daotranbang.vfsmart.vision.TrafficLightAnal
     val (label, color) = when (reading.state) {
         TrafficLightDetector.State.RED ->
             stringResource(R.string.traffic_light_state_red) to Color(0xFFEF5350)
-        TrafficLightDetector.State.GREEN ->
-            stringResource(R.string.traffic_light_state_green) to Color(0xFF4CAF50)
         TrafficLightDetector.State.NONE ->
             stringResource(R.string.traffic_light_state_none) to Color(0xFF9E9E9E)
     }

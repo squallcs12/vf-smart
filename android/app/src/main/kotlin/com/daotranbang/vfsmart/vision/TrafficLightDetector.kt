@@ -30,17 +30,21 @@ import kotlin.math.roundToInt
  * | 2     | `Red`         | the red light is lit                   |
  * | 3     | `Red count`   | a red countdown number is displayed    |
  *
- * It reports the dominant light [State] (RED / GREEN) plus whether a countdown
- * box is present. It does **not** read the countdown digits — that would need a
- * second OCR pass on the count box (see [RedLightDetector]).
+ * Although the model can see green, this reader **only cares about red**: it
+ * reports whether the red light is lit ([State.RED] vs [State.NONE]) plus whether
+ * a red countdown box is present. Green detections are dropped. It does **not**
+ * read the countdown digits — that would need a second OCR pass on the count box
+ * (see [RedLightDetector]).
  *
- * Designed to run repeatedly on live RTSP frames: [detect] takes a [Bitmap], is
- * fully offline, and reuses a single cached interpreter (GPU-accelerated when
- * available, multi-threaded CPU otherwise).
+ * Designed to run on live RTSP frames: [detect] takes a [Bitmap], is fully offline,
+ * and reuses a single cached interpreter (GPU-accelerated when available,
+ * multi-threaded CPU otherwise). Note [detect] runs the model once **per tile**
+ * ([TILE_ROWS]×[TILE_COLS] = 16 inferences per frame), so the caller should sample
+ * frames slowly rather than analysing every frame.
  *
  * ## Wiring the model
- *  - Trained on the Roboflow "vietnam-traffic-light-f0zoa" YOLOv11 export,
- *    augmented with Imou-camera footage (`best_float16_with_imou.tflite`).
+ *  - Trained on the Roboflow "vietnam-traffic-light-f0zoa" YOLOv11 export
+ *    (v2: 4×4 tiling), so inference tiles to match — see [TILE_ROWS]/[TILE_COLS].
  *  - `yolo export model=best.pt format=tflite half=True imgsz=640`
  *  - Dropped at `app/src/main/assets/traffic_light.tflite`.
  */
@@ -51,13 +55,19 @@ object TrafficLightDetector {
     private const val CONF_THRESHOLD = 0.40f
     private const val IOU_THRESHOLD = 0.45f
 
-    // Class indices — must match data.yaml order.
-    private const val CLS_GREEN = 0
-    private const val CLS_GREEN_COUNT = 1
+    // The model is trained on a 4×4 tiling of the source frames (Roboflow v2), so
+    // inference must tile the same way: a far/small light is ~11 px in a whole-frame
+    // 640 downscale (undetectable) but ~4× larger inside a 1/4×1/4 tile. Each tile is
+    // run through the model and its boxes are mapped back to full-frame coordinates.
+    private const val TILE_ROWS = 4
+    private const val TILE_COLS = 4
+
+    // Class indices — must match data.yaml order. (Green classes 0/1 exist in the
+    // model but are intentionally ignored; only red is reported.)
     private const val CLS_RED = 2
     private const val CLS_RED_COUNT = 3
 
-    enum class State { RED, GREEN, NONE }
+    enum class State { RED, NONE }
 
     data class Box(
         val left: Float, val top: Float, val right: Float, val bottom: Float,
@@ -65,19 +75,17 @@ object TrafficLightDetector {
     )
 
     data class Result(
-        /** Dominant light colour in view, or [State.NONE] if no light detected. */
+        /** [State.RED] if the red light is lit, else [State.NONE]. */
         val state: State,
-        /** Confidence of the light box that decided [state] (0 when NONE). */
+        /** Confidence of the red-light box that decided [state] (0 when NONE). */
         val confidence: Float,
         /** A red countdown number box is visible. */
         val hasRedCount: Boolean,
-        /** A green countdown number box is visible. */
-        val hasGreenCount: Boolean,
-        /** All kept detections (normalised 0..1 coords), e.g. to draw an overlay. */
+        /** Kept red detections only (normalised 0..1 coords), e.g. to draw an overlay. */
         val boxes: List<Box>
     ) {
         companion object {
-            val EMPTY = Result(State.NONE, 0f, false, false, emptyList())
+            val EMPTY = Result(State.NONE, 0f, false, emptyList())
         }
     }
 
@@ -89,12 +97,51 @@ object TrafficLightDetector {
     val isLoaded: Boolean get() = interpreter != null
 
     /**
-     * Run detection on [frame]. Caller owns [frame] (we never recycle it).
+     * Run detection on [frame] by splitting it into a [TILE_ROWS]×[TILE_COLS] grid,
+     * detecting in each tile, and merging the results in full-frame coordinates.
+     * Caller owns [frame] (we never recycle it).
      * Throws [IllegalStateException] if the model asset is missing.
      */
     fun detect(context: Context, frame: Bitmap): Result {
         val interp = obtainInterpreter(context.applicationContext)
-        return runDetection(interp, frame)
+
+        val tileW = frame.width / TILE_COLS
+        val tileH = frame.height / TILE_ROWS
+        // Frame too small to tile meaningfully — fall back to whole-frame detection.
+        if (tileW < 1 || tileH < 1) return summarise(nms(detectBoxesIn(interp, frame)))
+
+        val all = ArrayList<Box>()
+        for (ry in 0 until TILE_ROWS) {
+            for (cx in 0 until TILE_COLS) {
+                val left = cx * tileW
+                val top = ry * tileH
+                // The last row/column extends to the edge so no remainder pixels are lost.
+                val w = if (cx == TILE_COLS - 1) frame.width - left else tileW
+                val h = if (ry == TILE_ROWS - 1) frame.height - top else tileH
+
+                val tile = Bitmap.createBitmap(frame, left, top, w, h)
+                val boxes = detectBoxesIn(interp, tile)
+                tile.recycle()
+
+                // Map this tile's normalised boxes into full-frame normalised coords.
+                val ox = left.toFloat() / frame.width
+                val oy = top.toFloat() / frame.height
+                val fw = w.toFloat() / frame.width
+                val fh = h.toFloat() / frame.height
+                for (b in boxes) {
+                    all.add(
+                        b.copy(
+                            left = ox + b.left * fw,
+                            top = oy + b.top * fh,
+                            right = ox + b.right * fw,
+                            bottom = oy + b.bottom * fh
+                        )
+                    )
+                }
+            }
+        }
+        // Global NMS removes duplicates of the same light found in adjacent tiles.
+        return summarise(nms(all))
     }
 
     /** Release the interpreter and GPU delegate. Call when detection stops. */
@@ -138,7 +185,12 @@ object TrafficLightDetector {
 
     // --- Inference -------------------------------------------------------------
 
-    private fun runDetection(interp: Interpreter, bitmap: Bitmap): Result {
+    /**
+     * Run the model on a single [bitmap] (a whole frame or one tile) and return the
+     * decoded boxes in that bitmap's normalised [0,1] coords. No NMS or summarise —
+     * the caller merges across tiles and applies global NMS.
+     */
+    private fun detectBoxesIn(interp: Interpreter, bitmap: Bitmap): List<Box> {
         val inT = interp.getInputTensor(0)
         val inShape = inT.shape()            // [1, H, W, 3]
         val h = inShape[1]
@@ -158,12 +210,9 @@ object TrafficLightDetector {
         interp.run(input, outBuf)
 
         val flat = readOutput(outBuf, outType, outQ.scale, outQ.zeroPoint, outElems)
-        // Boxes come out in letterboxed-model space; map them back to the
-        // original frame so the overlay and count-box crop line up with [frame].
-        val mapped = decode(flat, outShape).map { unletterbox(it, bitmap.width, bitmap.height, w, h) }
-        val kept = nms(mapped)
-
-        return summarise(kept)
+        // Boxes come out in letterboxed-model space; map them back to [bitmap]'s
+        // own normalised coords (the caller then maps tile→frame and runs NMS).
+        return decode(flat, outShape).map { unletterbox(it, bitmap.width, bitmap.height, w, h) }
     }
 
     /**
@@ -181,26 +230,20 @@ object TrafficLightDetector {
         return b.copy(left = fx(b.left), top = fy(b.top), right = fx(b.right), bottom = fy(b.bottom))
     }
 
-    /** Collapse the kept boxes into a single traffic-light reading. */
+    /** Collapse the kept boxes into a single traffic-light reading (red only). */
     private fun summarise(kept: List<Box>): Result {
         if (kept.isEmpty()) return Result.EMPTY
 
-        // The lit light = the highest-scoring Green/Red box across the frame.
-        val light = kept
-            .filter { it.cls == CLS_GREEN || it.cls == CLS_RED }
-            .maxByOrNull { it.score }
+        // Green is ignored entirely — keep only red light / red countdown boxes.
+        val redBoxes = kept.filter { it.cls == CLS_RED || it.cls == CLS_RED_COUNT }
+        // The lit light = the highest-scoring red box across the frame.
+        val light = redBoxes.filter { it.cls == CLS_RED }.maxByOrNull { it.score }
 
-        val state = when (light?.cls) {
-            CLS_RED -> State.RED
-            CLS_GREEN -> State.GREEN
-            else -> State.NONE
-        }
         return Result(
-            state = state,
+            state = if (light != null) State.RED else State.NONE,
             confidence = light?.score ?: 0f,
-            hasRedCount = kept.any { it.cls == CLS_RED_COUNT },
-            hasGreenCount = kept.any { it.cls == CLS_GREEN_COUNT },
-            boxes = kept
+            hasRedCount = redBoxes.any { it.cls == CLS_RED_COUNT },
+            boxes = redBoxes
         )
     }
 

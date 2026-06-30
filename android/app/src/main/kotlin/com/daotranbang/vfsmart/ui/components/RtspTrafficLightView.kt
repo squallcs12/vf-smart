@@ -43,9 +43,12 @@ import com.daotranbang.vfsmart.vision.TrafficLightDetector
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
-// Frame size pulled off the TextureView for inference (16:9, small = fast).
-private const val ANALYSIS_W = 640
-private const val ANALYSIS_H = 360
+// Frame size pulled off the TextureView for inference (16:9). Must stay high-res:
+// the detector tiles each frame 4×4, so a small capture would leave each tile with
+// no real detail and far-away lights stay undetectable. 1920×1080 gives each tile
+// ~480×270 of real pixels (capped by the RTSP stream's own resolution).
+private const val ANALYSIS_W = 1920
+private const val ANALYSIS_H = 1080
 
 /**
  * Live RTSP surface (Media3 ExoPlayer on a [TextureView]) that runs the custom
@@ -189,7 +192,6 @@ fun RtspTrafficLightView(
 private fun StateBadge(reading: TrafficLightAnalyzer.Reading, modifier: Modifier = Modifier) {
     val (label, color) = when (reading.state) {
         TrafficLightDetector.State.RED -> "ĐỎ" to Color(0xFFEF5350)
-        TrafficLightDetector.State.GREEN -> "XANH" to Color(0xFF4CAF50)
         TrafficLightDetector.State.NONE -> return
     }
     val text = reading.seconds?.let { "$label  ${it}s" } ?: label
@@ -212,17 +214,16 @@ private val FULL_FRAME = Rect(0f, 0f, 1f, 1f)
 private const val CROP_PAD = 0.35f
 
 // Detection class indices, mirrored from TrafficLightDetector / data.yaml order.
-private const val CLASS_GREEN_LIGHT = 0
-private const val CLASS_GREEN_COUNT = 1
+// (Green classes are ignored; reading.boxes only ever contains red detections.)
 private const val CLASS_RED_LIGHT = 2
 private const val CLASS_RED_COUNT = 3
 
 /**
  * Bounding rect (normalised) to zoom onto, chosen by priority:
- * red-with-countdown → red → green-with-countdown → green. Within each colour the
- * highest-scoring light box wins, and its matching countdown box is folded into the
- * crop so the number stays visible. Returns [FULL_FRAME] when there's nothing to
- * zoom onto so the view shows the plain stream.
+ * red-with-countdown → red. The highest-scoring red light box wins, and its
+ * matching countdown box is folded into the crop so the number stays visible.
+ * Returns [FULL_FRAME] when there's nothing to zoom onto so the view shows the
+ * plain stream.
  */
 private fun cropRectFor(reading: TrafficLightAnalyzer.Reading): Rect {
     val boxes = reading.boxes
@@ -233,14 +234,10 @@ private fun cropRectFor(reading: TrafficLightAnalyzer.Reading): Rect {
 
     val bestRedLight = bestOf(CLASS_RED_LIGHT)
     val bestRedCount = bestOf(CLASS_RED_COUNT)
-    val bestGreenLight = bestOf(CLASS_GREEN_LIGHT)
-    val bestGreenCount = bestOf(CLASS_GREEN_COUNT)
 
     val chosenBoxes = when {
         bestRedLight != null && bestRedCount != null -> listOf(bestRedLight, bestRedCount)
         bestRedLight != null -> listOf(bestRedLight)
-        bestGreenLight != null && bestGreenCount != null -> listOf(bestGreenLight, bestGreenCount)
-        bestGreenLight != null -> listOf(bestGreenLight)
         else -> return FULL_FRAME
     }
 
@@ -261,11 +258,9 @@ private fun cropRectFor(reading: TrafficLightAnalyzer.Reading): Rect {
     )
 }
 
-/** Box colour by class: lights match their colour, count boxes are dimmer. */
+/** Box colour by class: the red light, and a dimmer red for its count box. */
 private fun colorForClass(cls: Int): Color = when (cls) {
-    0 -> Color(0xFF4CAF50)        // Green
-    1 -> Color(0xFF81C784)        // Green count
-    2 -> Color(0xFFEF5350)        // Red
-    3 -> Color(0xFFE57373)        // Red count
+    CLASS_RED_LIGHT -> Color(0xFFEF5350)   // Red
+    CLASS_RED_COUNT -> Color(0xFFE57373)   // Red count
     else -> Color.Yellow
 }

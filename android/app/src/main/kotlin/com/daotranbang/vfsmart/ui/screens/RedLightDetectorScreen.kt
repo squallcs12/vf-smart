@@ -217,8 +217,6 @@ private fun ResultCard(result: TrafficLightDetector.Result) {
     val (label, color) = when (result.state) {
         TrafficLightDetector.State.RED ->
             stringResource(R.string.traffic_light_state_red) to androidx.compose.ui.graphics.Color(0xFFEF5350)
-        TrafficLightDetector.State.GREEN ->
-            stringResource(R.string.traffic_light_state_green) to androidx.compose.ui.graphics.Color(0xFF4CAF50)
         TrafficLightDetector.State.NONE ->
             stringResource(R.string.traffic_light_state_none) to MaterialTheme.colorScheme.error
     }
@@ -254,7 +252,7 @@ private fun ResultCard(result: TrafficLightDetector.Result) {
                 )
             }
 
-            // Count-box presence — what the "Red count" / "Green count" classes found.
+            // Count-box presence — whether the "Red count" class was found.
             Row(
                 horizontalArrangement = Arrangement.spacedBy(24.dp),
                 modifier = Modifier.padding(top = 4.dp)
@@ -262,10 +260,6 @@ private fun ResultCard(result: TrafficLightDetector.Result) {
                 CountChip(
                     label = stringResource(R.string.tl_photo_red_count),
                     present = result.hasRedCount
-                )
-                CountChip(
-                    label = stringResource(R.string.tl_photo_green_count),
-                    present = result.hasGreenCount
                 )
             }
 
@@ -334,16 +328,12 @@ private fun DetectionOverlay(
 }
 
 private fun boxColor(cls: Int): Color = when (cls) {
-    0 -> Color(0xFF4CAF50)   // Green
-    1 -> Color(0xFF81C784)   // Green count
     2 -> Color(0xFFEF5350)   // Red
     3 -> Color(0xFFE57373)   // Red count
     else -> Color.Yellow
 }
 
 private fun boxLabel(cls: Int): String = when (cls) {
-    0 -> "Green"
-    1 -> "G.count"
     2 -> "Red"
     3 -> "R.count"
     else -> "?"
