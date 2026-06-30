@@ -48,7 +48,7 @@ import kotlinx.coroutines.withContext
 private sealed interface DetectState {
     data object Idle : DetectState
     data object Detecting : DetectState
-    data class Success(val result: TrafficLightDetector.Result) : DetectState
+    data class Success(val result: TrafficLightDetector.Result, val ms: Long) : DetectState
     data class Failure(val message: String) : DetectState
 }
 
@@ -84,10 +84,12 @@ fun RedLightDetectorScreen(
         try {
             val bmp = withContext(Dispatchers.IO) { loadBitmap(context, uri) }
             preview = bmp.asImageBitmap()
+            val t0 = System.nanoTime()
             val result = withContext(Dispatchers.Default) {
                 TrafficLightDetector.detect(context, bmp)
             }
-            state = DetectState.Success(result)
+            val ms = (System.nanoTime() - t0) / 1_000_000
+            state = DetectState.Success(result, ms)
         } catch (e: Exception) {
             state = DetectState.Failure(e.message ?: e.javaClass.simpleName)
         }
@@ -195,7 +197,7 @@ fun RedLightDetectorScreen(
                     }
                 }
 
-                is DetectState.Success -> ResultCard(s.result)
+                is DetectState.Success -> ResultCard(s.result, s.ms)
 
                 is DetectState.Failure -> {
                     Card(
@@ -217,7 +219,7 @@ fun RedLightDetectorScreen(
 }
 
 @Composable
-private fun ResultCard(result: TrafficLightDetector.Result) {
+private fun ResultCard(result: TrafficLightDetector.Result, ms: Long) {
     val (label, color) = when (result.state) {
         TrafficLightDetector.State.RED ->
             stringResource(R.string.traffic_light_state_red) to androidx.compose.ui.graphics.Color(0xFFEF5350)
@@ -269,6 +271,13 @@ private fun ResultCard(result: TrafficLightDetector.Result) {
 
             Text(
                 text = stringResource(R.string.tl_photo_boxes, result.boxes.size),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = stringResource(R.string.tl_photo_detect_time, ms),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center

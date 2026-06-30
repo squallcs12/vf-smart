@@ -205,6 +205,7 @@
     <string name="tl_photo_yes">Có</string>
     <string name="tl_photo_no">Không</string>
     <string name="tl_photo_boxes">Số đối tượng phát hiện: %d</string>
+    <string name="tl_photo_detect_time">Thời gian nhận diện: %1$d ms</string>
     <string name="red_light_pick_image">Chọn ảnh</string>
     <string name="red_light_pick_another">Chọn ảnh khác</string>
     <string name="red_light_detecting">Đang nhận diện…</string>
