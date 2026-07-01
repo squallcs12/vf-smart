@@ -3,12 +3,12 @@
 This file covers the Android companion app for VF3 Smart (Kotlin/Compose).
 ESP32 firmware and REST API docs are in the root `CLAUDE.md`.
 
-## Target Devices
+## Target Device
 
-This app is built for two devices: **Samsung Galaxy S20+** and an **armeabi-v7a (32-bit ARM) head unit**.
-The app is **primarily for the S20+** — default to focusing on the S20+ unless the
-user explicitly says to target the ARM device. Optimize layouts, screen sizes, and
-device-specific behavior for the S20+ first.
+This app runs on a **rooted Samsung Galaxy S20+** phone. The phone connects to the
+car over USB and mirrors its own screen onto the car's display via AutoLink Pro
+screen mirroring. Optimize layouts, screen sizes, and device-specific behavior for
+the S20+.
 
 ## UI Language
 
@@ -56,19 +56,36 @@ voice flow ends at `VF3Repository`, which emits an HTTP command.
 > are illustrative — the real classes are `VF3ApiService` (Retrofit) and
 > `WebSocketManager`, not a hand-rolled `VF3ApiClient`.
 
-## AutoLink Auto-Connect (head unit)
+### Emulator (AVD) testability
 
-The head unit auto-connects to AutoLink Pro screen mirroring hands-free: when the user
-gets in the car, the app launches AutoLink Pro and drives its UI through an accessibility
-service to select the device and dismiss the "Start now" capture dialog. This is handled by
+A side benefit of the WiFi/WebSocket/HTTP transport: the car-communication path is
+now testable in the Android Emulator. BLE never was — the AVD has no Bluetooth
+radio (`BluetoothAdapter.getDefaultAdapter()` returns `null`), so it can't scan,
+advertise, or open a GATT connection. HTTP + WebSocket are plain TCP sockets, which
+the emulator handles fine.
+
+To test against a real ESP32 from an AVD: the emulator can make **outbound**
+connections to your LAN through the host's NAT, so point the app straight at the
+ESP32's LAN IP — no `adb forward` / port bridging needed, and no need to invert the
+client/server roles (the ESP32 stays the server).
+
+The one piece that still doesn't work in an AVD is **UDP discovery** — emulator NAT
+drops the port-8888 LAN broadcast, so `UdpDiscoveryService` won't find the device.
+Enter the ESP32 IP manually in `SetupScreen` instead.
+
+## AutoLink Auto-Connect
+
+The app auto-connects to AutoLink Pro screen mirroring hands-free: when the user
+gets in the car and plugs the phone in, the app launches AutoLink Pro and drives its UI
+through an accessibility service to switch it to USB mode and dismiss the "Start now"
+capture dialog, so the phone screen projects onto the car display. This is handled by
 `autolink/AutoLinkService` (foreground service: triggers, debounce, verification, side
 features) and `autolink/AutoLinkAccessibilityService` (drives the AutoLink Pro UI).
 
 **See [`app/src/main/kotlin/com/daotranbang/vfsmart/autolink/AUTOLINK_FLOW.md`](app/src/main/kotlin/com/daotranbang/vfsmart/autolink/AUTOLINK_FLOW.md)**
 for the full flow: the four launch triggers, the accessibility state machine, the
 connection verification/retry loop, side features (driving tracker, light reminder),
-exposed `StateFlow`s, and key constants. This flow assumes a **rooted head unit** and does
-not run on the S20+.
+exposed `StateFlow`s, and key constants. This flow assumes a **rooted phone** (the S20+).
 
 ## Google Assistant Integration (Android Auto)
 
@@ -504,7 +521,8 @@ SideEffect {
 
 ### Mirror Mode: ODO Instrument Cluster Design
 
-**Target hardware**: 9-inch 1080p landscape screen (~960×540dp at xhdpi / ~245 PPI)
+**Projection target** (the car display the phone mirrors onto): 9-inch 1080p landscape
+screen (~960×540dp at xhdpi / ~245 PPI)
 
 The mirror mode renders as a car instrument cluster (ODO style), not a standard Android UI:
 
@@ -546,7 +564,7 @@ Each cell: centered icon (40dp) → large bold value (28sp, 1sp letter-spacing) 
 
 ### Screen Capture Permission Grant (root)
 
-On every app start (`MainActivity.onCreate`, head unit only), VF3 Smart silently grants `PROJECT_MEDIA` consent via root so no "Start now" dialog ever appears for the mirroring app:
+On every app start (`MainActivity.onCreate`), VF3 Smart silently grants `PROJECT_MEDIA` consent via root so no "Start now" dialog ever appears for the mirroring app:
 ```
 su -c "appops set com.link.autolink.pro PROJECT_MEDIA allow"
 ```
