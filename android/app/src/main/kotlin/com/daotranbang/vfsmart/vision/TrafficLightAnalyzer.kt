@@ -97,5 +97,5 @@ object TrafficLightAnalyzer {
     }
 
     // Class index mirrored from TrafficLightDetector / data.yaml order.
-    private const val CLS_RED_COUNT = 3
+    private const val CLS_RED_COUNT = 1
 }
