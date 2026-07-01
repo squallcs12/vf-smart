@@ -1,4 +1,5 @@
 #include "discovery.h"
+#include "websocket.h"
 
 // UDP Discovery Configuration
 #define UDP_BROADCAST_PORT 8888
@@ -24,6 +25,12 @@ void handleDiscoveryBroadcast() {
 
   // Only broadcast if WiFi is connected in Station mode
   if (WiFi.getMode() != WIFI_STA || WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+
+  // Pause discovery while a phone is connected over WebSocket — it already
+  // knows our IP. Broadcasting resumes automatically once it disconnects.
+  if (hasWebSocketClient()) {
     return;
   }
 

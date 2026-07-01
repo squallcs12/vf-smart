@@ -29,6 +29,9 @@ void setupWebSocket(AsyncWebServer& server);
 // Drive heartbeat + delta detection. Call once per control-loop tick.
 void handleWebSocket();
 
+// True while at least one client is connected to /ws.
+bool hasWebSocketClient();
+
 // Push an immediate delta to connected clients (used by command endpoints
 // after they change state). Safe no-op when no clients are connected.
 void broadcastStatus();

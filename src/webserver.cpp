@@ -18,7 +18,26 @@
 
 AsyncWebServer server(80);
 
+// Log-only handler: registered first so its canHandle() runs for every incoming
+// request (matched routes, 404s, and the /ws upgrade). It logs and returns false
+// so the real handler still matches and serves the request.
+class RequestLogger : public AsyncWebHandler {
+public:
+  bool canHandle(AsyncWebServerRequest *request) override {
+    IPAddress ip = request->client() ? request->client()->remoteIP() : IPAddress();
+    Serial.printf("[HTTP] %s %s from %s\n",
+                  request->methodToString(),
+                  request->url().c_str(),
+                  ip.toString().c_str());
+    return false;  // never handle — just log
+  }
+};
+static RequestLogger requestLogger;
+
 void setupWebServer() {
+  // Log every request (must be added before any real handler)
+  server.addHandler(&requestLogger);
+
   // Register all endpoint modules
   registerStatusEndpoint(server);
   registerLockEndpoints(server);
@@ -47,6 +66,9 @@ void setupWebServer() {
 }
 
 void setupOnboardingServer() {
+  // Log every request (must be added before any real handler)
+  server.addHandler(&requestLogger);
+
   // Register onboarding endpoints
   registerOnboardingEndpoints(server);
 

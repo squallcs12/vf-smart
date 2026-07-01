@@ -239,6 +239,10 @@ void setupWebSocket(AsyncWebServer& server) {
     Serial.println("[WS] WebSocket handler registered at /ws");
 }
 
+bool hasWebSocketClient() {
+    return ws.count() > 0;
+}
+
 void handleWebSocket() {
     ws.cleanupClients();
 
