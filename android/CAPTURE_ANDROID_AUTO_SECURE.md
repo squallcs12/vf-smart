@@ -24,7 +24,7 @@ adb shell dumpsys SurfaceFlinger --display-id
 adb shell dumpsys display          # cross-check: AA creates a VirtualDisplay during projection
 ```
 
-Identify the AA virtual display (appears only while projecting to the head unit).
+Identify the AA virtual display (appears only while projecting to the car display).
 Note its **display id** (for `screenrecord`) and its **display token** (for the
 reflection API).
 
@@ -84,7 +84,3 @@ adb shell screenrecord --display-id <id> /sdcard/aa.mp4
 - **Route 2** — Smali Patcher patches SurfaceFlinger to ignore secure flag system-wide;
   then plain `screenrecord --display-id` works. Most reliable, but ROM-specific re-patch
   after each OTA, and weakens secure-layer protection device-wide.
-- **Easier path entirely** — capture on the **head unit** side instead: the projected
-  frames are already decoded there and are **not** secure (this project already does
-  head-unit capture for AutoLink). Only do phone-side secure capture if the pixels are
-  needed on the phone before streaming.

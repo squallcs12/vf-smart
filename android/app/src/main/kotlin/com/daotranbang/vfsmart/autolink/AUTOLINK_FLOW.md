@@ -2,8 +2,8 @@
 
 ## Overview
 
-The car head unit runs **AutoLink Pro** (`com.link.autolink.pro`) to mirror the phone's
-screen (Android Auto projection). This subsystem makes that connection happen
+The phone runs **AutoLink Pro** (`com.link.autolink.pro`) to mirror its own screen onto
+the car display over USB. This subsystem makes that connection happen
 **automatically and hands-free** — when the user gets in the car, the app launches AutoLink,
 drives its UI through the accessibility service to switch it to **USB mode**, then returns to
 our own `MainActivity`. (Screen-capture consent is pre-granted via `appops`, so the
@@ -16,13 +16,13 @@ our own `MainActivity`. (Screen-capture consent is pre-granted via `appops`, so 
 | `AutoLinkService` (foreground `Service`) | Detects the triggers, debounces, launches AutoLink Pro, and verifies the connection |
 | `AutoLinkAccessibilityService` (`AccessibilityService`) | Drives the AutoLink Pro UI: switches it to USB mode |
 
-> **Lifecycle:** the service runs only while the head unit has power — `VF3Application`
+> **Lifecycle:** the service runs only while the phone is plugged in — `VF3Application`
 > starts it on `ACTION_POWER_CONNECTED` (and at launch if already powered) and stops it
 > on `ACTION_POWER_DISCONNECTED`.
 
-> **Target device:** the armeabi-v7a head unit (see root `CLAUDE.md` → Target Devices).
-> This flow assumes a **rooted** head unit — accessibility is enabled via `su` and
-> screen-capture consent is pre-granted via `appops`. It does not run on the S20+.
+> **Target device:** the rooted Samsung Galaxy S20+ phone (see `CLAUDE.md` → Target
+> Device). This flow assumes a **rooted phone** — accessibility is enabled via `su` and
+> screen-capture consent is pre-granted via `appops`.
 
 ---
 
@@ -102,8 +102,8 @@ The two buttons are mutually exclusive — AutoLink shows the toggle for the mod
 - `action_button_wifi` visible ⇒ **already in USB mode** ⇒ nothing to do.
 
 No device picking, no WiFi-mode scan, and no "Start now" click: screen-capture consent is
-pre-granted on the rooted head unit via `appops set com.link.autolink.pro PROJECT_MEDIA allow`
-(done at app start — see root/Android `CLAUDE.md`), so the systemui capture dialog never
+pre-granted on the rooted phone via `appops set com.link.autolink.pro PROJECT_MEDIA allow`
+(done at app start — see Android `CLAUDE.md`), so the systemui capture dialog never
 appears.
 
 ### Enabling the service (root)

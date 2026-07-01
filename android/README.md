@@ -87,7 +87,7 @@ and `SetupScreen` saves the IP + API key.
 
 - Android Studio Ladybug | 2024.2.1 or later
 - Android SDK 35, minimum SDK 23
-- The two target devices: **Samsung Galaxy S20+** (primary) and the **armeabi-v7a head unit** (see `CLAUDE.md`)
+- Target device: a **rooted Samsung Galaxy S20+** phone (see `CLAUDE.md`)
 
 ### Build / Install / Test
 
