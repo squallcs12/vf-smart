@@ -13,6 +13,9 @@
 
     <!-- AutoLink foreground service -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Android 14+ (targetSdk 34+) requires a typed FGS permission; the service
+         orchestrates AutoLink Pro screen mirroring, which fits no standard type -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- Required on Android 13+ to show foreground service notification -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -61,7 +64,12 @@
         <!-- AutoLink Pro monitor service -->
         <service
             android:name=".autolink.AutoLinkService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="autolink_projection_orchestration" />
+        </service>
 
         <!-- AutoLink Pro UI automation (requires user to enable in Settings > Accessibility) -->
         <service

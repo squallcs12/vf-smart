@@ -12,7 +12,14 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(command -v platformio pio ~/.platformio/penv/bin/pio)",
-      "Read(//home/bang/.platformio/penv/bin/**)"
+      "Read(//home/bang/.platformio/penv/bin/**)",
+      "Bash(ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null || echo \"No serial device detected\")",
+      "Read(//dev/**)",
+      "Bash(~/.platformio/penv/bin/pio device *)",
+      "Bash(fuser -v /dev/ttyUSB0)",
+      "Bash(ps -o pid,cmd --no-headers -p 149511)",
+      "Bash(ps -o pid,cmd --no-headers 149511)",
+      "Bash(fuser /dev/ttyUSB0)"
     ]
   }
 }

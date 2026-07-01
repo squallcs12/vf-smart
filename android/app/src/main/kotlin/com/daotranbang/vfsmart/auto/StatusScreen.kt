@@ -222,7 +222,30 @@ class StatusScreen(
                 .build()
         )
 
-        // 7. ODO Config
+        // 7. Unlock Charger
+        gridItemListBuilder.addItem(
+            GridItem.Builder()
+                .setTitle(carContext.getString(R.string.btn_unlock_charger))
+                .setText(carContext.getString(R.string.auto_charger_unlock_desc))
+                .setImage(
+                    CarIcon.Builder(
+                        IconCompat.createWithResource(
+                            carContext,
+                            R.drawable.ic_charger
+                        )
+                    ).setTint(if (isConnected) CarColor.GREEN else CarColor.DEFAULT).build()
+                )
+                .setOnClickListener {
+                    if (isConnected) {
+                        scope.launch {
+                            repository.unlockCharger()
+                        }
+                    }
+                }
+                .build()
+        )
+
+        // 8. ODO Config
         gridItemListBuilder.addItem(
             GridItem.Builder()
                 .setTitle("ODO Config")

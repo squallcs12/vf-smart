@@ -98,6 +98,7 @@
     <string name="btn_beep_horn">Bóp còi</string>
     <string name="section_charging">Sạc pin</string>
     <string name="btn_unlock_charger">Mở cổng sạc</string>
+    <string name="auto_charger_unlock_desc">Nhả chốt để rút dây sạc</string>
     <string name="status_charging">Trạng thái: Đang sạc</string>
     <string name="status_not_charging">Trạng thái: Không sạc</string>
     <string name="section_settings">Cài đặt</string>
