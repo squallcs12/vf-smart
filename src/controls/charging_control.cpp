@@ -11,7 +11,7 @@ static unsigned long charger_unlock_timer = 0;  // Start time of the current pha
 
 void startChargerUnlock() {
   // Begin phase 1: pull pin ON
-  pcf8575.digitalWrite(VF3_CHARGER_UNLOCK_PULL, WRITE_ON);
+  digitalWrite(VF3_CHARGER_UNLOCK_PULL, WRITE_ON);
   charger_unlock_phase = 1;
   charger_unlock_timer = millis();
 }
@@ -37,13 +37,13 @@ void handleChargingControl() {
   if (charger_unlock_phase != 0 && (millis() - charger_unlock_timer) >= 1000) {
     if (charger_unlock_phase == 1) {
       // Phase 1 done: pull OFF, then start phase 2 (push ON)
-      pcf8575.digitalWrite(VF3_CHARGER_UNLOCK_PULL, WRITE_OFF);
-      pcf8575.digitalWrite(VF3_CHARGER_UNLOCK_PUSH, WRITE_ON);
+      digitalWrite(VF3_CHARGER_UNLOCK_PULL, WRITE_OFF);
+      digitalWrite(VF3_CHARGER_UNLOCK_PUSH, WRITE_ON);
       charger_unlock_phase = 2;
       charger_unlock_timer = millis();
     } else {
       // Phase 2 done: push OFF, sequence complete
-      pcf8575.digitalWrite(VF3_CHARGER_UNLOCK_PUSH, WRITE_OFF);
+      digitalWrite(VF3_CHARGER_UNLOCK_PUSH, WRITE_OFF);
       charger_unlock_phase = 0;
       charger_unlock_timer = 0;
       Serial.println("Charger port unlocked");

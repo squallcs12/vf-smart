@@ -43,8 +43,8 @@ bool readSensors() {
   int new_gear_drive = digitalRead(VF3_GEAR_DRIVE);
   int new_window_left_state = digitalRead(VF3_WINDOW_LEFT_STATE);
   int new_window_right_state = digitalRead(VF3_WINDOW_RIGHT_STATE);
-  int new_door_fl = digitalRead(VF3_DOOR_FL);
-  int new_door_fr = digitalRead(VF3_DOOR_FR);
+  int new_door_fl = safeDigitalRead(VF3_DOOR_FL);  // PCF8575 input (P13)
+  int new_door_fr = safeDigitalRead(VF3_DOOR_FR);  // PCF8575 input (P12)
   int new_door_trunk = digitalRead(VF3_DOOR_TRUNK);
   int new_seat_fl = digitalRead(VF3_SEAT_FL);
   int new_seat_fr = digitalRead(VF3_SEAT_FR);

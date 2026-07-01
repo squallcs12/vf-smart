@@ -19,8 +19,8 @@
 #define VF3_WINDOW_LEFT_STATE 34       // GPIO 34 - Left window state (0=closed, 1=open) (input only)
 #define VF3_WINDOW_RIGHT_STATE 35      // GPIO 35 - Right window state (0=closed, 1=open) (input only)
 // --- Doors & trunk ---
-#define VF3_DOOR_FL 4                  // GPIO 4 - Front left door open/close sensor
-#define VF3_DOOR_FR 16                 // GPIO 16 - Front right door open/close sensor
+// NOTE: Front-left/right door sensors are now PCF8575 inputs (P13/P12) — see the
+//       PCF8575 section below. GPIO 4/16 are the native charger-latch outputs.
 #define VF3_DOOR_TRUNK 17              // GPIO 17 - Trunk/tailgate open/close sensor
 // --- Seats & seatbelts ---
 #define VF3_SEAT_FL 15                 // GPIO 15 - Front left seat occupancy sensor
@@ -42,6 +42,11 @@
 #define VF3_FACTORY_RESET_BTN 0        // GPIO 0 - Factory reset button (BOOT button, active LOW, hold 10s to reset)
 #define TPMS_RF_PIN 23                 // GPIO 23 - RF 433MHz receiver DATA pin (XY-MK-5V or equivalent)
 
+// ===== NATIVE DIGITAL OUTPUTS (ESP32 GPIO) =====
+// --- Charger port latch (two-phase pulse: pull then push) ---
+#define VF3_CHARGER_UNLOCK_PULL 4        // GPIO 4  - ON 1s then OFF to pull charger latch (phase 1)
+#define VF3_CHARGER_UNLOCK_PUSH 16       // GPIO 16 - ON 1s then OFF to push charger latch (phase 2)
+
 // ===== DIGITAL OUTPUTS (Controls & Indicators) - PCF8575 I2C I/O Expander =====
 // All outputs now controlled via PCF8575 at I2C address 0x20 (pins P0-P15)
 // Use pcf8575.digitalWrite() and pcf8575.digitalRead() for these pins
@@ -59,9 +64,9 @@
 #define SELF_SIDE_MIRRORS_CLOSE PCF_P10  // P10 - ON 1s then OFF to close mirrors
 // --- Trunk ---
 #define VF3_FRONT_TRUNK_UNLOCK PCF_P7    // P7 - ON for 8s then OFF to unlock front trunk
-// --- Charger port ---
-#define VF3_CHARGER_UNLOCK_PULL PCF_P13  // P13 - ON for 1s then OFF to pull charger latch (1st phase)
-#define VF3_CHARGER_UNLOCK_PUSH PCF_P12  // P12 - ON for 1s then OFF to push charger latch (2nd phase)
+// --- Door sensors (inputs) ---
+#define VF3_DOOR_FL PCF_P13              // P13 - Front left door open/close sensor (input)
+#define VF3_DOOR_FR PCF_P12              // P12 - Front right door open/close sensor (input)
 // --- Accessory & cabin ---
 #define SELF_ACCESSORY_POWER PCF_P6      // P6 - ON/OFF accessory power
 #define SELF_INSIDE_CARMERAS PCF_P8      // P8 - ON/OFF inside cameras

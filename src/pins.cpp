@@ -37,8 +37,6 @@ void initializePins() {
   pinMode(VF3_GEAR_DRIVE, INPUT);
   pinMode(VF3_WINDOW_LEFT_STATE, INPUT);
   pinMode(VF3_WINDOW_RIGHT_STATE, INPUT);
-  pinMode(VF3_DOOR_FL, INPUT);
-  pinMode(VF3_DOOR_FR, INPUT);
   pinMode(VF3_DOOR_TRUNK, INPUT);
   pinMode(VF3_BRAKE_SWITCH, INPUT);
   pinMode(VF3_SEAT_FL, INPUT);
@@ -75,8 +73,15 @@ void initializePins() {
   pcf8575.digitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_OFF);
   pcf8575.digitalWrite(SELF_SIDE_MIRRORS_OPEN, WRITE_OFF);
   pcf8575.digitalWrite(SELF_SIDE_MIRRORS_CLOSE, WRITE_OFF);
-  pcf8575.digitalWrite(VF3_CHARGER_UNLOCK_PULL, WRITE_OFF);
-  pcf8575.digitalWrite(VF3_CHARGER_UNLOCK_PUSH, WRITE_OFF);
+  // Front door sensors are PCF8575 inputs (P13/P12)
+  pcf8575.pinMode(VF3_DOOR_FL, INPUT);
+  pcf8575.pinMode(VF3_DOOR_FR, INPUT);
+
+  // Charger latch outputs are native GPIO (4 = pull, 16 = push)
+  pinMode(VF3_CHARGER_UNLOCK_PULL, OUTPUT);
+  pinMode(VF3_CHARGER_UNLOCK_PUSH, OUTPUT);
+  digitalWrite(VF3_CHARGER_UNLOCK_PULL, WRITE_OFF);
+  digitalWrite(VF3_CHARGER_UNLOCK_PUSH, WRITE_OFF);
 
   // Turn on accessory power on startup
   pcf8575.digitalWrite(SELF_ACCESSORY_POWER, WRITE_ON);
