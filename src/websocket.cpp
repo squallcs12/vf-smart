@@ -4,9 +4,33 @@
 #include "time_sync.h"
 #include "controls/car_state.h"
 #include <Arduino.h>
+#include <ArduinoJson.h>
+#include <set>
+#include <map>
 
 // ── WebSocket endpoint ────────────────────────────────────────────────────────
 static AsyncWebSocket ws("/ws");
+
+// ── Authentication ────────────────────────────────────────────────────────────
+// The socket is open to anyone, but the server streams NOTHING until a client
+// proves it knows the configured API key. Right after connecting, a client must
+// send an auth frame as its first message:
+//     {"auth":"<api_key>"}
+// On success it receives {"auth":"ok"} then the normal status stream; on failure
+// it gets {"auth":"failed"} and is disconnected. Clients that don't authenticate
+// within WS_AUTH_TIMEOUT_MS are dropped so unauthenticated sockets can't linger.
+#define WS_AUTH_TIMEOUT_MS 5000UL
+
+// IDs of clients that have authenticated (only these receive status frames).
+static std::set<uint32_t> authedClients;
+// Connected-but-not-yet-authenticated clients → their connect time (for timeout).
+static std::map<uint32_t, unsigned long> pendingClients;
+
+// Send a text frame to every authenticated client (replaces ws.textAll, which
+// would leak status to unauthenticated sockets).
+static void sendToAuthed(const String& msg) {
+    for (uint32_t id : authedClients) ws.text(id, msg);
+}
 
 // ── Timing constants ──────────────────────────────────────────────────────────
 static const unsigned long FULL_INTERVAL_MS = 60000UL; // heartbeat full send every 60 s
@@ -218,17 +242,52 @@ static String buildDelta() {
     return any ? out : String();
 }
 
+// Handle the first message from a not-yet-authenticated client: it must be an
+// auth frame carrying the configured API key.
+static void handleAuthFrame(AsyncWebSocketClient* client, uint8_t* data, size_t len) {
+    JsonDocument doc;
+    const char* key = "";
+    if (!deserializeJson(doc, data, len)) {
+        key = doc["auth"] | "";
+    }
+
+    if (configured_api_key.length() > 0 && configured_api_key == key) {
+        authedClients.insert(client->id());
+        pendingClients.erase(client->id());
+        Serial.printf("[WS] Client #%u authenticated\n", client->id());
+        client->text("{\"auth\":\"ok\"}");
+        // Late joiner: hand it an immediate full baseline if the stream is already
+        // running. When it isn't (first client), handleWebSocket() sends the first
+        // full frame to all authed clients on its next tick.
+        if (snapshotValid) client->text(buildFull());
+    } else {
+        Serial.printf("[WS] Client #%u FAILED auth — disconnecting\n", client->id());
+        client->text("{\"auth\":\"failed\"}");
+        client->close();
+        pendingClients.erase(client->id());
+    }
+}
+
 // ── WebSocket events ──────────────────────────────────────────────────────────
 static void onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
                       AwsEventType type, void* arg, uint8_t* data, size_t len) {
     if (type == WS_EVT_CONNECT) {
-        Serial.printf("[WS] Client #%u connected from %s\n",
+        // Connected but NOT trusted yet — stream nothing until it authenticates.
+        Serial.printf("[WS] Client #%u connected from %s (awaiting auth)\n",
                       client->id(), client->remoteIP().toString().c_str());
-        // Force a full resync on the next handle tick so the new client gets a
-        // complete snapshot (mirrors the BLE full-on-connect behaviour).
-        snapshotValid = false;
+        pendingClients[client->id()] = millis();
     } else if (type == WS_EVT_DISCONNECT) {
         Serial.printf("[WS] Client #%u disconnected\n", client->id());
+        authedClients.erase(client->id());
+        pendingClients.erase(client->id());
+    } else if (type == WS_EVT_DATA) {
+        // Only the auth handshake is expected inbound (status is one-way). Handle
+        // complete single-frame text messages from unauthenticated clients.
+        AwsFrameInfo* info = (AwsFrameInfo*)arg;
+        if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT &&
+            authedClients.find(client->id()) == authedClients.end()) {
+            handleAuthFrame(client, data, len);
+        }
     }
 }
 
@@ -236,27 +295,39 @@ static void onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
 void setupWebSocket(AsyncWebServer& server) {
     ws.onEvent(onWsEvent);
     server.addHandler(&ws);
-    Serial.println("[WS] WebSocket handler registered at /ws");
+    Serial.println("[WS] WebSocket handler registered at /ws (auth required after connect)");
 }
 
 bool hasWebSocketClient() {
-    return ws.count() > 0;
+    // Only authenticated clients count as "a phone is connected".
+    return !authedClients.empty();
 }
 
 void handleWebSocket() {
     ws.cleanupClients();
 
-    if (ws.count() == 0) {
-        // No subscribers — drop the snapshot so the next client gets a full frame.
+    // Drop clients that connected but never authenticated in time.
+    unsigned long now = millis();
+    for (auto it = pendingClients.begin(); it != pendingClients.end(); ) {
+        if (now - it->second > WS_AUTH_TIMEOUT_MS) {
+            Serial.printf("[WS] Client #%u auth timeout — disconnecting\n", it->first);
+            ws.close(it->first);
+            it = pendingClients.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    if (authedClients.empty()) {
+        // No authenticated subscribers — drop the snapshot so the next one that
+        // authenticates gets a full frame.
         snapshotValid = false;
         return;
     }
 
-    unsigned long now = millis();
-
-    // First send after a (re)connect → full snapshot.
+    // First send after the stream (re)starts → full snapshot to all authed clients.
     if (!snapshotValid) {
-        ws.textAll(buildFull());
+        sendToAuthed(buildFull());
         takeSnapshot();
         lastFullSendMs = now;
         return;
@@ -264,14 +335,14 @@ void handleWebSocket() {
 
     if (now - lastFullSendMs >= FULL_INTERVAL_MS) {
         // Periodic full resync (heartbeat)
-        ws.textAll(buildFull());
+        sendToAuthed(buildFull());
         takeSnapshot();
         lastFullSendMs = now;
     } else {
         // Delta: only send if something changed
         String delta = buildDelta();
         if (delta.length() > 0) {
-            ws.textAll(delta);
+            sendToAuthed(delta);
         }
     }
 }
@@ -279,9 +350,9 @@ void handleWebSocket() {
 void broadcastStatus() {
     // Immediate delta push after a command-driven state change. The periodic
     // handleWebSocket() tick would catch it too, but this makes UI feedback snappy.
-    if (ws.count() == 0 || !snapshotValid) return;
+    if (authedClients.empty() || !snapshotValid) return;
     String delta = buildDelta();
     if (delta.length() > 0) {
-        ws.textAll(delta);
+        sendToAuthed(delta);
     }
 }

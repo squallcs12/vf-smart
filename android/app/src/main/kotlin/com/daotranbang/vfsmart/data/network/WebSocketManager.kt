@@ -1,6 +1,7 @@
 package com.daotranbang.vfsmart.data.network
 
 import android.util.Log
+import com.daotranbang.vfsmart.data.local.SecurePreferences
 import com.daotranbang.vfsmart.data.model.CarStatus
 import com.daotranbang.vfsmart.data.model.Controls
 import com.daotranbang.vfsmart.data.model.Doors
@@ -50,11 +51,18 @@ import javax.inject.Singleton
  *     C  brake_pressed,acc_power,cameras,car_lock,car_unlock
  *     X  charging,lock_state(0/1),wca,wcr_secs,lr,is_night
  *
- * No authentication required (read-only stream).
+ * Authentication: the socket streams nothing until the client proves it knows the
+ * configured API key. Right after [onOpen] we send an auth frame as the first
+ * message:
+ *     {"auth":"<api_key>"}
+ * The server replies {"auth":"ok"} (then begins streaming) or {"auth":"failed"}
+ * and disconnects. We only surface [ConnectionState.Connected] once we've received
+ * {"auth":"ok"} — a TCP-level open alone is not "connected" for our purposes.
  */
 @Singleton
 class WebSocketManager @Inject constructor(
-    private val okHttpClient: OkHttpClient
+    private val okHttpClient: OkHttpClient,
+    private val securePreferences: SecurePreferences
 ) {
     private var webSocket: WebSocket? = null
     private var reconnectJob: Job? = null
@@ -69,6 +77,9 @@ class WebSocketManager @Inject constructor(
     private var currentDeviceIp: String? = null
     private var autoReconnectEnabled = true
     private var reconnectAttempts = 0
+
+    /** True once the current socket has received {"auth":"ok"} from the server. */
+    private var authenticated = false
 
     companion object {
         private const val TAG = "WebSocketManager"
@@ -102,19 +113,29 @@ class WebSocketManager @Inject constructor(
 
         Log.d(TAG, "Connecting to ws://$deviceIp/ws")
 
+        authenticated = false
+
         val wsClient = okHttpClient.newBuilder()
             .pingInterval(5, TimeUnit.SECONDS)
             .build()
 
         webSocket = wsClient.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                Log.d(TAG, "WebSocket connected")
-                _connectionState.value = ConnectionState.Connected
-                reconnectAttempts = 0
+                // TCP-level open only. The server streams nothing until we send the
+                // auth frame and it replies {"auth":"ok"} — so we don't surface
+                // Connected yet (see handleAuthResponse).
+                Log.d(TAG, "WebSocket open — sending auth frame")
+                val apiKey = securePreferences.getApiKey() ?: ""
+                webSocket.send("{\"auth\":\"$apiKey\"}")
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
-                applyCarStatusPayload(text.trim())
+                val msg = text.trim()
+                if (!authenticated) {
+                    handleAuthResponse(webSocket, msg)
+                } else {
+                    applyCarStatusPayload(msg)
+                }
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -133,7 +154,31 @@ class WebSocketManager @Inject constructor(
         })
     }
 
+    /**
+     * Handle the server's reply to our auth frame (the first message on a fresh
+     * socket). `{"auth":"ok"}` promotes us to [ConnectionState.Connected] and the
+     * next frames are status; `{"auth":"failed"}` means the saved API key is wrong —
+     * the server closes the socket, which triggers the normal reconnect path.
+     */
+    private fun handleAuthResponse(webSocket: WebSocket, msg: String) {
+        when {
+            msg.contains("\"ok\"") -> {
+                Log.d(TAG, "WebSocket authenticated")
+                authenticated = true
+                _connectionState.value = ConnectionState.Connected
+                reconnectAttempts = 0
+            }
+            msg.contains("\"failed\"") -> {
+                Log.e(TAG, "WebSocket auth failed — check API key")
+                // Server will close; let handleDrop()/reconnect run its course.
+                webSocket.cancel()
+            }
+            else -> Log.w(TAG, "Unexpected pre-auth message: $msg")
+        }
+    }
+
     private fun handleDrop() {
+        authenticated = false
         _connectionState.value = ConnectionState.Disconnected
         _statusFlow.value = null
         if (autoReconnectEnabled && currentDeviceIp != null) {
@@ -145,6 +190,7 @@ class WebSocketManager @Inject constructor(
     fun disconnect() {
         Log.d(TAG, "Disconnecting WebSocket")
         autoReconnectEnabled = false
+        authenticated = false
         reconnectJob?.cancel()
         webSocket?.close(1000, "Client disconnect")
         webSocket = null

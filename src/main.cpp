@@ -13,6 +13,27 @@
 #include "ota.h"
 #include "tpms.h"
 
+// Bring up SoftAP + the onboarding web server. `banner` is the headline shown in
+// the serial log explaining why we're in onboarding (initial setup vs. reconfig).
+static void startOnboardingMode(const char* banner) {
+  Serial.println("===========================================");
+  Serial.println(banner);
+  Serial.println("===========================================");
+
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(onboarding_ssid, onboarding_password);
+
+  Serial.print("Connect to WiFi: ");
+  Serial.println(onboarding_ssid);
+  Serial.print("Password: ");
+  Serial.println(onboarding_password);
+  Serial.print("Then visit: http://");
+  Serial.println(WiFi.softAPIP());
+  Serial.println("===========================================");
+
+  setupOnboardingServer();
+}
+
 void setup() {
   // Initialize Serial Communication
   Serial.begin(9600);
@@ -76,43 +97,11 @@ void setup() {
     } else {
       // Connection failed - start AP mode for reconfiguration
       Serial.println("WiFi Connection Failed!");
-      Serial.println("Starting AP mode for reconfiguration...");
-
-      WiFi.mode(WIFI_AP);
-      WiFi.softAP(onboarding_ssid, onboarding_password);
-
-      Serial.println("===========================================");
-      Serial.println("RECONFIGURATION MODE - WiFi connection failed");
-      Serial.println("===========================================");
-      Serial.print("Connect to WiFi: ");
-      Serial.println(onboarding_ssid);
-      Serial.print("Password: ");
-      Serial.println(onboarding_password);
-      Serial.print("Then visit: http://");
-      Serial.println(WiFi.softAPIP());
-      Serial.println("===========================================");
-
-      // Setup onboarding web server
-      setupOnboardingServer();
+      startOnboardingMode("RECONFIGURATION MODE - WiFi connection failed");
     }
   } else {
     // Not configured - start AP mode for initial onboarding
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP(onboarding_ssid, onboarding_password);
-
-    Serial.println("===========================================");
-    Serial.println("ONBOARDING MODE - Device not configured");
-    Serial.println("===========================================");
-    Serial.print("Connect to WiFi: ");
-    Serial.println(onboarding_ssid);
-    Serial.print("Password: ");
-    Serial.println(onboarding_password);
-    Serial.print("Then visit: http://");
-    Serial.println(WiFi.softAPIP());
-    Serial.println("===========================================");
-
-    // Setup onboarding web server
-    setupOnboardingServer();
+    startOnboardingMode("ONBOARDING MODE - Device not configured");
   }
 }
 

@@ -177,7 +177,10 @@ This contract is the source of truth shared with the Android app
 - **Discovery:** the ESP32 UDP-broadcasts on port 8888; the app confirms to stop
   the broadcast (`src/discovery.cpp`).
 - **Auth:** all command POSTs require the `X-API-Key` header (or `?api_key=`)
-  matching `configured_api_key`; `GET /car/status` and `/ws` are unauthenticated.
+  matching `configured_api_key`; `GET /car/status` is unauthenticated. `/ws`
+  accepts any connection but streams nothing until the client sends an auth frame
+  `{"auth":"<api_key>"}` as its first message and gets `{"auth":"ok"}` back (wrong
+  key → `{"auth":"failed"}` + disconnect; no auth within 5 s → dropped).
 
 ### Status uplink — `ws://<ip>/ws` (ESP32 → phone)
 
