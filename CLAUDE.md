@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is an ESP32-based MCU control system for a VinFast VF3 electric car. The project uses PlatformIO with the Arduino framework to manage vehicle sensors, controls, and safety features.
 
-The ESP32 talks to the companion Android app **exclusively over Bluetooth Low Energy (BLE)**. There is **no webserver, WebSocket, UDP discovery, WiFi onboarding, or API key** — those were removed. The Android app is the BLE **peripheral / GATT server**; the ESP32 is the BLE **client**. See [BLE Communication](#ble-communication) and the Android side in `android/app/.../navigation/VF3GattServer.kt`.
+The ESP32 talks to the companion Android app **over WiFi**: it runs an HTTP webserver for commands and serves a `/ws` WebSocket that streams real-time car status (BLE was removed because it can't run alongside WiFi). The app is a plain WiFi client that finds the ESP32 via UDP discovery. See [Car ↔ App Communication](#car--app-communication-websocket-status--http-commands) and the Android side in `android/app/.../data/network/`.
 
 ## Build Commands
 
@@ -34,7 +34,7 @@ pio run --target upload && pio device monitor
 - **Framework**: Arduino (via espressif32 platform)
 - **Serial Communication**: 9600 baud
 - **Control Loop**: 50ms cycle time (20Hz)
-- **Connectivity**: BLE client (connects to the Android app's GATT server)
+- **Connectivity**: WiFi — HTTP webserver + `/ws` WebSocket (car status stream)
 
 ### Pin Assignment Architecture
 
@@ -55,7 +55,7 @@ The main loop follows a read-process-act pattern:
 1. Read all analog sensor values
 2. Read all digital sensor states
 3. Execute control logic through dedicated handler functions
-4. Push status changes over BLE; apply any received BLE commands
+4. Pump the `/ws` WebSocket (push full/delta status); the webserver applies any received HTTP commands asynchronously
 5. Delay 50ms before next cycle
 
 ### Function Organization
@@ -85,7 +85,7 @@ When modifying pin assignments:
 4. Create a dedicated handler function (e.g., `handleNewFeature()`)
 5. Call the handler function from `loop()`
 6. Read sensor inputs before processing logic in the loop
-7. If the feature exposes state or a command, add it to the BLE status/command protocol below
+7. If the feature exposes state or a command, add it to the WebSocket status / HTTP command protocol below
 
 ## Timer-Based Logic
 
@@ -129,7 +129,7 @@ battery_voltage = (adc_value / 4095.0) * 3.3V * 4.0
 ### Change Detection
 
 The system uses a 0.1V threshold to filter noise:
-- Only sends a BLE status delta if voltage changes by ±0.1V
+- Only sends a status delta over `/ws` if voltage changes by ±0.1V
 - Prevents excessive updates from ADC noise
 - Evaluated every 50ms control loop cycle
 
@@ -143,7 +143,7 @@ The system uses a 0.1V threshold to filter noise:
 - **<11.5V**: Critical, battery may be failing
 
 The battery voltage is reported to the app in the `S` group of the car-status
-characteristic (`brake,steering,voltage,gear`) — see [Status uplink](#status-uplink-esp32--phone).
+frame (`brake,steering,voltage,gear`) — see [Status uplink](#status-uplink--wsipws-esp32--phone).
 
 ### Troubleshooting
 
@@ -162,56 +162,29 @@ characteristic (`brake,steering,voltage,gear`) — see [Status uplink](#status-u
 - Check for electrical noise sources
 - Increase change threshold from 0.1V to 0.2V in sensors.cpp
 
-## BLE Communication
+## Car ↔ App Communication (WebSocket status + HTTP commands)
 
-All car ↔ app communication is BLE GATT. **The Android app is the GATT server /
-peripheral and advertises the service; the ESP32 is the GATT client** that scans
-for the service, connects, writes status, and subscribes to receive commands.
+BLE and WiFi cannot run concurrently on the ESP32, so **BLE was dropped**. The
+ESP32 runs an `ESPAsyncWebServer` again: real-time status streams from a `/ws`
+WebSocket, and the app sends commands as HTTP POSTs. The ESP32 is the **server**;
+the Android app is a plain WiFi **client**.
 
 This contract is the source of truth shared with the Android app
-(`android/app/src/main/kotlin/com/daotranbang/vfsmart/navigation/VF3GattServer.kt`).
-Keep both sides in sync.
+(`android/app/.../data/network/WebSocketManager.kt` for status,
+`.../data/network/VF3ApiService.kt` for commands). Keep both sides in sync.
 
-### Service and Characteristics
+- **Transport:** WiFi (HTTP :80 + `ws://<ip>/ws`).
+- **Discovery:** the ESP32 UDP-broadcasts on port 8888; the app confirms to stop
+  the broadcast (`src/discovery.cpp`).
+- **Auth:** all command POSTs require the `X-API-Key` header (or `?api_key=`)
+  matching `configured_api_key`; `GET /car/status` and `/ws` are unauthenticated.
 
-**Service UUID:** `A1B2C3D4-E5F6-7890-ABCD-EF1234567890`
+### Status uplink — `ws://<ip>/ws` (ESP32 → phone)
 
-| Characteristic | UUID | Direction | ESP32 operation |
-|---|---|---|---|
-| TPMS | `A1B2C3D4-E5F6-7890-ABCD-EF1234567893` | ESP32 → phone | **Write** |
-| Speed limit | `A1B2C3D4-E5F6-7890-ABCD-EF1234567894` | ESP32 → phone | **Write** |
-| Car status (delta) | `A1B2C3D4-E5F6-7890-ABCD-EF1234567895` | ESP32 → phone | **Write** |
-| Command | `A1B2C3D4-E5F6-7890-ABCD-EF1234567896` | phone → ESP32 | **Subscribe (notify)** |
+The WebSocket carries the **car-status delta protocol** (see `src/websocket.cpp`).
+On client connect the ESP32 sends a **full** frame, then **deltas** on change, plus
+a full-frame heartbeat every 60 s. All payloads are UTF-8 strings.
 
-The Command characteristic carries a standard CCCD descriptor
-(`00002902-0000-1000-8000-00805f9b34fb`). The ESP32 must **write the CCCD to
-enable notifications** after connecting, or it will receive no commands.
-
-### Connection flow (ESP32 side)
-
-1. Scan for the service UUID and connect to the Android app.
-2. Discover the four characteristics.
-3. Enable notifications on the Command characteristic (write CCCD = `0x0001`).
-4. On connect, send a **full** car-status frame (and current TPMS / speed limit).
-5. Thereafter, write status **deltas** whenever a value changes; send a full
-   frame periodically (e.g. every 60 s) as a heartbeat.
-6. Handle incoming command notifications (see [Command downlink](#command-downlink-phone--esp32)).
-
-All payloads are UTF-8 strings.
-
-### Status uplink (ESP32 → phone)
-
-#### TPMS characteristic
-```
-"FL_KPA,FL_TEMP,FL_ALARM|FR_KPA,FR_TEMP,FR_ALARM|RL_...|RR_..."
-```
-e.g. `225.5,28,0|227.0,29,0|220.0,27,0|221.5,28,1`
-(kPa float, temp °C int, alarm 0/1; four tires separated by `|`).
-
-#### Speed limit characteristic
-The current speed limit in km/h as a plain integer string, e.g. `50`.
-
-#### Car status characteristic — delta protocol
 ```
 Full  (on connect, 60 s heartbeat):
   "F|S:<s>|D:<d>|W:<w>|E:<e>|L:<l>|P:<p>|C:<c>|X:<x>"
@@ -236,36 +209,34 @@ Group field formats (comma-separated):
 `lr` = light_reminder_enabled 0/1.)
 
 Send the full frame on connect; send `U|...` deltas containing only the groups
-whose values changed since the last send.
+whose values changed since the last send. **`/ws` carries only car-status** — not
+TPMS pressures or a speed limit. Full state (including TPMS) is also available as
+JSON from `GET /car/status`.
 
-### Command downlink (phone → ESP32)
+### Command downlink — HTTP POST (phone → ESP32)
 
-Commands arrive as notifications on the Command characteristic — UTF-8 strings of
-the form `verb[:args]` with comma-separated args. The ESP32 parses the verb and
-acts; commands are **fire-and-forget** (no reply is expected, though state changes
-will naturally flow back as status deltas).
+Commands are HTTP requests to the webserver (`src/webserver/*_endpoint.cpp`).
+POSTs are fire-and-forget from the app's view — resulting state changes flow back
+over `/ws`.
 
-| Command | Action |
-|---|---|
-| `lock` / `unlock` | Lock / unlock the car |
-| `acc:on` / `acc:off` / `acc:toggle` | Accessory power |
-| `cameras:on` / `cameras:off` / `cameras:toggle` | Inside cameras |
-| `windows:close` | Start 30-second window auto-close |
-| `windows:stop` | Stop window operation |
-| `window:down,<side>,<on\|off>` | Roll window down (side: left/right/both) |
-| `window:up,<side>,<on\|off>` | Roll window up |
-| `buzzer:beep,<ms>` / `buzzer:on` / `buzzer:off` | Buzzer/horn |
-| `light-reminder:on` / `off` / `toggle` | Headlight reminder |
-| `charger-unlock` | Unlock charger port |
-| `mirrors:open` / `mirrors:close` | Side mirrors |
-| `odo:on` / `odo:off` / `odo:toggle` | ODO screen |
-| `armrest:on` / `armrest:off` / `armrest:toggle` | Armrest |
-| `dashcam:on` / `dashcam:off` / `dashcam:toggle` | Dashcam |
-| `tpms:reset` | Clear all TPMS sensor-ID assignments (re-learn) |
-| `tpms:swap,<a>,<b>` | Swap two tire positions (a/b: fl/fr/rl/rr) |
+| Endpoint | Params | Action |
+|---|---|---|
+| `POST /car/lock` / `/car/unlock` | — | Lock / unlock the car |
+| `POST /car/accessory-power` | `state=on\|off\|toggle` | Accessory power |
+| `POST /car/inside-cameras` | `state=on\|off\|toggle` | Inside cameras |
+| `POST /car/windows/close` / `/stop` | — | Start 30 s auto-close / stop |
+| `POST /car/windows/down` / `/up` | `side=left\|right\|both`, `state=on\|off` | Roll window |
+| `POST /car/buzzer` | `state=on\|off\|beep`, `duration=<ms>` | Buzzer/horn |
+| `POST /car/light-reminder` | `state=on\|off\|toggle` | Headlight reminder |
+| `POST /car/charger-unlock` | — | Unlock charger port |
+| `POST /car/side-mirrors` | `action=open\|close` | Side mirrors |
+| `POST /car/frunk/open` | — | Frunk (see safety below) |
+| `GET  /car/status` | — | Full status JSON (no auth) |
+| `GET  /tpms/calibrate` | — | Current TPMS sensor-ID assignments |
+| `POST /tpms/calibrate` | `action=reset`, or `action=swap&a=<>&b=<>` | Re-learn / swap tires |
 
-When adding a new command, update both this table and `VF3GattServer` /
-`VF3Repository` on the Android side.
+When adding a new command, add the endpoint under `src/webserver/` and update
+`VF3ApiService` / `VF3Repository` on the Android side.
 
 ### Headlight reminder logic
 
@@ -285,8 +256,8 @@ If the firmware exposes a frunk-open command, keep the original safeguards:
 
 ## OTA Updates
 
-OTA via **ArduinoOTA** remains available when the ESP32 is joined to a WiFi
-network (it is independent of the removed webserver):
+OTA via **ArduinoOTA** is available when the ESP32 is joined to a WiFi network
+(in addition to the webserver's `POST /ota/update` endpoint):
 
 - **Hostname**: `VF3-Smart`
 - **Port**: 3232 (default)
@@ -301,10 +272,10 @@ pio run --target upload --upload-port <esp32-ip>
 If the ESP32 no longer joins WiFi at all in your build, OTA is unavailable —
 flash over USB with `pio run --target upload`.
 
-## Factory Reset (Physical Button)
+## Factory Reset
 
-With no webserver there is no HTTP factory-reset endpoint. Reset is via the
-**physical BOOT button** only.
+Two ways to reset: `POST /factory-reset` on the webserver (API-key auth), or the
+**physical BOOT button** below (always works, no network needed).
 
 **Hardware Configuration:**
 - **Pin:** GPIO 0 (BOOT button on ESP32 Dev Module)
@@ -325,7 +296,7 @@ pull-up).
 
 ## Dependencies
 
-- **NimBLE-Arduino** (or the ESP32 Arduino BLE library) — BLE GATT client
-- **ArduinoJson** — only if still used internally; the BLE wire format above is
-  delimited text, not JSON, so JSON is no longer required for app communication
+- **ESPAsyncWebServer** / **AsyncTCP** — HTTP webserver + `/ws` WebSocket
+- **ArduinoJson** — JSON responses (`GET /car/status`, TPMS, config). The `/ws`
+  delta wire format is delimited text, not JSON.
 </content>
