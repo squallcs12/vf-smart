@@ -9,8 +9,9 @@ consumed, plus the runnable pipeline to reproduce it. The model is a custom
 ## Goal
 
 Detect a **red** traffic light (and its red countdown number) reliably, including
-far-away lights in dashcam frames. Green is detected by the model but **ignored**
-downstream — the app reports only `RED` / `NONE` (see [Inference](#inference-app-side)).
+far-away lights in dashcam frames. The model is **red-only** (Green / Green count
+were removed from the dataset); the app reports `RED` / `NONE`
+(see [Inference](#inference-app-side)).
 
 ## Files here
 
@@ -28,19 +29,22 @@ downstream — the app reports only `RED` / `NONE` (see [Inference](#inference-a
 - **Source images:** ~464, from the Roboflow "vietnam-traffic-light" set plus
   Imou-camera footage.
 - **Classes (exact `data.yaml` order — do not reorder, the app hard-codes these
-  indices):**
+  indices). Green / Green count were deleted from the Roboflow project, so the
+  export reindexes to 2 classes:**
 
-  | Index | Label         | Used by app? |
-  |-------|---------------|--------------|
-  | 0     | `Green`       | ignored      |
-  | 1     | `Green count` | ignored      |
-  | 2     | `Red`         | **yes** (`CLS_RED`) |
-  | 3     | `Red count`   | **yes** (`CLS_RED_COUNT`) |
+  | Index | Label       | Used by app? |
+  |-------|-------------|--------------|
+  | 0     | `Red`       | **yes** (`CLS_RED`) |
+  | 1     | `Red count` | **yes** (`CLS_RED_COUNT`) |
 
-| Version | Images | Preprocessing | Notes |
-|---------|--------|---------------|-------|
-| v1 | 512 | (baseline) | original, no tiling |
-| **v2** | **7,424** (train 7,024 / valid 272 / test 128) | **4×4 tiling**, resize 640×640 (stretch), auto-orient | current — the deployed model is trained on this |
+  After re-exporting, **verify this order in the downloaded `data.yaml`** and keep
+  the `CLS_*` indices in `TrafficLightDetector.kt` in sync.
+
+| Version | Preprocessing | Notes |
+|---------|---------------|-------|
+| v1 | (baseline, 4-class) | original, no tiling |
+| v2 | **4×4 tiling**, 640×640, 4-class | first tiled model |
+| **v3+** | **4×4 tiling**, 640×640, **2-class (red-only)** | current — regenerate after deleting green; train on this |
 
 ### Why 4×4 tiling
 
@@ -67,9 +71,9 @@ pip install -r requirements.txt
 
 ### 2. Get the dataset
 
-The deployed model uses **version 2** (4×4 tiling, 640×640 resize). Either:
+Use the latest **red-only** version (4×4 tiling, 640×640 resize, 2 classes). Either:
 
-- Download the **YOLOv11** export of v2 from the Roboflow UI and unzip into
+- Download the **YOLOv11** export from the Roboflow UI and unzip into
   `./dataset/` (so you have `dataset/train`, `dataset/valid`, `dataset/test`), or
 - Generate a new version via the API, then download it:
   ```bash
@@ -83,8 +87,9 @@ The deployed model uses **version 2** (4×4 tiling, 640×640 resize). Either:
   # then GET .../<version>/yolov11?api_key=$KEY for the download link
   ```
 
-`train.py` rewrites `dataset/data.yaml` with the correct absolute path and the
-canonical class order on each run, so you don't have to fix it by hand.
+`train.py` rewrites `dataset/data.yaml` with the correct absolute path (the
+export ships a relative one that resolves wrong) while preserving the export's
+class names, and prints them so you can confirm they match the app's `CLS_*`.
 
 ### 3. Train
 
@@ -96,13 +101,13 @@ Config: `yolo11n.pt` (nano — matches the ~5 MB tflite size/speed budget),
 100 epochs (early-stop `patience=25`), `imgsz=640`, `batch=64`, `device=0`.
 Outputs land in `runs/tiled4x4/weights/best.pt`.
 
-**Validation metrics** (`best.pt`, val split — small, so noisy):
+**Validation metrics** (from the prior 4×4 tiled run — re-check after the red-only
+retrain; the val split is small, so these are noisy/indicative):
 
 | Class | Instances | P | R | mAP50 |
 |-------|-----------|------|------|-------|
 | Red | 4 | 0.92 | 0.50 | 0.53 |
 | Red count | 13 | 0.73 | 0.63 | 0.75 |
-| Green / Green count | 2 / 3 | — | — | low (ignored) |
 
 > The val split has only ~22 light instances (4×4 tiling produces many empty
 > background tiles), so treat these as indicative, not precise.
@@ -129,8 +134,8 @@ Red-count 0.17; new model → **Red 0.69**, Red count 0.47.
 - **Tiling:** `detect()` splits each frame into `TILE_ROWS`×`TILE_COLS` = **4×4**,
   runs the model per tile, maps boxes back to full-frame coords, then global NMS.
   This must match the training tiling.
-- **Red-only:** `summarise()` keeps only `Red` / `Red count` boxes; `State` is
-  `RED` or `NONE`. `hasRedCount` flags a red countdown box; the digits are OCR'd
+- **Red-only:** the model has only `Red` / `Red count` classes; `State` is `RED`
+  or `NONE`. `hasRedCount` flags a red countdown box; the digits are OCR'd
   separately (see `TrafficLightAnalyzer` + `RedLightDetector`).
 - **Backend:** a single cached **CPU** interpreter, `numThreads = cores`.
   The **GPU delegate is intentionally not used** — it hangs on the Android
@@ -150,4 +155,5 @@ Because `detect()` does 16 inferences/frame, the live view samples slowly (~1 fp
   tiles, smaller `imgsz`) — more threads/interpreters don't help (CPU-bound).
 - **Stream resolution caps the gain:** low-res RTSP substreams limit how small a
   light tiling can recover.
-- **Green is not reported** by design; re-enable in `summarise()` if ever needed.
+- **Green is not modelled** — it was removed from the dataset. To bring it back,
+  re-add the classes in Roboflow and restore the class indices in the app.
