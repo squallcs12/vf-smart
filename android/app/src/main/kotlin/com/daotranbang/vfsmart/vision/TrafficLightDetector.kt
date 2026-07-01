@@ -20,18 +20,20 @@ import kotlin.math.roundToInt
  * On-device traffic-light state reader backed by a **custom YOLO model**
  * (Ultralytics YOLOv11) exported to TensorFlow Lite.
  *
- * The model has two classes, in this exact `data.yaml` order (green was removed
- * from the dataset — it's red-only now):
+ * The model has four classes, in this exact `data.yaml` order:
  *
- * | Index | Label       | Meaning                                |
- * |-------|-------------|----------------------------------------|
- * | 0     | `Red`       | the red light is lit                   |
- * | 1     | `Red count` | a red countdown number is displayed    |
+ * | Index | Label         | Meaning                                |
+ * |-------|---------------|----------------------------------------|
+ * | 0     | `Green`       | the green light is lit                 |
+ * | 1     | `Green count` | a green countdown number is displayed  |
+ * | 2     | `Red`         | the red light is lit                   |
+ * | 3     | `Red count`   | a red countdown number is displayed    |
  *
- * It reports whether the red light is lit ([State.RED] vs [State.NONE]) plus
- * whether a red countdown box is present. It does **not** read the countdown
- * digits — that would need a second OCR pass on the count box (see
- * [RedLightDetector]).
+ * Although the model can see green, this reader **only cares about red**: it
+ * reports whether the red light is lit ([State.RED] vs [State.NONE]) plus whether
+ * a red countdown box is present. Green detections are dropped. It does **not**
+ * read the countdown digits — that would need a second OCR pass on the count box
+ * (see [RedLightDetector]).
  *
  * Designed to run on live RTSP frames: [detect] takes a [Bitmap], is fully offline,
  * and reuses a single cached multi-threaded CPU interpreter. Note [detect] runs the
@@ -47,7 +49,7 @@ import kotlin.math.roundToInt
 object TrafficLightDetector {
 
     private const val MODEL_ASSET = "traffic_light.tflite"
-    private const val NUM_CLASSES = 2
+    private const val NUM_CLASSES = 4
     private const val CONF_THRESHOLD = 0.40f
     private const val IOU_THRESHOLD = 0.45f
 
@@ -58,9 +60,10 @@ object TrafficLightDetector {
     private const val TILE_ROWS = 4
     private const val TILE_COLS = 4
 
-    // Class indices — must match data.yaml order (red-only, 2-class model).
-    private const val CLS_RED = 0
-    private const val CLS_RED_COUNT = 1
+    // Class indices — must match data.yaml order. (Green classes 0/1 exist in the
+    // model but are intentionally ignored; only red is reported.)
+    private const val CLS_RED = 2
+    private const val CLS_RED_COUNT = 3
 
     enum class State { RED, NONE }
 

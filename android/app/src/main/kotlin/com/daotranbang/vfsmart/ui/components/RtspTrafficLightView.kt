@@ -213,10 +213,10 @@ private val FULL_FRAME = Rect(0f, 0f, 1f, 1f)
 // Context padding added around the detected light, as a fraction of its size.
 private const val CROP_PAD = 0.35f
 
-// Detection class indices, mirrored from TrafficLightDetector / data.yaml order
-// (red-only, 2-class model). reading.boxes only ever contains red detections.
-private const val CLASS_RED_LIGHT = 0
-private const val CLASS_RED_COUNT = 1
+// Detection class indices, mirrored from TrafficLightDetector / data.yaml order.
+// (Green classes are ignored; reading.boxes only ever contains red detections.)
+private const val CLASS_RED_LIGHT = 2
+private const val CLASS_RED_COUNT = 3
 
 /**
  * Bounding rect (normalised) to zoom onto, chosen by priority:
