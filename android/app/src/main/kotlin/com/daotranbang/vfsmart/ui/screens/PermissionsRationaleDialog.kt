@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
@@ -35,7 +34,6 @@ import com.daotranbang.vfsmart.R
 @Composable
 fun PermissionsRationaleDialog(onContinue: () -> Unit) {
     val items = listOf(
-        Triple(Icons.Filled.Bluetooth, R.string.perm_bluetooth_title, R.string.perm_bluetooth_reason),
         Triple(Icons.Filled.PhotoCamera, R.string.perm_camera_title, R.string.perm_camera_reason),
         Triple(Icons.Filled.LocationOn, R.string.perm_location_title, R.string.perm_location_reason),
         Triple(Icons.Filled.Notifications, R.string.perm_notification_title, R.string.perm_notification_reason),

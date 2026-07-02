@@ -13,12 +13,10 @@
     <!-- Runtime permission rationale prompt -->
     <string name="perm_rationale_title">Cấp quyền cho VF3 Smart</string>
     <string name="perm_rationale_intro">Ứng dụng cần các quyền sau để hoạt động:</string>
-    <string name="perm_bluetooth_title">Bluetooth</string>
-    <string name="perm_bluetooth_reason">Kết nối và điều khiển xe VF3 qua BLE</string>
     <string name="perm_camera_title">Máy ảnh</string>
     <string name="perm_camera_reason">Xem camera hành trình và nhận diện đèn đỏ</string>
     <string name="perm_location_title">Vị trí</string>
-    <string name="perm_location_reason">Theo dõi hành trình và phục vụ kết nối Bluetooth</string>
+    <string name="perm_location_reason">Theo dõi hành trình</string>
     <string name="perm_notification_title">Thông báo</string>
     <string name="perm_notification_reason">Hiển thị trạng thái dịch vụ nền của ứng dụng</string>
     <string name="perm_rationale_continue">Tiếp tục</string>
@@ -33,9 +31,9 @@
     <string name="connected">Kết nối</string>
     <string name="offline">Ngoại tuyến</string>
     <string name="not_connected_title">Chưa kết nối</string>
-    <string name="not_connected_desc">Điều khiển bị vô hiệu. Đang chờ kết nối Bluetooth…</string>
+    <string name="not_connected_desc">Điều khiển bị vô hiệu. Đang chờ kết nối WiFi với xe…</string>
     <string name="device_disconnected_title">Thiết bị mất kết nối</string>
-    <string name="device_disconnected_desc">Tất cả điều khiển bị vô hiệu. Đang chờ kết nối Bluetooth…</string>
+    <string name="device_disconnected_desc">Tất cả điều khiển bị vô hiệu. Đang chờ kết nối WiFi với xe…</string>
 
     <!-- Navigation access banner -->
     <string name="nav_access_title">Cần quyền thông báo</string>
@@ -66,6 +64,8 @@
     <string name="card_doors">Cửa xe</string>
     <string name="doors_open">Đang mở</string>
     <string name="doors_closed">Đã đóng</string>
+    <string name="section_vehicle_status">Cửa xe &amp; Số</string>
+    <string name="section_utilities">Tiện ích</string>
 
     <!-- HomeScreen quick actions -->
     <string name="quick_actions">Thao tác nhanh</string>

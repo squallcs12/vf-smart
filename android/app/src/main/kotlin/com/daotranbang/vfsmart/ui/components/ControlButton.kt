@@ -26,7 +26,8 @@ fun ControlButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     icon: @Composable (() -> Unit)? = null,
-    containerColor: Color? = null
+    containerColor: Color? = null,
+    contentPadding: PaddingValues = ButtonDefaults.ContentPadding
 ) {
     Button(
         onClick = onClick,
@@ -37,7 +38,8 @@ fun ControlButton(
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor ?: MaterialTheme.colorScheme.primary,
             disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+        ),
+        contentPadding = contentPadding
     ) {
         Row(
             horizontalArrangement = Arrangement.Center,
@@ -67,14 +69,16 @@ fun OutlinedControlButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    icon: @Composable (() -> Unit)? = null
+    icon: @Composable (() -> Unit)? = null,
+    contentPadding: PaddingValues = ButtonDefaults.ContentPadding
 ) {
     OutlinedButton(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
             .height(56.dp),
-        enabled = enabled
+        enabled = enabled,
+        contentPadding = contentPadding
     ) {
         Row(
             horizontalArrangement = Arrangement.Center,
@@ -104,7 +108,8 @@ fun ToggleControlButton(
     isOn: Boolean,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    contentPadding: PaddingValues = ButtonDefaults.ContentPadding
 ) {
     val containerColor = if (isOn) {
         MaterialTheme.colorScheme.primary
@@ -127,7 +132,8 @@ fun ToggleControlButton(
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
             contentColor = contentColor
-        )
+        ),
+        contentPadding = contentPadding
     ) {
         Row(
             horizontalArrangement = Arrangement.SpaceBetween,

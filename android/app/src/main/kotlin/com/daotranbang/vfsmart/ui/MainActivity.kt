@@ -31,7 +31,6 @@ import com.daotranbang.vfsmart.ui.screens.AccessibilityDisclosureDialog
 import com.daotranbang.vfsmart.ui.screens.PermissionsRationaleDialog
 import com.daotranbang.vfsmart.ui.screens.CameraPreviewScreen
 import com.daotranbang.vfsmart.ui.screens.RtspCaptureScreen
-import com.daotranbang.vfsmart.ui.screens.ControlScreen
 import com.daotranbang.vfsmart.ui.screens.DebugScreen
 import com.daotranbang.vfsmart.ui.screens.HomeScreen
 import com.daotranbang.vfsmart.ui.screens.MirrorScreen
@@ -128,7 +127,6 @@ class MainActivity : ComponentActivity() {
                 ) {
                     composable("home") {
                         HomeScreen(
-                            onNavigateToControls = { navController.navigate("controls") },
                             onNavigateToDebug    = { navController.navigate("debug") },
                             onNavigateToMirror   = {
                                 navController.navigate("mirror") {
@@ -136,7 +134,12 @@ class MainActivity : ComponentActivity() {
                                     launchSingleTop = true
                                 }
                             },
-                            onNavigateToSetup    = { navController.navigate("setup") }
+                            onNavigateToSetup    = { navController.navigate("setup") },
+                            onNavigateToTpmsCalibration = { navController.navigate("tpms_calibration") },
+                            onNavigateToCamera       = { navController.navigate("camera") },
+                            onNavigateToRedLight     = { navController.navigate("red_light") },
+                            onNavigateToTrafficLight = { navController.navigate("traffic_light_live") },
+                            onNavigateToRtspCapture  = { navController.navigate("rtsp_capture") }
                         )
                     }
 
@@ -153,29 +156,6 @@ class MainActivity : ComponentActivity() {
                                     popUpTo("mirror") { inclusive = false }
                                     launchSingleTop = true
                                 }
-                            }
-                        )
-                    }
-
-                    composable("controls") {
-                        ControlScreen(
-                            onNavigateBack = {
-                                navController.popBackStack()
-                            },
-                            onNavigateToTpmsCalibration = {
-                                navController.navigate("tpms_calibration")
-                            },
-                            onNavigateToCamera = {
-                                navController.navigate("camera")
-                            },
-                            onNavigateToRedLight = {
-                                navController.navigate("red_light")
-                            },
-                            onNavigateToTrafficLight = {
-                                navController.navigate("traffic_light_live")
-                            },
-                            onNavigateToRtspCapture = {
-                                navController.navigate("rtsp_capture")
                             }
                         )
                     }
