@@ -3,12 +3,9 @@
 Usage:
     python train.py
 
-Expects the Roboflow export extracted to ./dataset (train/ valid/ test/). Green
-and Green-count were removed from the Roboflow project, so the export is now
-**2-class** (Red, Red count). This script fixes data.yaml's path (the Roboflow
-zip ships a relative `path` that resolves wrong) while preserving the export's
-own class names/order, and prints them so you can confirm they match the app's
-indices in TrafficLightDetector (Red=0, Red count=1).
+Expects the Roboflow v2 export extracted to ./dataset (train/ valid/ test/).
+Rewrites ./dataset/data.yaml with an absolute path + the canonical class order
+so Ultralytics resolves the splits correctly regardless of how the zip shipped.
 
 See README.md for the full pipeline (dataset download, env, export, deploy).
 """
@@ -20,26 +17,22 @@ from ultralytics import YOLO
 HERE = Path(__file__).resolve().parent
 DATASET = HERE / "dataset"
 
-# Fallback only — normally the names come from the downloaded data.yaml.
-DEFAULT_NAMES = ["Red", "Red count"]
+# Class order is a contract with the Android app (TrafficLightDetector hard-codes
+# these indices: Red=2, Red count=3). Do not reorder.
+CLASS_NAMES = ["Green", "Green count", "Red", "Red count"]
 
 
 def ensure_data_yaml() -> Path:
+    cfg = {
+        "path": str(DATASET),
+        "train": "train/images",
+        "val": "valid/images",
+        "test": "test/images",
+        "nc": len(CLASS_NAMES),
+        "names": CLASS_NAMES,
+    }
     out = DATASET / "data.yaml"
-    cfg = yaml.safe_load(out.read_text()) if out.exists() else {}
-    cfg = cfg or {}
-    names = cfg.get("names") or DEFAULT_NAMES
-    cfg.update(
-        path=str(DATASET),
-        train="train/images",
-        val="valid/images",
-        test="test/images",
-        nc=len(names),
-        names=names,
-    )
     out.write_text(yaml.safe_dump(cfg, sort_keys=False))
-    print(f"classes ({cfg['nc']}): {names}  "
-          "— must match TrafficLightDetector CLS_* indices")
     return out
 
 

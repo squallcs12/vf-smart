@@ -341,14 +341,14 @@ private fun DetectionOverlay(
 }
 
 private fun boxColor(cls: Int): Color = when (cls) {
-    0 -> Color(0xFFEF5350)   // Red
-    1 -> Color(0xFFE57373)   // Red count
+    2 -> Color(0xFFEF5350)   // Red
+    3 -> Color(0xFFE57373)   // Red count
     else -> Color.Yellow
 }
 
 private fun boxLabel(cls: Int): String = when (cls) {
-    0 -> "Red"
-    1 -> "R.count"
+    2 -> "Red"
+    3 -> "R.count"
     else -> "?"
 }
 
