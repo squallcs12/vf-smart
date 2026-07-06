@@ -19,7 +19,9 @@
       "Bash(fuser -v /dev/ttyUSB0)",
       "Bash(ps -o pid,cmd --no-headers -p 149511)",
       "Bash(ps -o pid,cmd --no-headers 149511)",
-      "Bash(fuser /dev/ttyUSB0)"
+      "Bash(fuser /dev/ttyUSB0)",
+      "Bash(grep -rniE \"Too many messages|WS_MAX_QUEUED|bool canSend|queueIsFull|_queueMessage|_messageQueue\" ~/.platformio/ .pio/ 2>/dev/null | grep -iE \"AsyncWebSocket|WebSocket\" | head -30)",
+      "Read(//home/bang/.platformio/**)"
     ]
   }
 }

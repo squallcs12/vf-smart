@@ -28,15 +28,37 @@ static std::map<uint32_t, unsigned long> pendingClients;
 
 // Send a text frame to every authenticated client (replaces ws.textAll, which
 // would leak status to unauthenticated sockets).
+//
+// Skip any client whose send queue is already full (or that isn't connected):
+// the underlying library would otherwise log "ERROR: Too many messages queued"
+// and drop the frame. A backed-up client (slow WiFi, backgrounded app, stale
+// socket) just misses this delta and resyncs on the next delta it can accept or
+// the 60 s full-frame heartbeat, instead of thrashing the queue at 20 Hz.
 static void sendToAuthed(const String& msg) {
-    for (uint32_t id : authedClients) ws.text(id, msg);
+    for (uint32_t id : authedClients) {
+        AsyncWebSocketClient* c = ws.client(id);
+        if (c && !c->queueIsFull()) c->text(msg);
+    }
 }
 
 // ── Timing constants ──────────────────────────────────────────────────────────
 static const unsigned long FULL_INTERVAL_MS = 60000UL; // heartbeat full send every 60 s
+// Minimum spacing between status pushes. The control loop ticks at 20 Hz, but
+// grpS carries jittery analog values (brake/steering) that would otherwise emit
+// a delta almost every tick. Streaming at 20 Hz keeps a slow client's send queue
+// and TCP window saturated, which starves the WebSocket PONG reply and trips the
+// phone's 5 s ping timeout ("sent ping but didn't receive pong"). Coalescing to
+// ~10 Hz keeps the UI responsive while leaving room for control frames.
+static const unsigned long SEND_MIN_INTERVAL_MS = 100UL;
+// Deadband for the raw 12-bit ADC brake/steering values. analogRead() jitters by
+// dozens of counts on the ESP32, which would otherwise fire an S delta almost every
+// tick (churning the phone's UI recomposition). Only treat a change this large as
+// real. ~40 counts ≈ 1% of the 0-4095 range — well below any actual pedal/wheel move.
+static const int SENSOR_ADC_DEADBAND = 40;
 
 static bool          snapshotValid  = false;
 static unsigned long lastFullSendMs = 0;
+static unsigned long lastSendMs     = 0; // last status frame (full or delta) push
 
 // ── Previous-value snapshot (per group) ──────────────────────────────────────
 // Sensors
@@ -121,6 +143,10 @@ static String buildFull() {
 }
 
 // ── Snapshot helper ───────────────────────────────────────────────────────────
+// Records the exact current readings as the baseline that buildDelta() compares
+// against. Intentionally does NOT apply the brake/steering deadband (or the voltage
+// threshold): those live only in the emit decision in buildDelta(). The baseline is
+// exact so a real move is measured from where the last frame actually reported.
 static void takeSnapshot() {
     pBrake    = vf3_brake;
     pSteering = vf3_steering_angle;
@@ -178,8 +204,9 @@ static String buildDelta() {
     String out = "U";
     bool any   = false;
 
-    // S — sensors (voltage threshold 0.05 V to filter ADC noise)
-    if (vf3_brake != pBrake || vf3_steering_angle != pSteering ||
+    // S — sensors (brake/steering deadbanded, voltage threshold 0.05 V, to filter ADC noise)
+    if (abs(vf3_brake - pBrake) > SENSOR_ADC_DEADBAND ||
+        abs(vf3_steering_angle - pSteering) > SENSOR_ADC_DEADBAND ||
         vf3_gear_drive != pGear || fabsf(vf3_battery_voltage - pVoltage) > 0.05f) {
         out += "|"; out += grpS();
         pBrake = vf3_brake; pSteering = vf3_steering_angle;
@@ -259,7 +286,7 @@ static void handleAuthFrame(AsyncWebSocketClient* client, uint8_t* data, size_t 
         // Late joiner: hand it an immediate full baseline if the stream is already
         // running. When it isn't (first client), handleWebSocket() sends the first
         // full frame to all authed clients on its next tick.
-        if (snapshotValid) client->text(buildFull());
+        if (snapshotValid && !client->queueIsFull()) client->text(buildFull());
     } else {
         Serial.printf("[WS] Client #%u FAILED auth — disconnecting\n", client->id());
         client->text("{\"auth\":\"failed\"}");
@@ -330,6 +357,7 @@ void handleWebSocket() {
         sendToAuthed(buildFull());
         takeSnapshot();
         lastFullSendMs = now;
+        lastSendMs = now;
         return;
     }
 
@@ -338,11 +366,18 @@ void handleWebSocket() {
         sendToAuthed(buildFull());
         takeSnapshot();
         lastFullSendMs = now;
-    } else {
-        // Delta: only send if something changed
+        lastSendMs = now;
+    } else if (now - lastSendMs >= SEND_MIN_INTERVAL_MS) {
+        // Delta: only send if something changed. Throttled to SEND_MIN_INTERVAL_MS
+        // so bursty analog changes coalesce instead of flooding the socket. Gating
+        // the buildDelta() call (not just the send) lets intervening changes
+        // accumulate into the next frame. buildDelta() returns "" if nothing
+        // changed, in which case we leave lastSendMs alone so the next real change
+        // goes out promptly.
         String delta = buildDelta();
         if (delta.length() > 0) {
             sendToAuthed(delta);
+            lastSendMs = now;
         }
     }
 }
@@ -354,5 +389,6 @@ void broadcastStatus() {
     String delta = buildDelta();
     if (delta.length() > 0) {
         sendToAuthed(delta);
+        lastSendMs = millis();
     }
 }

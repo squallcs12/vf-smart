@@ -16,9 +16,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daotranbang.vfsmart.R
-import com.daotranbang.vfsmart.data.model.CarStatus
 import com.daotranbang.vfsmart.data.network.ConnectionState
 import com.daotranbang.vfsmart.ui.components.ControlButton
 import com.daotranbang.vfsmart.ui.components.OutlinedControlButton
@@ -65,8 +65,20 @@ fun HomeScreen(
     val operationState  by controlViewModel.operationState.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        if (!isNotificationListenerGranted(context)) {
+    // Notification-listener access reads Settings.Secure, a synchronous binder call to
+    // system_server. Never do that in the composition body — it would run on every
+    // recomposition (i.e. every /ws frame) on the UI thread and can stall for seconds
+    // when system_server is busy. Query once here and re-check only on resume (e.g. when
+    // returning from the grant screen), caching the result in state the UI reads.
+    var notificationAccessGranted by remember {
+        mutableStateOf(isNotificationListenerGranted(context))
+    }
+    LifecycleResumeEffect(Unit) {
+        notificationAccessGranted = isNotificationListenerGranted(context)
+        onPauseOrDispose { }
+    }
+    LaunchedEffect(notificationAccessGranted) {
+        if (!notificationAccessGranted) {
             context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
     }
@@ -133,7 +145,7 @@ fun HomeScreen(
                 .padding(Gap),
             verticalArrangement = Arrangement.spacedBy(Gap)
         ) {
-            if (!isNotificationListenerGranted(context)) {
+            if (!notificationAccessGranted) {
                 NotificationAccessBanner()
             }
 
@@ -142,32 +154,51 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(Gap)
             ) {
+                // Pass each section only the group/primitives it renders, not the whole
+                // CarStatus. In WebSocketManager a nested group (windows, doors, …) is
+                // only reallocated when its own delta arrives, and unrelated scalars keep
+                // their value — so a section receiving just its inputs is skipped by
+                // Compose on frames that didn't touch them, instead of recomposing on
+                // every /ws frame.
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(Gap)
                 ) {
-                    LockSection(carStatus, enabled, controlViewModel)
-                    ChargingSection(carStatus, enabled, controlViewModel)
-                    VehicleStatusSection(carStatus)
+                    LockSection(carStatus?.carLockState, enabled, controlViewModel)
+                    ChargingSection(carStatus?.chargingStatus, enabled, controlViewModel)
+                    VehicleStatusSection(carStatus?.doors, carStatus?.sensors?.gearDrive)
                 }
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(Gap)
                 ) {
-                    WindowsSection(carStatus, enabled, controlViewModel)
+                    WindowsSection(
+                        windows                = carStatus?.windows,
+                        isLocked               = carStatus?.carLockState == "locked",
+                        windowCloseActive      = carStatus?.windowCloseActive == true,
+                        windowCloseRemainingMs = carStatus?.windowCloseRemainingMs ?: 0L,
+                        enabled                = enabled,
+                        controlViewModel       = controlViewModel
+                    )
                 }
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(Gap)
                 ) {
-                    LightsSection(carStatus, enabled, controlViewModel)
+                    LightsSection(
+                        lights               = carStatus?.lights,
+                        isNight              = carStatus?.time?.isNight == true,
+                        lightReminderEnabled = carStatus?.lightReminderEnabled == true,
+                        enabled              = enabled,
+                        controlViewModel     = controlViewModel
+                    )
                     AudioSection(enabled, controlViewModel)
                 }
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(Gap)
                 ) {
-                    AccessoriesSection(carStatus, enabled, controlViewModel)
+                    AccessoriesSection(carStatus?.controls, enabled, controlViewModel)
                     UtilitiesSection(
                         onNavigateToCamera          = onNavigateToCamera,
                         onNavigateToRtspCapture     = onNavigateToRtspCapture,
@@ -186,21 +217,21 @@ fun HomeScreen(
 /** Car lock: locked/unlocked status badge + lock/unlock buttons. */
 @Composable
 private fun LockSection(
-    carStatus: CarStatus?,
+    lockState: String?,
     enabled: Boolean,
     controlViewModel: ControlViewModel
 ) {
-    val isLocked = carStatus?.carLockState == "locked"
+    val isLocked = lockState == "locked"
     FeatureCard(
         title  = stringResource(R.string.card_car_lock),
         icon   = if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
         status = when {
-            carStatus == null -> "--"
+            lockState == null -> "--"
             isLocked          -> stringResource(R.string.car_locked)
             else              -> stringResource(R.string.car_unlocked)
         },
         statusColor = when {
-            carStatus == null -> MaterialTheme.colorScheme.onSurfaceVariant
+            lockState == null -> MaterialTheme.colorScheme.onSurfaceVariant
             isLocked          -> MaterialTheme.colorScheme.primary
             else              -> MaterialTheme.colorScheme.error
         }
@@ -230,42 +261,43 @@ private fun LockSection(
 /** Windows: open/closed badge + per-side states + open/close + auto-close-all. */
 @Composable
 private fun WindowsSection(
-    carStatus: CarStatus?,
+    windows: com.daotranbang.vfsmart.data.model.Windows?,
+    isLocked: Boolean,
+    windowCloseActive: Boolean,
+    windowCloseRemainingMs: Long,
     enabled: Boolean,
     controlViewModel: ControlViewModel
 ) {
-    val isLocked    = carStatus?.carLockState == "locked"
-    val windowsOpen = carStatus != null &&
-            (carStatus.windows.leftState == 2 || carStatus.windows.rightState == 2)
+    val windowsOpen = windows != null && (windows.leftState == 2 || windows.rightState == 2)
     FeatureCard(
         title  = stringResource(R.string.section_windows),
         icon   = Icons.Default.Window,
         status = when {
-            carStatus == null -> "--"
-            windowsOpen       -> stringResource(R.string.windows_open)
-            else              -> stringResource(R.string.windows_closed)
+            windows == null -> "--"
+            windowsOpen     -> stringResource(R.string.windows_open)
+            else            -> stringResource(R.string.windows_closed)
         },
         statusColor = when {
-            carStatus == null       -> MaterialTheme.colorScheme.onSurfaceVariant
+            windows == null         -> MaterialTheme.colorScheme.onSurfaceVariant
             windowsOpen && isLocked -> MaterialTheme.colorScheme.error
             windowsOpen             -> MaterialTheme.colorScheme.tertiary
             else                    -> MaterialTheme.colorScheme.primary
         }
     ) {
-        if (carStatus != null) {
+        if (windows != null) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
                     text = stringResource(R.string.window_left_state,
-                        windowStateText(carStatus.windows.leftState)),
+                        windowStateText(windows.leftState)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = stringResource(R.string.window_right_state,
-                        windowStateText(carStatus.windows.rightState)),
+                        windowStateText(windows.rightState)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -310,8 +342,8 @@ private fun WindowsSection(
             )
         }
         // Auto-close all windows (was a Home quick action) with live countdown.
-        val closeAllLabel = if (carStatus?.windowCloseActive == true)
-            stringResource(R.string.action_closing_windows, carStatus.windowCloseRemainingMs / 1000)
+        val closeAllLabel = if (windowCloseActive)
+            stringResource(R.string.action_closing_windows, windowCloseRemainingMs / 1000)
         else
             stringResource(R.string.action_close_windows)
         ControlButton(
@@ -329,23 +361,23 @@ private fun WindowsSection(
 /** Charging: charging/not-charging badge + charger-port unlock. */
 @Composable
 private fun ChargingSection(
-    carStatus: CarStatus?,
+    chargingStatus: Int?,
     enabled: Boolean,
     controlViewModel: ControlViewModel
 ) {
-    val isCharging = carStatus?.chargingStatus == 1
+    val isCharging = chargingStatus == 1
     FeatureCard(
         title  = stringResource(R.string.section_charging),
         icon   = Icons.Default.BatteryChargingFull,
         status = when {
-            carStatus == null -> "--"
-            isCharging        -> stringResource(R.string.charging_active)
-            else              -> stringResource(R.string.not_charging)
+            chargingStatus == null -> "--"
+            isCharging             -> stringResource(R.string.charging_active)
+            else                   -> stringResource(R.string.not_charging)
         },
         statusColor = when {
-            carStatus == null -> MaterialTheme.colorScheme.onSurfaceVariant
-            isCharging        -> MaterialTheme.colorScheme.primary
-            else              -> MaterialTheme.colorScheme.onSurfaceVariant
+            chargingStatus == null -> MaterialTheme.colorScheme.onSurfaceVariant
+            isCharging             -> MaterialTheme.colorScheme.primary
+            else                   -> MaterialTheme.colorScheme.onSurfaceVariant
         }
     ) {
         ControlButton(
@@ -363,29 +395,28 @@ private fun ChargingSection(
 /** Lights: on/off badge (alert when off at night) + light-reminder toggle. */
 @Composable
 private fun LightsSection(
-    carStatus: CarStatus?,
+    lights: com.daotranbang.vfsmart.data.model.Lights?,
+    isNight: Boolean,
+    lightReminderEnabled: Boolean,
     enabled: Boolean,
     controlViewModel: ControlViewModel
 ) {
-    val lightsOn = carStatus != null &&
-            (carStatus.lights.normalLight == 1 || carStatus.lights.demiLight == 1)
-    val isNight  = carStatus?.time?.isNight == true
+    val lightsOn = lights != null && (lights.normalLight == 1 || lights.demiLight == 1)
     FeatureCard(
         title  = stringResource(R.string.card_lights),
         icon   = Icons.Default.Lightbulb,
         status = when {
-            carStatus == null -> "--"
-            lightsOn          -> stringResource(R.string.lights_on)
-            else              -> stringResource(R.string.lights_off)
+            lights == null -> "--"
+            lightsOn       -> stringResource(R.string.lights_on)
+            else           -> stringResource(R.string.lights_off)
         },
         statusColor = when {
-            carStatus == null -> MaterialTheme.colorScheme.onSurfaceVariant
-            lightsOn          -> MaterialTheme.colorScheme.primary
-            isNight           -> MaterialTheme.colorScheme.error
-            else              -> MaterialTheme.colorScheme.onSurfaceVariant
+            lights == null -> MaterialTheme.colorScheme.onSurfaceVariant
+            lightsOn       -> MaterialTheme.colorScheme.primary
+            isNight        -> MaterialTheme.colorScheme.error
+            else           -> MaterialTheme.colorScheme.onSurfaceVariant
         }
     ) {
-        val lightReminderEnabled = carStatus?.lightReminderEnabled == true
         ToggleControlButton(
             text = stringResource(R.string.light_reminder),
             isOn = lightReminderEnabled,
@@ -399,10 +430,13 @@ private fun LightsSection(
 
 /** Status-only items with no controls: doors + gear. */
 @Composable
-private fun VehicleStatusSection(carStatus: CarStatus?) {
-    val doorsOpen = carStatus != null && (carStatus.doors.frontLeft == 1 ||
-            carStatus.doors.frontRight == 1 || carStatus.doors.trunk == 1)
-    val inDrive   = carStatus?.sensors?.gearDrive == 1
+private fun VehicleStatusSection(
+    doors: com.daotranbang.vfsmart.data.model.Doors?,
+    gearDrive: Int?
+) {
+    val doorsOpen = doors != null &&
+            (doors.frontLeft == 1 || doors.frontRight == 1 || doors.trunk == 1)
+    val inDrive   = gearDrive == 1
 
     FeatureCard(
         title = stringResource(R.string.section_vehicle_status),
@@ -411,21 +445,21 @@ private fun VehicleStatusSection(carStatus: CarStatus?) {
         StatusRow(
             label = stringResource(R.string.card_doors),
             value = when {
-                carStatus == null -> "--"
-                doorsOpen         -> stringResource(R.string.doors_open)
-                else              -> stringResource(R.string.doors_closed)
+                doors == null -> "--"
+                doorsOpen     -> stringResource(R.string.doors_open)
+                else          -> stringResource(R.string.doors_closed)
             },
             valueColor = when {
-                carStatus == null -> MaterialTheme.colorScheme.onSurfaceVariant
-                doorsOpen         -> MaterialTheme.colorScheme.error
-                else              -> MaterialTheme.colorScheme.primary
+                doors == null -> MaterialTheme.colorScheme.onSurfaceVariant
+                doorsOpen     -> MaterialTheme.colorScheme.error
+                else          -> MaterialTheme.colorScheme.primary
             },
             icon = if (doorsOpen) Icons.Default.Warning else Icons.Default.Check
         )
         StatusRow(
             label = stringResource(R.string.card_gear),
             value = when {
-                carStatus == null -> "--"
+                gearDrive == null -> "--"
                 inDrive           -> stringResource(R.string.gear_drive)
                 else              -> stringResource(R.string.gear_park)
             },
@@ -438,7 +472,7 @@ private fun VehicleStatusSection(carStatus: CarStatus?) {
 /** Accessories: accessory power + inside cameras toggles (state is the toggle). */
 @Composable
 private fun AccessoriesSection(
-    carStatus: CarStatus?,
+    controls: com.daotranbang.vfsmart.data.model.Controls?,
     enabled: Boolean,
     controlViewModel: ControlViewModel
 ) {
@@ -446,7 +480,7 @@ private fun AccessoriesSection(
         title = stringResource(R.string.section_accessories),
         icon  = Icons.Default.PowerSettingsNew
     ) {
-        val accessoryPowerOn = carStatus?.controls?.accessoryPower == 1
+        val accessoryPowerOn = controls?.accessoryPower == 1
         ToggleControlButton(
             text = stringResource(R.string.accessory_power),
             isOn = accessoryPowerOn,
@@ -455,7 +489,7 @@ private fun AccessoriesSection(
             enabled = enabled,
             contentPadding = CompactPadding
         )
-        val camerasOn = carStatus?.controls?.insideCameras == 1
+        val camerasOn = controls?.insideCameras == 1
         ToggleControlButton(
             text = stringResource(R.string.inside_cameras),
             isOn = camerasOn,
