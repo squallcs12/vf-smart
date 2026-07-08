@@ -54,9 +54,20 @@ void registerOTAEndpoint(AsyncWebServer& server) {
     },
     // Upload handler called for each chunk of data
     [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-      // Check authentication on first chunk
+      // First chunk: authenticate, then open the update session.
       if (index == 0) {
         if (!authenticateRequest(request)) {
+          // Reject unauthenticated uploads outright - drop the connection so we
+          // don't keep parsing (and feeding) the rest of the body.
+          request->client()->close();
+          return;
+        }
+
+        // Refuse to start on top of an in-flight session (e.g. a previous
+        // upload that hasn't timed out yet) - Update supports only one at a time.
+        if (ota_in_progress) {
+          Serial.println("OTA rejected: an update is already in progress");
+          request->client()->close();
           return;
         }
 
@@ -64,12 +75,11 @@ void registerOTAEndpoint(AsyncWebServer& server) {
         ota_in_progress = true;
         ota_progress_percent = 0;
         ota_error = "";
+        ota_last_activity = millis();
 
         // Determine update type based on filename
         int updateType = U_FLASH; // Default to firmware
-        if (filename.endsWith(".bin")) {
-          updateType = U_FLASH;
-        } else if (filename.endsWith(".littlefs.bin") || filename.endsWith(".spiffs.bin")) {
+        if (filename.endsWith(".littlefs.bin") || filename.endsWith(".spiffs.bin")) {
           updateType = U_SPIFFS;
         }
 
@@ -81,10 +91,20 @@ void registerOTAEndpoint(AsyncWebServer& server) {
         }
       }
 
+      // Only process chunks for an authorized, active session. This also drops
+      // any post-auth-failure chunks (index > 0) that skipped the block above.
+      if (!ota_in_progress) {
+        return;
+      }
+      ota_last_activity = millis();
+
       // Write data chunk
       if (Update.write(data, len) != len) {
         Update.printError(Serial);
         ota_error = Update.errorString();
+        Update.abort();
+        ota_in_progress = false;
+        return;
       }
 
       // Update progress
@@ -102,8 +122,10 @@ void registerOTAEndpoint(AsyncWebServer& server) {
         } else {
           Update.printError(Serial);
           ota_error = Update.errorString();
+          Update.abort();
           ota_in_progress = false;
         }
+        ota_last_activity = 0;
       }
     }
   );

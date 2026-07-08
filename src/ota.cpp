@@ -1,10 +1,12 @@
 #include "ota.h"
 #include <LittleFS.h>
+#include <Update.h>
 
 // OTA status tracking
 bool ota_in_progress = false;
 int ota_progress_percent = 0;
 String ota_error = "";
+unsigned long ota_last_activity = 0;
 
 void initOTA() {
   // Configure OTA hostname
@@ -89,4 +91,18 @@ void initOTA() {
 
 void handleOTA() {
   ArduinoOTA.handle();
+
+  // Recover from an HTTP OTA upload that dropped mid-transfer without ever
+  // reaching its final chunk. Without this, ota_in_progress stays true and
+  // Update stays open, blocking all future uploads until a reboot.
+  // ota_last_activity is only set by the HTTP path, so ArduinoOTA sessions
+  // (which leave it at 0) are never touched here.
+  if (ota_in_progress && ota_last_activity != 0 &&
+      (millis() - ota_last_activity) > OTA_HTTP_TIMEOUT_MS) {
+    Serial.println("\nOTA HTTP upload timed out - aborting");
+    Update.abort();
+    ota_in_progress = false;
+    ota_last_activity = 0;
+    ota_error = "Upload timed out";
+  }
 }
