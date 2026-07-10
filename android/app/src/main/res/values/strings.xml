@@ -65,7 +65,7 @@
     <string name="doors_open">Đang mở</string>
     <string name="doors_closed">Đã đóng</string>
     <string name="section_vehicle_status">Cửa xe &amp; Số</string>
-    <string name="section_utilities">Tiện ích</string>
+    <string name="section_red_light_tools">Đèn đỏ</string>
 
     <!-- HomeScreen quick actions -->
     <string name="quick_actions">Thao tác nhanh</string>

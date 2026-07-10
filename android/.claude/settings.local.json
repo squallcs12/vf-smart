@@ -74,7 +74,12 @@
       "Read(//home/bang/Downloads/**)",
       "mcp__ide__getDiagnostics",
       "Bash(adb -s emulator-5556 push ~/Downloads/48f2f62bc6c5479b1ed4.jpg /sdcard/Download/48f2f62bc6c5479b1ed4.jpg)",
-      "Bash(adb -s emulator-5556 shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/48f2f62bc6c5479b1ed4.jpg)"
+      "Bash(adb -s emulator-5556 shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/48f2f62bc6c5479b1ed4.jpg)",
+      "PowerShell(git pull *)",
+      "PowerShell(git remote -v; ssh -o ConnectTimeout=5 -T -p 443 git@ssh.github.com)",
+      "PowerShell(git log *)",
+      "PowerShell(git fsck *)",
+      "PowerShell(New-Item *)"
     ]
   }
 }

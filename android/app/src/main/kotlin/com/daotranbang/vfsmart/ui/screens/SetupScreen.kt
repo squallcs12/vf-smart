@@ -27,6 +27,7 @@ import com.daotranbang.vfsmart.viewmodel.SetupViewModel
 @Composable
 fun SetupScreen(
     onSetupComplete: () -> Unit,
+    onNavigateToTpmsCalibration: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SetupViewModel = hiltViewModel()
 ) {
@@ -296,6 +297,27 @@ fun SetupScreen(
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.padding(12.dp))
                     }
+                }
+            }
+
+            // Maintenance tools
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(text = stringResource(R.string.section_settings),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedControlButton(
+                        text = stringResource(R.string.tpms_calibration),
+                        onClick = onNavigateToTpmsCalibration
+                    )
                 }
             }
 

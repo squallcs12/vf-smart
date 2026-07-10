@@ -29,9 +29,9 @@ import com.daotranbang.vfsmart.viewmodel.ControlViewModel
 
 // Compact metrics so the whole dashboard fits the landscape height (~300dp of
 // usable content below the app bar) with no scrolling.
-private val ButtonHeight = 38.dp
-private val CardPadding  = 10.dp
-private val GapSmall     = 6.dp
+private val ButtonHeight = 34.dp
+private val CardPadding  = 8.dp
+private val GapSmall     = 4.dp
 private val Gap          = 8.dp
 // Material's default 24dp button padding truncates labels in the narrow columns.
 private val CompactPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
@@ -43,7 +43,7 @@ private val CompactPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
  * each card shows a feature's live status as a colored badge in its header with
  * that feature's controls in the body (windows status + window buttons, lock
  * status + lock/unlock, charging status + charger unlock, …). Status-only items
- * (doors, gear) share a compact read-only card. Cards flow into four columns
+ * (doors, gear) share a compact read-only card. Cards flow into three columns
  * sized so the whole screen fits the landscape height without scrolling.
  */
 @Composable
@@ -51,7 +51,6 @@ fun HomeScreen(
     onNavigateToDebug: () -> Unit = {},
     onNavigateToMirror: () -> Unit = {},
     onNavigateToSetup: () -> Unit = {},
-    onNavigateToTpmsCalibration: () -> Unit = {},
     onNavigateToCamera: () -> Unit = {},
     onNavigateToRedLight: () -> Unit = {},
     onNavigateToTrafficLight: () -> Unit = {},
@@ -149,7 +148,7 @@ fun HomeScreen(
                 NotificationAccessBanner()
             }
 
-            // Landscape four-column card flow sized to fit without scrolling.
+            // Landscape three-column card flow sized to fit without scrolling.
             Row(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(Gap)
@@ -180,6 +179,7 @@ fun HomeScreen(
                         enabled                = enabled,
                         controlViewModel       = controlViewModel
                     )
+                    AudioSection(enabled, controlViewModel)
                 }
                 Column(
                     modifier = Modifier.weight(1f),
@@ -192,19 +192,12 @@ fun HomeScreen(
                         enabled              = enabled,
                         controlViewModel     = controlViewModel
                     )
-                    AudioSection(enabled, controlViewModel)
-                }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(Gap)
-                ) {
                     AccessoriesSection(carStatus?.controls, enabled, controlViewModel)
                     UtilitiesSection(
-                        onNavigateToCamera          = onNavigateToCamera,
-                        onNavigateToRtspCapture     = onNavigateToRtspCapture,
-                        onNavigateToRedLight        = onNavigateToRedLight,
-                        onNavigateToTrafficLight    = onNavigateToTrafficLight,
-                        onNavigateToTpmsCalibration = onNavigateToTpmsCalibration
+                        onNavigateToCamera       = onNavigateToCamera,
+                        onNavigateToRtspCapture  = onNavigateToRtspCapture,
+                        onNavigateToRedLight     = onNavigateToRedLight,
+                        onNavigateToTrafficLight = onNavigateToTrafficLight
                     )
                 }
             }
@@ -539,12 +532,11 @@ private fun UtilitiesSection(
     onNavigateToCamera: () -> Unit,
     onNavigateToRtspCapture: () -> Unit,
     onNavigateToRedLight: () -> Unit,
-    onNavigateToTrafficLight: () -> Unit,
-    onNavigateToTpmsCalibration: () -> Unit
+    onNavigateToTrafficLight: () -> Unit
 ) {
     FeatureCard(
-        title = stringResource(R.string.section_utilities),
-        icon  = Icons.Default.Apps
+        title = stringResource(R.string.section_red_light_tools),
+        icon  = Icons.Default.Traffic
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -558,8 +550,6 @@ private fun UtilitiesSection(
                 stringResource(R.string.btn_red_light_detector), onNavigateToRedLight)
             UtilityIcon(Icons.Default.Traffic,
                 stringResource(R.string.btn_traffic_light_live), onNavigateToTrafficLight)
-            UtilityIcon(Icons.Default.Settings,
-                stringResource(R.string.tpms_calibration), onNavigateToTpmsCalibration)
         }
     }
 }
@@ -572,7 +562,7 @@ private fun UtilityIcon(
 ) {
     FilledTonalIconButton(
         onClick = onClick,
-        modifier = Modifier.size(40.dp)
+        modifier = Modifier.size(36.dp)
     ) {
         Icon(icon, contentDescription = contentDescription,
             modifier = Modifier.size(20.dp))

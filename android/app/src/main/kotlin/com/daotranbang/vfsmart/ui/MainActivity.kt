@@ -135,7 +135,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onNavigateToSetup    = { navController.navigate("setup") },
-                            onNavigateToTpmsCalibration = { navController.navigate("tpms_calibration") },
                             onNavigateToCamera       = { navController.navigate("camera") },
                             onNavigateToRedLight     = { navController.navigate("red_light") },
                             onNavigateToTrafficLight = { navController.navigate("traffic_light_live") },
@@ -145,7 +144,8 @@ class MainActivity : ComponentActivity() {
 
                     composable("setup") {
                         SetupScreen(
-                            onSetupComplete = { navController.popBackStack() }
+                            onSetupComplete = { navController.popBackStack() },
+                            onNavigateToTpmsCalibration = { navController.navigate("tpms_calibration") }
                         )
                     }
 
