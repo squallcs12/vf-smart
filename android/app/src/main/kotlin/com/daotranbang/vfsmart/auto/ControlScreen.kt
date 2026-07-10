@@ -93,35 +93,20 @@ class ControlScreen(
                 .build()
         )
 
-        // Window Control
-        if (windowsOpen) {
-            listBuilder.addItem(
-                Row.Builder()
-                    .setTitle("Close Windows")
-                    .addText("Windows are currently open")
-                    .setImage(
-                        CarIcon.Builder(CarIcon.ALERT).build(),
-                        Row.IMAGE_TYPE_ICON
-                    )
-                    .setOnClickListener {
-                        scope.launch {
-                            repository.closeWindows()
-                        }
-                    }
-                    .build()
-            )
-        } else {
-            listBuilder.addItem(
-                Row.Builder()
-                    .setTitle("Windows")
-                    .addText("Windows are closed")
-                    .setImage(
-                        CarIcon.Builder(CarIcon.APP_ICON).build(),
-                        Row.IMAGE_TYPE_ICON
-                    )
-                    .build()
-            )
-        }
+        // Window status (informational only). Windows are hold-to-move, one at a
+        // time, from the phone app — Android Auto rows can't press-and-hold, and
+        // closing both windows at once is a heavy motor load on the car, so no
+        // close-all action is offered here.
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("Windows")
+                .addText(if (windowsOpen) "Windows are currently open" else "Windows are closed")
+                .setImage(
+                    CarIcon.Builder(if (windowsOpen) CarIcon.ALERT else CarIcon.APP_ICON).build(),
+                    Row.IMAGE_TYPE_ICON
+                )
+                .build()
+        )
 
         // Status Info Row
         val statusText = buildStatusText(status)

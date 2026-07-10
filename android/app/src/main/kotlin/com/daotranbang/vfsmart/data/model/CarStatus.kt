@@ -34,12 +34,6 @@ data class CarStatus(
     @SerializedName("car_lock_state")
     val carLockState: String,
 
-    @SerializedName("window_close_active")
-    val windowCloseActive: Boolean,
-
-    @SerializedName("window_close_remaining_ms")
-    val windowCloseRemainingMs: Long,
-
     @SerializedName("light_reminder_enabled")
     val lightReminderEnabled: Boolean,
 

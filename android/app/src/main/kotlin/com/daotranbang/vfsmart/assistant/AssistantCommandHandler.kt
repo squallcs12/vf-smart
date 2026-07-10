@@ -99,7 +99,7 @@ class AssistantCommandHandler @Inject constructor(
     private suspend fun handleOpenCommand(objectName: String?) {
         when (objectName?.lowercase()) {
             "windows", "window" -> {
-                speak("Cannot open windows remotely. Use close windows instead")
+                speak("Please open the windows one at a time from the app")
             }
             "mirrors", "side_mirrors", "side mirrors" -> {
                 withContext(Dispatchers.IO) {
@@ -116,12 +116,10 @@ class AssistantCommandHandler @Inject constructor(
     private suspend fun handleCloseCommand(objectName: String?) {
         when (objectName?.lowercase()) {
             "windows", "window" -> {
-                withContext(Dispatchers.IO) {
-                    repository.closeWindows()
-                }.fold(
-                    onSuccess = { speak("Closing windows for 30 seconds") },
-                    onFailure = { speak("Failed to close windows: ${it.message}") }
-                )
+                // Windows are hold-to-move, one at a time, from the app. Closing
+                // both windows at once is a heavy motor load on the car, so it's
+                // deliberately not available as a hands-free voice command.
+                speak("Please close the windows one at a time from the app")
             }
             "mirrors", "side_mirrors", "side mirrors" -> {
                 withContext(Dispatchers.IO) {

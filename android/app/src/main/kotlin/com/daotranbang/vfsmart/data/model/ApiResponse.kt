@@ -43,12 +43,6 @@ data class WindowResponse(
     @SerializedName("message")
     val message: String,
 
-    @SerializedName("window_close_active")
-    val windowCloseActive: Boolean? = null,
-
-    @SerializedName("duration_ms")
-    val durationMs: Long? = null,
-
     @SerializedName("side")
     val side: String? = null,
 

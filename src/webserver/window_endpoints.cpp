@@ -6,55 +6,6 @@
 #include <ArduinoJson.h>
 
 void registerWindowEndpoints(AsyncWebServer& server) {
-  // POST /car/windows/close - Close windows (30 second timer)
-  server.on("/car/windows/close", HTTP_POST, [](AsyncWebServerRequest *request){
-    if (!authenticateRequest(request)) {
-      sendUnauthorized(request);
-      return;
-    }
-
-    window_close_timer = millis();
-    safeDigitalWrite(VF3_WINDOW_LEFT_UP, WRITE_OFF);
-    safeDigitalWrite(VF3_WINDOW_RIGHT_UP, WRITE_OFF);
-
-    JsonDocument doc;
-    doc["success"] = true;
-    doc["message"] = "Windows closing for 30 seconds";
-    doc["window_close_active"] = true;
-    doc["duration_ms"] = WINDOW_CLOSE_DURATION;
-
-    String output;
-    serializeJson(doc, output);
-    request->send(200, "application/json", output);
-
-    // Broadcast updated status immediately
-    broadcastStatus();
-  });
-
-  // POST /car/windows/stop - Stop window operation
-  server.on("/car/windows/stop", HTTP_POST, [](AsyncWebServerRequest *request){
-    if (!authenticateRequest(request)) {
-      sendUnauthorized(request);
-      return;
-    }
-
-    window_close_timer = 0;
-    safeDigitalWrite(VF3_WINDOW_LEFT_UP, WRITE_ON);
-    safeDigitalWrite(VF3_WINDOW_RIGHT_UP, WRITE_ON);
-
-    JsonDocument doc;
-    doc["success"] = true;
-    doc["message"] = "Window operation stopped";
-    doc["window_close_active"] = false;
-
-    String output;
-    serializeJson(doc, output);
-    request->send(200, "application/json", output);
-
-    // Broadcast updated status immediately
-    broadcastStatus();
-  });
-
   // POST /car/windows/down - Control windows down
   server.on("/car/windows/down", HTTP_POST, [](AsyncWebServerRequest *request){
     if (!authenticateRequest(request)) {
@@ -74,25 +25,11 @@ void registerWindowEndpoints(AsyncWebServer& server) {
 
     bool validRequest = false;
 
-    if (side == "left" && state == "on") {
-      safeDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_OFF);
-      validRequest = true;
-    } else if (side == "left" && state == "off") {
-      safeDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_ON);
-      validRequest = true;
-    } else if (side == "right" && state == "on") {
-      safeDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_OFF);
-      validRequest = true;
-    } else if (side == "right" && state == "off") {
-      safeDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_ON);
-      validRequest = true;
-    } else if (side == "both" && state == "on") {
-      safeDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_OFF);
-      safeDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_OFF);
-      validRequest = true;
-    } else if (side == "both" && state == "off") {
-      safeDigitalWrite(VF3_WINDOW_LEFT_DOWN, WRITE_ON);
-      safeDigitalWrite(VF3_WINDOW_RIGHT_DOWN, WRITE_ON);
+    bool moving = (state == "on");
+    if ((state == "on" || state == "off") &&
+        (side == "left" || side == "right" || side == "both")) {
+      if (side == "left" || side == "both")  moveWindow(VF3_WINDOW_LEFT_DOWN, moving);
+      if (side == "right" || side == "both") moveWindow(VF3_WINDOW_RIGHT_DOWN, moving);
       validRequest = true;
     }
 
@@ -140,25 +77,11 @@ void registerWindowEndpoints(AsyncWebServer& server) {
 
     bool validRequest = false;
 
-    if (side == "left" && state == "on") {
-      safeDigitalWrite(VF3_WINDOW_LEFT_UP, WRITE_OFF);
-      validRequest = true;
-    } else if (side == "left" && state == "off") {
-      safeDigitalWrite(VF3_WINDOW_LEFT_UP, WRITE_ON);
-      validRequest = true;
-    } else if (side == "right" && state == "on") {
-      safeDigitalWrite(VF3_WINDOW_RIGHT_UP, WRITE_OFF);
-      validRequest = true;
-    } else if (side == "right" && state == "off") {
-      safeDigitalWrite(VF3_WINDOW_RIGHT_UP, WRITE_ON);
-      validRequest = true;
-    } else if (side == "both" && state == "on") {
-      safeDigitalWrite(VF3_WINDOW_LEFT_UP, WRITE_OFF);
-      safeDigitalWrite(VF3_WINDOW_RIGHT_UP, WRITE_OFF);
-      validRequest = true;
-    } else if (side == "both" && state == "off") {
-      safeDigitalWrite(VF3_WINDOW_LEFT_UP, WRITE_ON);
-      safeDigitalWrite(VF3_WINDOW_RIGHT_UP, WRITE_ON);
+    bool moving = (state == "on");
+    if ((state == "on" || state == "off") &&
+        (side == "left" || side == "right" || side == "both")) {
+      if (side == "left" || side == "both")  moveWindow(VF3_WINDOW_LEFT_UP, moving);
+      if (side == "right" || side == "both") moveWindow(VF3_WINDOW_RIGHT_UP, moving);
       validRequest = true;
     }
 

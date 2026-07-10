@@ -49,7 +49,7 @@ import javax.inject.Singleton
  *     L  demi,normal
  *     P  rear_l,rear_r
  *     C  brake_pressed,acc_power,cameras,car_lock,car_unlock
- *     X  charging,lock_state(0/1),wca,wcr_secs,lr,is_night
+ *     X  charging,lock_state(0/1),lr,is_night
  *
  * Authentication: the socket streams nothing until the client proves it knows the
  * configured API key. Right after [onOpen] we send an auth frame as the first
@@ -234,8 +234,6 @@ class WebSocketManager @Inject constructor(
         var controls  = cur?.controls  ?: Controls(0, 0, 0, 0, 0, 0, 0, 0)
         var chargingStatus         = cur?.chargingStatus         ?: 0
         var carLockState           = cur?.carLockState           ?: "unlocked"
-        var windowCloseActive      = cur?.windowCloseActive      ?: false
-        var windowCloseRemainingMs = cur?.windowCloseRemainingMs ?: 0L
         var lightReminderEnabled   = cur?.lightReminderEnabled   ?: true
         var isNight                = cur?.time?.isNight          ?: false
         val tpms                   = cur?.tpms
@@ -291,10 +289,8 @@ class WebSocketManager @Inject constructor(
                 "X" -> {
                     chargingStatus         = v.getOrNull(0)?.toIntOrNull() ?: chargingStatus
                     carLockState           = if ((v.getOrNull(1)?.toIntOrNull() ?: 0) == 1) "locked" else "unlocked"
-                    windowCloseActive      = (v.getOrNull(2)?.toIntOrNull() ?: 0) == 1
-                    windowCloseRemainingMs = (v.getOrNull(3)?.toLongOrNull() ?: 0L) * 1000L
-                    lightReminderEnabled   = (v.getOrNull(4)?.toIntOrNull() ?: 1) == 1
-                    isNight                = (v.getOrNull(5)?.toIntOrNull() ?: 0) == 1
+                    lightReminderEnabled   = (v.getOrNull(2)?.toIntOrNull() ?: 1) == 1
+                    isNight                = (v.getOrNull(3)?.toIntOrNull() ?: 0) == 1
                 }
             }
         }
@@ -309,8 +305,6 @@ class WebSocketManager @Inject constructor(
             controls               = controls,
             chargingStatus         = chargingStatus,
             carLockState           = carLockState,
-            windowCloseActive      = windowCloseActive,
-            windowCloseRemainingMs = windowCloseRemainingMs,
             lightReminderEnabled   = lightReminderEnabled,
             time                   = TimeInfo(
                 synced      = true,

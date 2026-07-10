@@ -71,8 +71,6 @@ class StatusScreen(
         controls = Controls(brakePressed = 0, accessoryPower = 0, insideCameras = 0, carLock = 0, carUnlock = 0, dashcam = 0, odoScreen = 0, armrest = 0),
         chargingStatus = 0,
         carLockState = "",
-        windowCloseActive = false,
-        windowCloseRemainingMs = 0,
         lightReminderEnabled = false,
         time = null,
         tpms = null

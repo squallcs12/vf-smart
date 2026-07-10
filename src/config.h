@@ -31,8 +31,4 @@ extern bool light_reminder_enabled;
 #define NIGHT_START_HOUR 18                    // 6 PM
 #define NIGHT_END_HOUR 6                       // 6 AM
 
-// ===== WINDOW CONTROL =====
-extern unsigned long window_close_timer;
-#define WINDOW_CLOSE_DURATION 30000    // Window close duration in milliseconds (30 seconds)
-
 #endif // CONFIG_H

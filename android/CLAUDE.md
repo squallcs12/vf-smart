@@ -289,8 +289,7 @@ Map Google Assistant voice commands to VF3 Smart HTTP commands (sent via
 |--------------|-------------|--------|
 | "Lock my car" | `lock` | Lock the car |
 | "Unlock my car" | `unlock` | Unlock the car |
-| "Close the windows" | `windows:close` | Close all windows (30s) |
-| "Stop the windows" | `windows:stop` | Stop window operation |
+| "Close/open the windows" | — | Windows are press-and-hold, one at a time, from the app UI only — no voice/timed close (the handler asks the user to do it in-app) |
 | "Open the mirrors" | `mirrors:open` | Open side mirrors |
 | "Close the mirrors" | `mirrors:close` | Close side mirrors |
 | "Honk the horn" | `buzzer:beep,1000` | Beep buzzer |
@@ -322,11 +321,6 @@ class VF3StatusMonitor(private val wsUrl: String) {
         // Provide voice feedback for important events
         if (status.getJSONObject("controls").getInt("car_lock") == 1) {
             speak("Car is now locked")
-        }
-
-        if (status.getBoolean("window_close_active")) {
-            val remaining = status.getInt("window_close_remaining_ms") / 1000
-            speak("Windows closing, $remaining seconds remaining")
         }
     }
 }

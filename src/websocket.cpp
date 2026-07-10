@@ -78,8 +78,6 @@ static int   pProxL = -1, pProxR = -1;
 static int   pBp = -1, pAp = -1, pCam = -1, pCl = -1, pCu = -1;
 // Misc
 static int   pCharging = -1, pLockState = -1;
-static bool  pWca = false;
-static long  pWcrSecs = -1;
 static bool  pLr = false, pNight = false;
 
 // ── Group builders ────────────────────────────────────────────────────────────
@@ -124,14 +122,10 @@ static String grpC() {
     return String(buf);
 }
 static String grpX() {
-    bool wca = (window_close_timer != 0);
-    long wcrSecs = wca
-        ? (long)((WINDOW_CLOSE_DURATION - (millis() - window_close_timer)) / 1000UL)
-        : 0L;
     int ls = (car_lock_state == CAR_LOCKED) ? 1 : 0;
-    char buf[32];
-    snprintf(buf, sizeof(buf), "X:%d,%d,%d,%ld,%d,%d",
-             vf3_charging_status, ls, wca ? 1 : 0, wcrSecs,
+    char buf[24];
+    snprintf(buf, sizeof(buf), "X:%d,%d,%d,%d",
+             vf3_charging_status, ls,
              light_reminder_enabled ? 1 : 0, isNightTime() ? 1 : 0);
     return String(buf);
 }
@@ -178,11 +172,8 @@ static void takeSnapshot() {
     pCl  = vf3_car_lock;
     pCu  = vf3_car_unlock;
 
-    bool wca = (window_close_timer != 0);
     pCharging  = vf3_charging_status;
     pLockState = (car_lock_state == CAR_LOCKED) ? 1 : 0;
-    pWca       = wca;
-    pWcrSecs   = wca ? (long)((WINDOW_CLOSE_DURATION - (millis() - window_close_timer)) / 1000UL) : 0L;
     pLr        = light_reminder_enabled;
     pNight     = isNightTime();
 
@@ -194,10 +185,6 @@ static void takeSnapshot() {
 static String buildDelta() {
     if (!snapshotValid) return String();
 
-    bool wca = (window_close_timer != 0);
-    long wcrSecs = wca
-        ? (long)((WINDOW_CLOSE_DURATION - (millis() - window_close_timer)) / 1000UL)
-        : 0L;
     int ls    = (car_lock_state == CAR_LOCKED) ? 1 : 0;
     bool night = isNightTime();
 
@@ -255,13 +242,11 @@ static String buildDelta() {
         pCam = self_inside_cameras; pCl = vf3_car_lock; pCu = vf3_car_unlock;
         any = true;
     }
-    // X — misc (wcr changes every second while window is closing, so compare by second)
+    // X — misc
     if (vf3_charging_status != pCharging || ls != pLockState ||
-        wca != pWca || wcrSecs != pWcrSecs ||
         light_reminder_enabled != pLr || night != pNight) {
         out += "|"; out += grpX();
         pCharging = vf3_charging_status; pLockState = ls;
-        pWca = wca; pWcrSecs = wcrSecs;
         pLr = light_reminder_enabled; pNight = night;
         any = true;
     }

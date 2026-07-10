@@ -61,7 +61,7 @@ The main loop follows a read-process-act pattern:
 ### Function Organization
 
 Control logic is modularized into separate handler functions:
-- `handleWindowControl()`: Manages window auto-close when car is locked (30-second timer)
+- `handleWindowControl()`: Failsafe that auto-stops a press-and-hold window relay if its "off" release is lost (`WINDOW_MAX_HOLD_MS`)
 - `handleAccessoryPower()`: Controls accessory power based on lock/unlock state
 
 When adding new features, follow this pattern by creating dedicated handler functions and calling them from the main loop.
@@ -89,7 +89,7 @@ When modifying pin assignments:
 
 ## Timer-Based Logic
 
-The codebase uses `millis()` for non-blocking timing (see `window_close_timer`). When implementing time-based features:
+The codebase uses `millis()` for non-blocking timing (see the window hold failsafe in `handleWindowControl()`). When implementing time-based features:
 - Use `unsigned long` for timer variables
 - Compare `millis() - timer_start` against duration constants
 - Define duration constants in milliseconds as `#define` values
@@ -100,7 +100,7 @@ The codebase uses `millis()` for non-blocking timing (see `window_close_timer`).
 State is managed through global variables that mirror physical sensor/actuator states. Variable naming convention:
 - Input sensors: `vf3_<sensor_name>` (e.g., `vf3_door_fl`)
 - Output controls: `vf3_<control_name>` (e.g., `vf3_car_lock`)
-- Timer variables: `<feature>_timer` (e.g., `window_close_timer`)
+- Timer variables: `<feature>_timer` (e.g., `light_reminder` timing state)
 
 ## Battery Voltage Monitoring
 
@@ -206,10 +206,9 @@ Group field formats (comma-separated):
 | `L` | demi, normal |
 | `P` | rear_l, rear_r |
 | `C` | brake_pressed, acc_power, cameras, car_lock, car_unlock |
-| `X` | charging, lock_state(0/1), wca, wcr_secs, lr, is_night |
+| `X` | charging, lock_state(0/1), lr, is_night |
 
-(`wca` = window_close_active 0/1, `wcr_secs` = window_close_remaining seconds,
-`lr` = light_reminder_enabled 0/1.)
+(`lr` = light_reminder_enabled 0/1.)
 
 Send the full frame on connect; send `U|...` deltas containing only the groups
 whose values changed since the last send. **`/ws` carries only car-status** — not
@@ -227,8 +226,7 @@ over `/ws`.
 | `POST /car/lock` / `/car/unlock` | — | Lock / unlock the car |
 | `POST /car/accessory-power` | `state=on\|off\|toggle` | Accessory power |
 | `POST /car/inside-cameras` | `state=on\|off\|toggle` | Inside cameras |
-| `POST /car/windows/close` / `/stop` | — | Start 30 s auto-close / stop |
-| `POST /car/windows/down` / `/up` | `side=left\|right\|both`, `state=on\|off` | Roll window |
+| `POST /car/windows/down` / `/up` | `side=left\|right\|both`, `state=on\|off` | Roll window (press-and-hold: `on` on press, `off` on release) |
 | `POST /car/buzzer` | `state=on\|off\|beep`, `duration=<ms>` | Buzzer/horn |
 | `POST /car/light-reminder` | `state=on\|off\|toggle` | Headlight reminder |
 | `POST /car/charger-unlock` | — | Unlock charger port |

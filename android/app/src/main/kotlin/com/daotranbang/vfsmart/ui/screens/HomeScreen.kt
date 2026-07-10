@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.data.network.ConnectionState
 import com.daotranbang.vfsmart.ui.components.ControlButton
+import com.daotranbang.vfsmart.ui.components.HoldControlButton
 import com.daotranbang.vfsmart.ui.components.OutlinedControlButton
 import com.daotranbang.vfsmart.ui.components.ToggleControlButton
 import com.daotranbang.vfsmart.util.playLightReminder
@@ -174,8 +175,6 @@ fun HomeScreen(
                     WindowsSection(
                         windows                = carStatus?.windows,
                         isLocked               = carStatus?.carLockState == "locked",
-                        windowCloseActive      = carStatus?.windowCloseActive == true,
-                        windowCloseRemainingMs = carStatus?.windowCloseRemainingMs ?: 0L,
                         enabled                = enabled,
                         controlViewModel       = controlViewModel
                     )
@@ -256,8 +255,6 @@ private fun LockSection(
 private fun WindowsSection(
     windows: com.daotranbang.vfsmart.data.model.Windows?,
     isLocked: Boolean,
-    windowCloseActive: Boolean,
-    windowCloseRemainingMs: Long,
     enabled: Boolean,
     controlViewModel: ControlViewModel
 ) {
@@ -296,58 +293,52 @@ private fun WindowsSection(
                 )
             }
         }
+        // Per-side window control — press-and-hold like a physical car window
+        // switch: each window rolls only while its button is held and stops on
+        // release. One window at a time; there is deliberately no "both windows"
+        // button (closing both at once is a heavy motor load on the car).
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(GapSmall)
         ) {
-            ControlButton(
-                text = stringResource(R.string.btn_close_left),
-                onClick = { controlViewModel.closeLeftWindow() },
-                modifier = Modifier.weight(1f).height(ButtonHeight),
-                enabled = enabled,
-                contentPadding = CompactPadding
-            )
-            ControlButton(
-                text = stringResource(R.string.btn_close_right),
-                onClick = { controlViewModel.closeRightWindow() },
-                modifier = Modifier.weight(1f).height(ButtonHeight),
-                enabled = enabled,
-                contentPadding = CompactPadding
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(GapSmall)
-        ) {
-            ControlButton(
+            HoldControlButton(
                 text = stringResource(R.string.btn_open_left),
-                onClick = { controlViewModel.openLeftWindow() },
+                onPress = { controlViewModel.holdOpenWindow("left", true) },
+                onRelease = { controlViewModel.holdOpenWindow("left", false) },
                 modifier = Modifier.weight(1f).height(ButtonHeight),
                 enabled = enabled,
                 contentPadding = CompactPadding
             )
-            ControlButton(
-                text = stringResource(R.string.btn_open_right),
-                onClick = { controlViewModel.openRightWindow() },
+            HoldControlButton(
+                text = stringResource(R.string.btn_close_left),
+                onPress = { controlViewModel.holdCloseWindow("left", true) },
+                onRelease = { controlViewModel.holdCloseWindow("left", false) },
                 modifier = Modifier.weight(1f).height(ButtonHeight),
                 enabled = enabled,
                 contentPadding = CompactPadding
             )
         }
-        // Auto-close all windows (was a Home quick action) with live countdown.
-        val closeAllLabel = if (windowCloseActive)
-            stringResource(R.string.action_closing_windows, windowCloseRemainingMs / 1000)
-        else
-            stringResource(R.string.action_close_windows)
-        ControlButton(
-            text = closeAllLabel,
-            onClick = { controlViewModel.closeWindows() },
-            modifier = Modifier.fillMaxWidth().height(ButtonHeight),
-            enabled = enabled,
-            contentPadding = CompactPadding,
-            icon = { Icon(Icons.Default.Close, contentDescription = null,
-                modifier = Modifier.size(16.dp)) }
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(GapSmall)
+        ) {
+            HoldControlButton(
+                text = stringResource(R.string.btn_open_right),
+                onPress = { controlViewModel.holdOpenWindow("right", true) },
+                onRelease = { controlViewModel.holdOpenWindow("right", false) },
+                modifier = Modifier.weight(1f).height(ButtonHeight),
+                enabled = enabled,
+                contentPadding = CompactPadding
+            )
+            HoldControlButton(
+                text = stringResource(R.string.btn_close_right),
+                onPress = { controlViewModel.holdCloseWindow("right", true) },
+                onRelease = { controlViewModel.holdCloseWindow("right", false) },
+                modifier = Modifier.weight(1f).height(ButtonHeight),
+                enabled = enabled,
+                contentPadding = CompactPadding
+            )
+        }
     }
 }
 

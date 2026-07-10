@@ -89,10 +89,6 @@ class VF3Repository @Inject constructor(
         apiService.controlInsideCameras(if (on) "on" else "off")
     }
 
-    suspend fun closeWindows(): Result<WindowResponse> = safeApiCall { apiService.closeWindows() }
-
-    suspend fun stopWindows(): Result<WindowResponse> = safeApiCall { apiService.stopWindows() }
-
     /** @param side "left", "right", or "both" */
     suspend fun controlWindowDown(side: String, on: Boolean): Result<WindowResponse> = safeApiCall {
         apiService.controlWindowsDown(side, if (on) "on" else "off")

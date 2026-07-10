@@ -1,45 +1,40 @@
 #include "window_control.h"
 
-void handleWindowControl() {
-  // Close windows after 3 car lock pulses
-  static int lock_pulse_count = 0;
-  static int prev_car_lock = LOW;
-  static unsigned long last_pulse_time = 0;
-  const unsigned long PULSE_TIMEOUT = 2000;  // 2 seconds timeout between pulses
+// Per-relay hold tracking. moving_since = millis() when the relay was last
+// energized by a hold command, 0 when idle/stopped. Lets handleWindowControl()
+// auto-stop any relay whose "off" release was lost, so a held window can never
+// stay powered indefinitely.
+struct WindowRelay { uint8_t pin; unsigned long moving_since; };
+static WindowRelay window_relays[] = {
+  { VF3_WINDOW_LEFT_UP,    0 },
+  { VF3_WINDOW_RIGHT_UP,   0 },
+  { VF3_WINDOW_LEFT_DOWN,  0 },
+  { VF3_WINDOW_RIGHT_DOWN, 0 },
+};
+static const size_t WINDOW_RELAY_COUNT = sizeof(window_relays) / sizeof(window_relays[0]);
 
-  // Reset pulse count if timeout exceeded
-  if (lock_pulse_count > 0 && (millis() - last_pulse_time) > PULSE_TIMEOUT) {
-    lock_pulse_count = 0;
-    Serial.println("Window control: Pulse count reset due to timeout");
-  }
-
-  // Detect rising edge (LOW to HIGH transition) of car lock signal
-  if (vf3_car_lock == HIGH && prev_car_lock == LOW) {
-    lock_pulse_count++;
-    last_pulse_time = millis();
-    Serial.print("Window control: Lock pulse detected, count = ");
-    Serial.println(lock_pulse_count);
-
-    // Start window closing after 3 pulses
-    if (lock_pulse_count >= 3) {
-      Serial.println("Window control: 3 pulses detected, closing windows");
-      window_close_timer = millis();
-      lock_pulse_count = 0;  // Reset count
+void moveWindow(uint8_t pin, bool moving) {
+  safeDigitalWrite(pin, moving ? WRITE_OFF : WRITE_ON);
+  for (size_t i = 0; i < WINDOW_RELAY_COUNT; i++) {
+    if (window_relays[i].pin == pin) {
+      window_relays[i].moving_since = moving ? millis() : 0;
+      break;
     }
   }
+}
 
-  prev_car_lock = vf3_car_lock;
-
-  // Handle window closing timer (30 second duration)
-  if (window_close_timer != 0 && millis() - window_close_timer < WINDOW_CLOSE_DURATION) {
-    // Keep windows closing for 30 seconds
-    pcf8575.digitalWrite(VF3_WINDOW_LEFT_UP, WRITE_OFF);
-    pcf8575.digitalWrite(VF3_WINDOW_RIGHT_UP, WRITE_OFF);
-  } else if (window_close_timer != 0) {
-    // Timer expired, stop windows
-    pcf8575.digitalWrite(VF3_WINDOW_LEFT_UP, WRITE_ON);
-    pcf8575.digitalWrite(VF3_WINDOW_RIGHT_UP, WRITE_ON);
-    window_close_timer = 0;
-    Serial.println("Window control: Window closing completed");
+// Windows are press-and-hold only (like the physical switches): each side rolls
+// while its button is held and stops on release. The only job here is the
+// firmware-side backstop for a lost "off" release — auto-stop any relay held
+// past WINDOW_MAX_HOLD_MS (see the header).
+void handleWindowControl() {
+  for (size_t i = 0; i < WINDOW_RELAY_COUNT; i++) {
+    if (window_relays[i].moving_since != 0 &&
+        millis() - window_relays[i].moving_since >= WINDOW_MAX_HOLD_MS) {
+      safeDigitalWrite(window_relays[i].pin, WRITE_ON);
+      window_relays[i].moving_since = 0;
+      Serial.print("Window control: hold failsafe stopped relay ");
+      Serial.println(window_relays[i].pin);
+    }
   }
 }

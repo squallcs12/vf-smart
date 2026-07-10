@@ -54,19 +54,6 @@ interface VF3ApiService {
     ): ControlResponse
 
     /**
-     * Start auto-closing windows (requires API key)
-     * Triggers 30-second window close operation
-     */
-    @POST("/car/windows/close")
-    suspend fun closeWindows(): WindowResponse
-
-    /**
-     * Stop window operation immediately (requires API key)
-     */
-    @POST("/car/windows/stop")
-    suspend fun stopWindows(): WindowResponse
-
-    /**
      * Control window down operation (requires API key)
      * @param side: "left", "right", or "both"
      * @param state: "on" or "off"

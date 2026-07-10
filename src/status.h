@@ -10,6 +10,5 @@
 #include <ArduinoJson.h>
 
 String getCarStatusJSON();
-String getCarStatusCompact();
 
 #endif // STATUS_H

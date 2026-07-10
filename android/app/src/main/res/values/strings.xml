@@ -72,8 +72,6 @@
     <string name="action_lock">Khóa</string>
     <string name="action_unlock">Mở khóa</string>
     <string name="action_beep">Còi</string>
-    <string name="action_close_windows">Đóng kính</string>
-    <string name="action_closing_windows">Đang đóng (%ds)</string>
     <string name="more_controls">Điều khiển thêm</string>
 
     <!-- ControlScreen -->

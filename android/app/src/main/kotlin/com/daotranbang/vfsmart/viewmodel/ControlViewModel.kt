@@ -58,24 +58,6 @@ class ControlViewModel @Inject constructor(
     }
 
     /**
-     * Close windows (30-second timer)
-     */
-    fun closeWindows() {
-        executeOperation("Closing windows...") {
-            repository.closeWindows()
-        }
-    }
-
-    /**
-     * Stop window operation
-     */
-    fun stopWindows() {
-        executeOperation("Stopping windows...") {
-            repository.stopWindows()
-        }
-    }
-
-    /**
      * Control window down
      * @param side "left", "right", or "both"
      * @param on true to roll down, false to stop
@@ -115,27 +97,30 @@ class ControlViewModel @Inject constructor(
         }
     }
 
-    fun openLeftWindow() {
-        executeOperation("Opening left window...") {
-            repository.controlWindowDown("left", true)
+    /**
+     * Hold-to-open a single window, like a physical window switch: roll the
+     * window down while the button is held, stop the moment it's released.
+     * One window at a time — never both at once (heavy motor load on the car).
+     * Bypasses [executeOperation] so rapid press/release doesn't spam the
+     * loading/success operation state.
+     * @param side "left" or "right"
+     * @param pressed true on press (start rolling down), false on release (stop)
+     */
+    fun holdOpenWindow(side: String, pressed: Boolean) {
+        viewModelScope.launch {
+            repository.controlWindowDown(side, pressed)
         }
     }
 
-    fun closeLeftWindow() {
-        executeOperation("Closing left window...") {
-            repository.controlWindowDown("left", false)
-        }
-    }
-
-    fun openRightWindow() {
-        executeOperation("Opening right window...") {
-            repository.controlWindowDown("right", true)
-        }
-    }
-
-    fun closeRightWindow() {
-        executeOperation("Closing right window...") {
-            repository.controlWindowDown("right", false)
+    /**
+     * Hold-to-close a single window: roll the window up while the button is
+     * held, stop the moment it's released. One window at a time.
+     * @param side "left" or "right"
+     * @param pressed true on press (start rolling up), false on release (stop)
+     */
+    fun holdCloseWindow(side: String, pressed: Boolean) {
+        viewModelScope.launch {
+            repository.controlWindowUp(side, pressed)
         }
     }
 
