@@ -5,3 +5,6 @@
 .vscode/ipch
 include/mqtt_config.h
 .venv/
+# Claude Code machine-local settings
+.claude/settings.local.json
+android/.claude/settings.local.json
