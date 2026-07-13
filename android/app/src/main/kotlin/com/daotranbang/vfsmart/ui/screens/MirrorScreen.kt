@@ -472,12 +472,18 @@ private fun OdoClockCell(
         }
     }
 
-    // Tap to refresh weather immediately
+    // Tap to refresh weather immediately (with a brief spinner so the tap is acknowledged)
     val scope = rememberCoroutineScope()
+    var refreshing by remember { mutableStateOf(false) }
     val refreshWeather = {
-        scope.launch {
-            currentLocation?.let { loc ->
-                fetchWeather(loc.latitude, loc.longitude)?.let { weather = it }
+        if (!refreshing) scope.launch {
+            refreshing = true
+            try {
+                currentLocation?.let { loc ->
+                    fetchWeather(loc.latitude, loc.longitude)?.let { weather = it }
+                }
+            } finally {
+                refreshing = false
             }
         }
         Unit
@@ -506,8 +512,13 @@ private fun OdoClockCell(
             Icon(currentIcon, contentDescription = "now", tint = OdoNormal,
                 modifier = Modifier.size(48.dp))
             Spacer(Modifier.width(8.dp))
-            Icon(Icons.Default.ArrowForward, contentDescription = null,
-                tint = OdoInactive, modifier = Modifier.size(18.dp))
+            if (refreshing) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp, color = OdoNormal)
+            } else {
+                Icon(Icons.Default.ArrowForward, contentDescription = null,
+                    tint = OdoInactive, modifier = Modifier.size(18.dp))
+            }
             Spacer(Modifier.width(8.dp))
             Icon(nextIcon, contentDescription = "+1h", tint = OdoNormal,
                 modifier = Modifier.size(36.dp))
