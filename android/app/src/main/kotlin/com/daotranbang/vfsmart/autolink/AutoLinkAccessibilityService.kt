@@ -11,62 +11,35 @@ import android.provider.Settings
 import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
-import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
 import com.daotranbang.vfsmart.R
+import com.daotranbang.vfsmart.navigation.NavigationNotificationService
 import com.daotranbang.vfsmart.ui.MainActivity
 
 class AutoLinkAccessibilityService : AccessibilityService() {
 
-    private enum class State { IDLE, SWITCHING_TO_USB }
-
-    private var state = State.IDLE
     private val handler = Handler(Looper.getMainLooper())
     private var onConnected: (() -> Unit)? = null
-    private var usbSwitchRetries = 0
+    private var mirroringWaitPolls = 0
 
-    private val timeoutRunnable = Runnable {
-        Log.w(TAG, "startConnecting timed out — USB toggle never appeared")
-        state = State.IDLE
-    }
-
-    // Once AutoLink Pro opens, just switch it to USB mode. `action_button_usb` is shown
-    // while in WiFi mode (tap it to go USB); `action_button_wifi` is shown when USB mode
-    // is already active (nothing to do). No device picking, no "Start now" dialog.
-    private val pollForUsbToggleRunnable = object : Runnable {
+    // After launching AutoLink Pro, stay on it and poll until its "Mirroring" status-bar
+    // notification appears (tracked by NavigationNotificationService). Only then return to
+    // our app, so mirroring is confirmed live before we take the foreground.
+    private val waitForMirroringRunnable = object : Runnable {
         override fun run() {
-            if (state != State.SWITCHING_TO_USB) return
-            val root = rootInActiveWindow
-            val usbBtn = root?.findAccessibilityNodeInfosByViewId(
-                "com.link.autolink.pro:id/action_button_usb"
-            )?.firstOrNull()
-            if (usbBtn != null) {
-                Log.d(TAG, "USB toggle found — clicking to switch to USB mode")
-                clickNodeOrParent(usbBtn)
-                @Suppress("DEPRECATION") usbBtn.recycle()
+            if (NavigationNotificationService.autoLinkMirroringActive) {
+                Log.i(TAG, "Mirroring notification seen — returning to app")
                 finishConnection()
-                return
-            }
-            val wifiBtn = root?.findAccessibilityNodeInfosByViewId(
-                "com.link.autolink.pro:id/action_button_wifi"
-            )?.firstOrNull()
-            if (wifiBtn != null) {
-                Log.d(TAG, "WiFi toggle visible — already in USB mode, nothing to do")
-                @Suppress("DEPRECATION") wifiBtn.recycle()
-                finishConnection()
-            } else if (usbSwitchRetries++ < USB_SWITCH_MAX_RETRIES) {
-                Log.v(TAG, "mode buttons not yet visible — retry $usbSwitchRetries/${USB_SWITCH_MAX_RETRIES}")
+            } else if (mirroringWaitPolls++ < MIRRORING_WAIT_MAX_POLLS) {
                 handler.postDelayed(this, POLL_INTERVAL_MS)
             } else {
-                Log.w(TAG, "mode buttons not found after retries — finishing anyway")
+                Log.w(TAG, "Mirroring notification not seen within timeout — returning anyway")
                 finishConnection()
             }
         }
     }
 
     private fun finishConnection() {
-        state = State.IDLE
-        handler.removeCallbacks(timeoutRunnable)
         handler.postDelayed({
             Log.i(TAG, "AutoLink connection complete — returning to MainActivity")
             startActivity(Intent(this@AutoLinkAccessibilityService, MainActivity::class.java).apply {
@@ -90,32 +63,24 @@ class AutoLinkAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        // The USB-mode switch is handled by pollForUsbToggleRunnable.
-    }
-
-    private fun clickNodeOrParent(node: AccessibilityNodeInfo) {
-        if (!node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-            node.parent?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-        }
+        // No UI automation needed — AutoLink Pro is always in USB mode.
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean = false
 
     fun startConnecting(onConnected: (() -> Unit)? = null) {
         this.onConnected = onConnected
-        usbSwitchRetries = 0
-        Log.d(TAG, "startConnecting — switching AutoLink to USB mode")
-        state = State.SWITCHING_TO_USB
-        handler.removeCallbacks(timeoutRunnable)
-        handler.removeCallbacks(pollForUsbToggleRunnable)
-        handler.postDelayed(timeoutRunnable, TIMEOUT_MS)
-        handler.post(pollForUsbToggleRunnable)
+        mirroringWaitPolls = 0
+        // AutoLink Pro is always in USB mode and auto-mirrors on launch, so there's no
+        // toggle to drive — just wait on AutoLink until its "Mirroring" notification shows,
+        // then return to our app.
+        Log.d(TAG, "startConnecting — waiting for AutoLink Mirroring notification")
+        handler.removeCallbacks(waitForMirroringRunnable)
+        handler.post(waitForMirroringRunnable)
     }
 
     override fun onInterrupt() {
-        state = State.IDLE
         handler.removeCallbacksAndMessages(null)
-        handler.removeCallbacks(pollForUsbToggleRunnable)
         onConnected = null
     }
 
@@ -129,9 +94,9 @@ class AutoLinkAccessibilityService : AccessibilityService() {
         private const val TAG = "AutoLinkA11y"
         const val AUTOLINK_PACKAGE = "com.link.autolink.pro"
         var instance: AutoLinkAccessibilityService? = null
-        private const val TIMEOUT_MS = 30_000L
         private const val POLL_INTERVAL_MS = 500L
-        private const val USB_SWITCH_MAX_RETRIES = 6
+        // Max polls (×POLL_INTERVAL_MS) to wait for the Mirroring notification ≈ 30 s.
+        private const val MIRRORING_WAIT_MAX_POLLS = 60
 
         /** The flattened component name of this accessibility service. */
         private fun component(context: Context): String =

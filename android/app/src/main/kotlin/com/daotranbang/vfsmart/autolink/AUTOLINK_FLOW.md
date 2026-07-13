@@ -4,17 +4,17 @@
 
 The phone runs **AutoLink Pro** (`com.link.autolink.pro`) to mirror its own screen onto
 the car display over USB. This subsystem makes that connection happen
-**automatically and hands-free** — when the user gets in the car, the app launches AutoLink,
-drives its UI through the accessibility service to switch it to **USB mode**, then returns to
-our own `MainActivity`. (Screen-capture consent is pre-granted via `appops`, so the
-"Start now" dialog never appears.)
+**automatically and hands-free** — when the user gets in the car, the app launches AutoLink
+(which is always in **USB mode** and auto-mirrors on launch), then returns to our own
+`MainActivity`. (Screen-capture consent is pre-granted via `appops`, so the "Start now"
+dialog never appears.)
 
 **Two classes:**
 
 | Class | Role |
 |---|---|
 | `AutoLinkService` (foreground `Service`) | Detects the triggers, debounces, launches AutoLink Pro, and verifies the connection |
-| `AutoLinkAccessibilityService` (`AccessibilityService`) | Drives the AutoLink Pro UI: switches it to USB mode |
+| `AutoLinkAccessibilityService` (`AccessibilityService`) | Returns to our `MainActivity` after launch (AutoLink Pro is always in USB mode, so no UI to drive) |
 
 > **Lifecycle:** the service runs only while the phone is plugged in — `VF3Application`
 > starts it on `ACTION_POWER_CONNECTED` (and at launch if already powered) and stops it
@@ -68,43 +68,38 @@ startActivity(AutoLink Pro MainActivity)   // NEW_TASK | CLEAR_TASK
    │           with EXTRA_NAVIGATE_MIRROR = true
 ```
 
-If the accessibility service isn't running we can't drive AutoLink's UI, so we just bounce
-back to our own mirror screen.
+Both branches end up back on our own mirror screen; the difference is that the
+accessibility branch also arms the post-launch verification (`scheduleConnectionCheck`).
 
 ---
 
-## Accessibility state machine
+## Accessibility service — wait for mirroring, then return to app
 
-`AutoLinkAccessibilityService.startConnecting()` runs a polling state machine
-(`POLL_INTERVAL_MS` = 500 ms, overall `TIMEOUT_MS` = 30 s). It only sees windows from
-`com.link.autolink.pro`.
+AutoLink Pro is **always in USB mode** and auto-mirrors on launch, so there is no toggle
+to drive. `AutoLinkAccessibilityService.startConnecting()` therefore does no UI automation
+— it stays on AutoLink and **polls until AutoLink's "Mirroring" notification appears**
+(`NavigationNotificationService.autoLinkMirroringActive`), then returns to our
+`MainActivity` so our screen is what gets mirrored:
 
 ```
-SWITCHING_TO_USB
-  ├─ USB button visible   (= WiFi mode active)
-  │     → click USB ──────────────────► finishConnection()
-  ├─ WiFi button visible  (= already USB mode)
-  │     → nothing to do ──────────────► finishConnection()
-  └─ neither yet visible  (UI still loading)
-        → retry up to USB_SWITCH_MAX_RETRIES (6),
-          then finishConnection() anyway
+startConnecting()
+  → poll every POLL_INTERVAL_MS (500 ms) for the Mirroring notification
+      ├─ notification seen ──────────────► finishConnection()
+      └─ not seen after MIRRORING_WAIT_MAX_POLLS (≈30 s)
+            → finishConnection() anyway
 
 finishConnection()
-  → state = IDLE
-  → return to our MainActivity
+  → return to our MainActivity  (after a short settle delay)
   → invoke onConnected  (→ AutoLinkService.scheduleConnectionCheck())
 ```
 
-The two buttons are mutually exclusive — AutoLink shows the toggle for the mode you're
-**not** in:
+Screen-capture consent is pre-granted on the rooted phone via
+`appops set com.link.autolink.pro PROJECT_MEDIA allow` (done at app start — see Android
+`CLAUDE.md`), so the systemui "Start now" capture dialog never appears.
 
-- `action_button_usb` visible ⇒ currently in **WiFi mode** ⇒ tap it to switch to USB.
-- `action_button_wifi` visible ⇒ **already in USB mode** ⇒ nothing to do.
-
-No device picking, no WiFi-mode scan, and no "Start now" click: screen-capture consent is
-pre-granted on the rooted phone via `appops set com.link.autolink.pro PROJECT_MEDIA allow`
-(done at app start — see Android `CLAUDE.md`), so the systemui capture dialog never
-appears.
+> The accessibility service is kept (rather than removed) because its presence is what
+> routes `launchAutoLink()` through the branch that arms `scheduleConnectionCheck()`, and
+> because `finishConnection()` brings our `MainActivity` back to the foreground.
 
 ### Enabling the service (root)
 
@@ -166,9 +161,5 @@ They live with the MirrorScreen speed cell so the app keeps a single GPS listene
 | `CONNECTION_CHECK_INTERVAL_MS` | 6 s | Service | Verification poll interval (×5) |
 | `MAX_AUTO_RETRIES` | 1 | Service | Retries if mirroring never starts |
 | `RETURN_DELAY_MS` | 2 s | Service | Delay before bouncing back when no a11y |
-| `POLL_INTERVAL_MS` | 500 ms | A11y | UI poll interval |
-| `TIMEOUT_MS` | 30 s | A11y | Overall connect timeout |
-| `USB_SWITCH_MAX_RETRIES` | 6 | A11y | Retries waiting for the mode buttons to appear |
-
-> **AutoLink-Pro-specific view IDs:** `action_button_usb` / `action_button_wifi` are read
-> by view ID and will break if that app updates its layout.
+| `POLL_INTERVAL_MS` | 500 ms | A11y | Mirroring-notification poll interval |
+| `MIRRORING_WAIT_MAX_POLLS` | 60 (≈30 s) | A11y | Max wait for the Mirroring notification before returning anyway |

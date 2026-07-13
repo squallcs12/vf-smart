@@ -44,7 +44,7 @@ class NavigationNotificationService : NotificationListenerService() {
         private const val MAPS_PACKAGE      = "com.google.android.apps.maps"
         private const val AUTOLINK_PACKAGE  = "com.link.autolink.pro"
         private const val TAG               = "NavNotifService"
-        private const val RELAUNCH_GRACE_MS = 3_000L
+        private const val RELAUNCH_GRACE_MS = 30_000L
 
         @Volatile @JvmField var autoLinkMirroringActive = false
     }

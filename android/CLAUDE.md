@@ -76,14 +76,16 @@ Enter the ESP32 IP manually in `SetupScreen` instead.
 ## AutoLink Auto-Connect
 
 The app auto-connects to AutoLink Pro screen mirroring hands-free: when the user
-gets in the car and plugs the phone in, the app launches AutoLink Pro and drives its UI
-through an accessibility service to switch it to USB mode and dismiss the "Start now"
-capture dialog, so the phone screen projects onto the car display. This is handled by
-`autolink/AutoLinkService` (foreground service: triggers, debounce, verification, side
-features) and `autolink/AutoLinkAccessibilityService` (drives the AutoLink Pro UI).
+gets in the car and plugs the phone in, the app launches AutoLink Pro (which is always
+in USB mode and auto-mirrors on launch, with screen-capture consent pre-granted via
+`appops` so the "Start now" dialog never appears) and then returns to its own screen, so
+the phone projects onto the car display. This is handled by `autolink/AutoLinkService`
+(foreground service: triggers, debounce, verification, side features) and
+`autolink/AutoLinkAccessibilityService` (returns to `MainActivity` after launch + arms
+the connection check).
 
 **See [`app/src/main/kotlin/com/daotranbang/vfsmart/autolink/AUTOLINK_FLOW.md`](app/src/main/kotlin/com/daotranbang/vfsmart/autolink/AUTOLINK_FLOW.md)**
-for the full flow: the four launch triggers, the accessibility state machine, the
+for the full flow: the four launch triggers, the return-to-app step, the
 connection verification/retry loop, side features (driving tracker, light reminder),
 exposed `StateFlow`s, and key constants. This flow assumes a **rooted phone** (the S20+).
 
