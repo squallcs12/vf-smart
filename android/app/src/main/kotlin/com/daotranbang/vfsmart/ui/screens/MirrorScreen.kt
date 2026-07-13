@@ -728,7 +728,8 @@ private const val CHARGER_KML_URL =
     "https://www.google.com/maps/d/kml?mid=1iIZ3L3KEKU0fg5XsIQ6hbRl7NVY8JNA&forcekml=1"
 private const val KML_CACHE_FILE = "charger_kml.json"
 
-private data class NearbyStation(val name: String, val distanceM: Double)
+private data class NearbyStation(val name: String, val distanceM: Double,
+                                 val lat: Double, val lon: Double)
 
 private fun haversineM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
     val r    = 6_371_000.0
@@ -823,7 +824,7 @@ private fun findClosestStation(context: Context, userLat: Double, userLon: Doubl
             val stLat = line.substring(i1 + 1, i2).toDoubleOrNull() ?: return@forEach
             val stLon = line.substring(i2 + 1).toDoubleOrNull() ?: return@forEach
             val dist  = haversineM(userLat, userLon, stLat, stLon)
-            if (dist < minDist) { minDist = dist; closest = NearbyStation(line.substring(0, i1), dist) }
+            if (dist < minDist) { minDist = dist; closest = NearbyStation(line.substring(0, i1), dist, stLat, stLon) }
         }
     }
     return closest
@@ -865,6 +866,33 @@ private fun OdoChargingCell(
         }
     }
 
+    // Double-tap → turn-by-turn directions to the closest station in Google Maps.
+    fun openDirections() {
+        val st = closest ?: return
+        val nav = android.content.Intent(
+            android.content.Intent.ACTION_VIEW,
+            android.net.Uri.parse("google.navigation:q=${st.lat},${st.lon}")
+        ).apply {
+            setPackage("com.google.android.apps.maps")
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(nav)
+        } catch (e: Exception) {
+            // Maps not installed / no navigation handler — fall back to a maps URL that
+            // still launches navigation directly (dir_action=navigate), from the current
+            // location, rather than showing the route preview.
+            try {
+                context.startActivity(android.content.Intent(
+                    android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse(
+                        "https://www.google.com/maps/dir/?api=1" +
+                        "&destination=${st.lat},${st.lon}&travelmode=driving&dir_action=navigate")
+                ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (_: Exception) {}
+        }
+    }
+
     var foregroundKey by remember { mutableIntStateOf(0) }
     LifecycleEventEffect(Lifecycle.Event.ON_START) { foregroundKey++ }
 
@@ -879,8 +907,12 @@ private fun OdoChargingCell(
         }
     }
 
+    @OptIn(ExperimentalFoundationApi::class)
     Column(modifier = modifier.fillMaxHeight()
-            .clickable(enabled = !recalculating) { scope.launch { recalc(refreshKml = true) } },
+            .combinedClickable(
+                enabled = !recalculating,
+                onDoubleClick = { openDirections() },
+            ) { scope.launch { recalc(refreshKml = true) } },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center) {
         if (recalculating) {
