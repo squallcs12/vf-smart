@@ -122,11 +122,13 @@ class AutoLinkService : Service() {
             CarConnection.CONNECTION_TYPE_PROJECTION -> {
                 Log.i(TAG, "Android Auto connected — triggering AutoLink")
                 _androidAutoConnected.value = true
+                ScreenAwakeController.keepAwake()   // wake + unlock, hold screen on for the session
                 launchAutoLink()
             }
             else -> {
                 Log.i(TAG, "Android Auto disconnected")
                 _androidAutoConnected.value = false
+                ScreenAwakeController.release()      // restore normal screen timeout
             }
         }
     }

@@ -128,6 +128,23 @@ Mirroring status is read from `NavigationNotificationService.autoLinkMirroringAc
 
 ---
 
+## Keep screen awake during the Android Auto session
+
+MediaProjection keeps capturing even after the phone's display times out, so if the
+screen sleeps the car shows a blank/locked screen. The `CarConnection` observer ties the
+display to the Android Auto session via `ScreenAwakeController` (root, rooted S20+ only):
+
+- **Android Auto connects** → `keepAwake()`: `input keyevent 224` (wake) +
+  `wm dismiss-keyguard` (unlock without password) + `svc power stayon true` (hold the
+  screen on for the whole session).
+- **Android Auto disconnects** → `release()`: `svc power stayon false` (restore the
+  normal timeout).
+
+A secure lock (PIN/pattern) still can't be auto-cleared; on a non-rooted device `su`
+fails and this is a no-op.
+
+---
+
 ## Driving speed & light reminder (moved out of this service)
 
 Vehicle speed and the night light reminder are **no longer owned by `AutoLinkService`**.
