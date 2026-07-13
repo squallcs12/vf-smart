@@ -41,6 +41,7 @@ class VF3Application : Application() {
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var cameraScanJob: Job? = null
+    private var autoLinkStartJob: Job? = null
 
     // AutoLink monitoring should only run while the head unit has power (car on).
     // This receiver lives for the whole process, so it can start the service again
@@ -49,17 +50,32 @@ class VF3Application : Application() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_POWER_CONNECTED -> {
-                    Log.i(TAG, "Power connected — starting AutoLinkService")
-                    AutoLinkService.start(context)
+                    Log.i(TAG, "Power connected — AutoLinkService starts in ${AUTOLINK_START_DELAY_MS / 1000}s")
+                    scheduleAutoLinkStart(context)
                     startCameraDetection(context)
                     repository.connectIfConfigured()
                 }
                 Intent.ACTION_POWER_DISCONNECTED -> {
                     Log.i(TAG, "Power disconnected — stopping AutoLinkService")
+                    autoLinkStartJob?.cancel()
                     AutoLinkService.stop(context)
                     cameraScanJob?.cancel()
                 }
             }
+        }
+    }
+
+    /**
+     * On power-up the car's systems (WiFi, AutoLink Pro, head unit) need a moment to
+     * come up, so wait [AUTOLINK_START_DELAY_MS] before kicking off the AutoLink launch
+     * flow. The job is cancelled if power drops during the wait (see [powerReceiver]).
+     */
+    private fun scheduleAutoLinkStart(context: Context) {
+        autoLinkStartJob?.cancel()
+        autoLinkStartJob = appScope.launch {
+            delay(AUTOLINK_START_DELAY_MS)
+            Log.i(TAG, "AutoLink start delay elapsed — starting AutoLinkService")
+            AutoLinkService.start(context)
         }
     }
 
@@ -107,8 +123,8 @@ class VF3Application : Application() {
         repository.connectIfConfigured()
         // Start immediately if the device is already on power at launch.
         if (isOnPower()) {
-            Log.i(TAG, "Already on power at startup — starting AutoLinkService")
-            AutoLinkService.start(this)
+            Log.i(TAG, "Already on power at startup — AutoLinkService starts in ${AUTOLINK_START_DELAY_MS / 1000}s")
+            scheduleAutoLinkStart(this)
             startCameraDetection(this)
         }
     }
@@ -123,6 +139,8 @@ class VF3Application : Application() {
 
     companion object {
         private const val TAG = "VF3App"
+        // Wait for the car's systems (WiFi/AutoLink/head unit) to come up after power-on.
+        private const val AUTOLINK_START_DELAY_MS = 30_000L
         // Scan once every 30 s for 5 minutes → 10 attempts.
         private const val CAMERA_SCAN_INTERVAL_MS = 30_000L
         private const val CAMERA_SCAN_ATTEMPTS = 10
