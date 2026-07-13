@@ -554,7 +554,7 @@ Each cell: centered icon (40dp) → large bold value (28sp, 1sp letter-spacing) 
 **Confirmed cells:**
 1. **Battery Voltage** — horizontal gauge bar + numeric value, color zones by voltage range
 2. **Clock** — large HH:MM from `time.current_time`, sun/moon icon from `time.is_night`
-3. **Trip Timer** — elapsed HH:MM since app came to foreground, tracked via `LifecycleEventEffect(ON_START)` + 1-second tick in `HomeScreen`. No icon. Resets each time app is foregrounded.
+3. **Trip Timer** — elapsed HH:MM since the current Android Auto session started, counted from `AutoLinkService.sessionStartedAt` + a 1-second tick in `MirrorScreen`. No icon. Resets when a new Android Auto session begins (or on manual tap-to-reset).
 
 **Still looking for 3 more features** — must be VF3-specific, not already on VF3 original screen.
 

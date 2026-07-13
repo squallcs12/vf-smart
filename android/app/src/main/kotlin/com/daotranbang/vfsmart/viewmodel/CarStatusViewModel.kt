@@ -3,6 +3,7 @@ package com.daotranbang.vfsmart.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.daotranbang.vfsmart.autolink.LightReminderSession
 import com.daotranbang.vfsmart.data.model.CarStatus
 import com.daotranbang.vfsmart.data.network.ConnectionState
 import com.daotranbang.vfsmart.data.repository.VF3Repository
@@ -25,14 +26,10 @@ class CarStatusViewModel @Inject constructor(
 
     companion object {
         private const val TAG = "CarStatusViewModel"
-        private const val LIGHT_REMINDER_INTERVAL_MS = 30_000L
     }
 
     // Track previous car lock state to detect lock events
     private var previousLockState: String? = null
-
-    // Track last light reminder time
-    private var lastLightReminderTime = 0L
 
     // Real-time car status from BLE
     val carStatus: StateFlow<CarStatus?> = repository.carStatus.stateIn(
@@ -88,44 +85,25 @@ class CarStatusViewModel @Inject constructor(
     }
 
     /**
-     * Check if headlights should be on but aren't (nighttime + driving + lights off)
-     * Mirrors ESP32 light_reminder.cpp logic with 30-second interval
+     * Check if headlights should be on but aren't (nighttime + driving + lights off).
+     * Mirrors ESP32 light_reminder.cpp conditions, but the phone voice plays at most
+     * once per Android Auto session (see [LightReminderSession]).
      */
     private fun checkLightReminder(status: CarStatus) {
         // Guard: reminder must be enabled
-        if (!status.lightReminderEnabled) {
-            lastLightReminderTime = 0L
-            return
-        }
-
-        // Guard: time must be synced
-        if (status.time?.synced != true) return
-
-        // Guard: must be nighttime
-        if (!status.time.isNight) {
-            lastLightReminderTime = 0L
-            return
-        }
-
+        if (!status.lightReminderEnabled) return
+        // Guard: time must be synced + nighttime
+        if (status.time?.synced != true || !status.time.isNight) return
         // Guard: must be in Drive
-        if (status.sensors.gearDrive != 1) {
-            lastLightReminderTime = 0L
-            return
-        }
-
+        if (status.sensors.gearDrive != 1) return
         // Guard: normal light must be off
-        if (status.lights.normalLight != 0) {
-            lastLightReminderTime = 0L
-            return
-        }
+        if (status.lights.normalLight != 0) return
 
-        // All conditions met - check interval
-        val now = System.currentTimeMillis()
-        if (now - lastLightReminderTime < LIGHT_REMINDER_INTERVAL_MS) return
+        // All conditions met — play once per session.
+        if (!LightReminderSession.claim()) return
 
         Log.d(TAG, "Light reminder: headlights off while driving at night")
         voiceWarningManager.warnLightsOff()
-        lastLightReminderTime = now
     }
 
     override fun onCleared() {

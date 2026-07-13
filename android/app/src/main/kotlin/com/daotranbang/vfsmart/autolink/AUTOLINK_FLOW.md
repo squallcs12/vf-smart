@@ -154,9 +154,12 @@ They live with the MirrorScreen speed cell so the app keeps a single GPS listene
   >5 km/h). The MirrorScreen GPS (the speed cell) is the only producer; it resets speed
   to 0 when it stops tracking. `MainActivity` reads `DrivingState.isMoving`.
 - The **light reminder** runs in `OdoGpsSpeedCell`: the first time speed exceeds 5 km/h
-  **at night** (hour ≥ 18 or < 6) it plays `R.raw.light_reminder` once via the shared
+  **at night** (hour ≥ 18 or < 6) it plays `R.raw.light_reminder` via the shared
   `util/playLightReminder` (ducks other audio with navigation-guidance focus). It plays
-  once per screen session.
+  **at most once per Android Auto session** via `LightReminderSession` — a shared gate
+  reset on the `CarConnection` PROJECTION event and also honored by
+  `CarStatusViewModel`'s ESP32-driven reminder, so the driver hears it once per session
+  regardless of which source fires first.
 
 ---
 

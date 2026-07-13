@@ -52,6 +52,8 @@ import com.daotranbang.vfsmart.data.model.TpmsData
 import com.daotranbang.vfsmart.data.model.TpmsTire
 import com.daotranbang.vfsmart.navigation.DrivingState
 import com.daotranbang.vfsmart.navigation.GpsState
+import com.daotranbang.vfsmart.autolink.AutoLinkService
+import com.daotranbang.vfsmart.autolink.LightReminderSession
 import com.daotranbang.vfsmart.navigation.NavigationNotificationService
 import com.daotranbang.vfsmart.navigation.NavigationState
 import com.daotranbang.vfsmart.data.network.ConnectionState
@@ -89,13 +91,15 @@ fun MirrorScreen(
     val tpmsData        = carStatus?.tpms
     val speedLimit: Int? = null
 
-    // Trip clock — resets each time screen comes to foreground
-    var foregroundTime by remember { mutableStateOf(System.currentTimeMillis()) }
-    LifecycleEventEffect(Lifecycle.Event.ON_START) { foregroundTime = System.currentTimeMillis() }
+    // Trip clock — counts from the start of the Android Auto session (resets when a new
+    // session begins), not per screen foreground. Manual reset still works.
+    val sessionStart by AutoLinkService.sessionStartedAt.collectAsStateWithLifecycle()
+    var tripStart by remember { mutableStateOf(sessionStart) }
+    LaunchedEffect(sessionStart) { tripStart = sessionStart }
     var tripTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) { while (true) { delay(1000); tripTick++ } }
-    val tripText = remember(tripTick, foregroundTime) {
-        val secs = (System.currentTimeMillis() - foregroundTime) / 1000
+    val tripText = remember(tripTick, tripStart) {
+        val secs = (System.currentTimeMillis() - tripStart) / 1000
         "${secs / 3600}:${((secs % 3600) / 60).toString().padStart(2, '0')}"
     }
 
@@ -122,7 +126,7 @@ fun MirrorScreen(
         speedLimit      = speedLimit,
         tripText        = tripText,
         onNavCellDoubleTap = onNavigateBack,
-        onResetTrip        = { foregroundTime = System.currentTimeMillis() }
+        onResetTrip        = { tripStart = System.currentTimeMillis() }
     )
 }
 
@@ -540,15 +544,13 @@ private fun OdoGpsSpeedCell(
         else           -> OdoNormal
     }
 
-    // Night "turn your lights on" reminder — plays once per screen session the
-    // first time the car exceeds 5 km/h between 18:00 and 06:00.
+    // Night "turn your lights on" reminder — plays at most once per Android Auto
+    // session the first time the car exceeds 5 km/h between 18:00 and 06:00.
     val context = LocalContext.current
-    var lightReminderPlayed by remember { mutableStateOf(false) }
     LaunchedEffect(hasSpeed, speedKmh) {
-        if (hasSpeed && speedKmh > 5f && !lightReminderPlayed) {
+        if (hasSpeed && speedKmh > 5f) {
             val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-            if (hour >= 18 || hour < 6) {
-                lightReminderPlayed = true
+            if ((hour >= 18 || hour < 6) && LightReminderSession.claim()) {
                 playLightReminder(context)
             }
         }

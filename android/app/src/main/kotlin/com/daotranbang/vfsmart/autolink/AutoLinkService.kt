@@ -122,7 +122,9 @@ class AutoLinkService : Service() {
             CarConnection.CONNECTION_TYPE_PROJECTION -> {
                 Log.i(TAG, "Android Auto connected — triggering AutoLink")
                 _androidAutoConnected.value = true
+                _sessionStartedAt.value = System.currentTimeMillis()  // trip timer counts from here
                 ScreenAwakeController.keepAwake()   // wake + unlock, hold screen on for the session
+                LightReminderSession.reset()        // allow one light reminder this session
                 launchAutoLink()
             }
             else -> {
@@ -266,6 +268,12 @@ class AutoLinkService : Service() {
 
         private val _androidAutoConnected = MutableStateFlow(false)
         val androidAutoConnected: StateFlow<Boolean> = _androidAutoConnected.asStateFlow()
+
+        // Timestamp (ms) the current Android Auto session started — the trip timer counts
+        // from here so it measures the drive, not just time-on-screen. Defaults to process
+        // start so it reads sensibly before the first session.
+        private val _sessionStartedAt = MutableStateFlow(System.currentTimeMillis())
+        val sessionStartedAt: StateFlow<Long> = _sessionStartedAt.asStateFlow()
         private const val NOTIFICATION_ID = 2001
         private const val AUTOLINK_PACKAGE       = "com.link.autolink.pro"
         private const val AUTOLINK_MAIN_ACTIVITY = "com.link.autolink.activity.MainActivity"
