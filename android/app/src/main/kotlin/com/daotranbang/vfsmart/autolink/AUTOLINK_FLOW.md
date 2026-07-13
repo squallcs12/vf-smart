@@ -138,7 +138,8 @@ display to the Android Auto session via `ScreenAwakeController` (root, rooted S2
   `wm dismiss-keyguard` (unlock without password) + `svc power stayon true` (hold the
   screen on for the whole session).
 - **Android Auto disconnects** → `release()`: `svc power stayon false` (restore the
-  normal timeout).
+  normal timeout), and a "Vui lòng đóng cửa sổ" (please close the windows) voice reminder
+  via `VoiceWarningManager` — only on a real connected→disconnected transition.
 
 A secure lock (PIN/pattern) still can't be auto-cleared; on a non-rooted device `su`
 fails and this is a no-op.

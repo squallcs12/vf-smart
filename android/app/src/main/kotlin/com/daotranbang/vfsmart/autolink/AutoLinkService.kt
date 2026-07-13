@@ -26,6 +26,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.navigation.NavigationNotificationService
 import com.daotranbang.vfsmart.ui.MainActivity
+import com.daotranbang.vfsmart.util.VoiceWarningManager
+import dagger.hilt.EntryPoint
+import dagger.hilt.EntryPoints
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
 
 class AutoLinkService : Service() {
 
@@ -34,6 +39,17 @@ class AutoLinkService : Service() {
     private var connectionCheckAttempt = 0
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var carConnection: CarConnection
+
+    /** Hilt entry point so this plain Service can reach the singleton voice manager. */
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface VoiceEntryPoint {
+        fun voiceWarningManager(): VoiceWarningManager
+    }
+
+    private val voiceWarningManager: VoiceWarningManager by lazy {
+        EntryPoints.get(applicationContext, VoiceEntryPoint::class.java).voiceWarningManager()
+    }
 
     // MediaController monitoring for double-press detection
     private val trackedControllers = mutableMapOf<MediaController, MediaController.Callback>()
@@ -129,8 +145,12 @@ class AutoLinkService : Service() {
             }
             else -> {
                 Log.i(TAG, "Android Auto disconnected")
+                val wasConnected = _androidAutoConnected.value
                 _androidAutoConnected.value = false
                 ScreenAwakeController.release()      // restore normal screen timeout
+                // Only on a real connected→disconnected transition (not the initial
+                // LiveData emission): remind the driver to close the windows.
+                if (wasConnected) voiceWarningManager.warnCloseWindows()
             }
         }
     }

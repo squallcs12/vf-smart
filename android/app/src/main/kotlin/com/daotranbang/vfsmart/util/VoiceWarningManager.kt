@@ -112,6 +112,13 @@ class VoiceWarningManager @Inject constructor(
     }
 
     /**
+     * Remind the driver to close the windows (e.g. when the Android Auto session ends).
+     */
+    fun warnCloseWindows() {
+        speak("Vui lòng đóng cửa sổ", repeatCount = 2)
+    }
+
+    /**
      * Stop any ongoing speech
      */
     fun stop() {

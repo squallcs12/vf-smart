@@ -1,6 +1,8 @@
 package com.daotranbang.vfsmart.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -42,6 +44,7 @@ fun DebugScreen(
             modifier = modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -103,6 +106,17 @@ fun DebugScreen(
                             icon = { Icon(Icons.Default.VolumeUp, contentDescription = null) }
                         )
                         Text(text = "Bạn chưa bật đèn (x2)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        ControlButton(
+                            text = stringResource(R.string.debug_test_close_windows),
+                            onClick = { debugViewModel.testCloseWindows() },
+                            icon = { Icon(Icons.Default.VolumeUp, contentDescription = null) }
+                        )
+                        Text(text = "Vui lòng đóng cửa sổ (x2)",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }

@@ -135,6 +135,7 @@
     <string name="debug_voice_warnings_desc">Kiểm tra cảnh báo giọng nói tiếng Việt</string>
     <string name="debug_test_window">Kiểm tra cảnh báo cửa sổ</string>
     <string name="debug_test_light">Kiểm tra nhắc đèn</string>
+    <string name="debug_test_close_windows">Kiểm tra nhắc đóng cửa sổ</string>
     <string name="debug_info">Thông tin</string>
     <string name="debug_tts_engine">Động cơ TTS:</string>
     <string name="debug_tts_value">Tiếng Việt (vi-VN)</string>

@@ -34,8 +34,15 @@ class DebugViewModel @Inject constructor(
         voiceWarningManager.warnLightsOff()
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        voiceWarningManager.shutdown()
+    /**
+     * Test the "close the windows" voice (played when the Android Auto session ends)
+     */
+    fun testCloseWindows() {
+        Log.d(TAG, "Testing close-windows voice")
+        voiceWarningManager.warnCloseWindows()
     }
+
+    // Note: do NOT shut down VoiceWarningManager here — it is an app-scoped @Singleton
+    // shared with CarStatusViewModel and AutoLinkService. Tearing it down when this
+    // screen-scoped ViewModel is cleared would kill TTS for the whole app.
 }

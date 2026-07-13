@@ -106,8 +106,7 @@ class CarStatusViewModel @Inject constructor(
         voiceWarningManager.warnLightsOff()
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        voiceWarningManager.shutdown()
-    }
+    // Note: do NOT shut down VoiceWarningManager here — it is an app-scoped @Singleton
+    // shared with DebugViewModel and AutoLinkService. Tearing it down when this
+    // screen-scoped ViewModel is cleared would kill TTS for the whole app.
 }
