@@ -1,8 +1,6 @@
 package com.daotranbang.vfsmart.ui
 
-import android.Manifest
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -17,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -24,6 +23,7 @@ import androidx.navigation.compose.rememberNavController
 import com.daotranbang.vfsmart.autolink.AccessibilityDisclosure
 import com.daotranbang.vfsmart.autolink.AutoLinkAccessibilityService
 import com.daotranbang.vfsmart.autolink.AutoLinkService
+import com.daotranbang.vfsmart.VF3Application
 import com.daotranbang.vfsmart.autolink.RootPermissionGranter
 import com.daotranbang.vfsmart.billing.BillingManager
 import com.daotranbang.vfsmart.navigation.DrivingState
@@ -41,6 +41,7 @@ import com.daotranbang.vfsmart.ui.screens.TpmsCalibrationScreen
 import com.daotranbang.vfsmart.ui.theme.VF3SmartTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -79,19 +80,16 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         // Connect to Play Billing and restore the "premium" subscription entitlement.
         billingManager.start()
-        // On the rooted head unit, silently grant every permission (runtime, notification
-        // listener, accessibility, screen-capture) so no dialog ever appears. If root is
-        // unavailable (e.g. the S20+), fall back to the in-app prompts below.
-        Thread {
-            val granted = RootPermissionGranter.grantAll(this, runtimePermissions())
-            if (granted) {
-                // Accessibility was enabled via root — record disclosure consent (Play
-                // policy gate) and kick off the AutoLink connect flow.
-                AccessibilityDisclosure.setAccepted(this, true)
-                AutoLinkService.start(this)
-            }
+        // The root grant (runtime perms, notification listener, accessibility, screen-
+        // capture) is owned by VF3Application and started at process creation, so it's
+        // already in flight before we get here. Await its result to drive the fallback
+        // dialogs and, on success, kick off the AutoLink connect flow. If root is
+        // unavailable (e.g. the S20+), it resolves false and the in-app prompts show.
+        lifecycleScope.launch {
+            val granted = (application as VF3Application).permissionGrant.await()
+            if (granted) AutoLinkService.start(this@MainActivity)
             rootGrant.value = if (granted) RootGrant.GRANTED else RootGrant.UNAVAILABLE
-        }.start()
+        }
 
         setContent {
             VF3SmartTheme {
@@ -258,18 +256,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Runtime permissions the app needs, by SDK level. Car comms are over WiFi
-     *  (HTTP + WebSocket), so no Bluetooth permissions are required. */
-    private fun runtimePermissions(): List<String> = buildList {
-        add(Manifest.permission.CAMERA)
-        add(Manifest.permission.ACCESS_FINE_LOCATION)
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-    }
+    /** Runtime permissions the app needs — shared with the root grant path so the two
+     *  never drift (see [RootPermissionGranter.requiredRuntimePermissions]). */
+    private fun runtimePermissions(): List<String> =
+        RootPermissionGranter.requiredRuntimePermissions()
 
     private fun missingPermissions(): List<String> = runtimePermissions()
         .filter { checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED }

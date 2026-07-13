@@ -1,7 +1,9 @@
 package com.daotranbang.vfsmart.autolink
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import com.daotranbang.vfsmart.navigation.NavigationNotificationService
 
@@ -20,6 +22,23 @@ import com.daotranbang.vfsmart.navigation.NavigationNotificationService
 object RootPermissionGranter {
 
     private const val TAG = "RootPermGranter"
+
+    /**
+     * Dangerous runtime permissions the app needs, by SDK level. Shared by the
+     * root `pm grant` path ([grantAll]) and MainActivity's in-app request path so
+     * the two never drift. Car comms are over WiFi (HTTP + WebSocket), so no
+     * Bluetooth permissions are required.
+     */
+    fun requiredRuntimePermissions(): List<String> = buildList {
+        add(Manifest.permission.CAMERA)
+        add(Manifest.permission.ACCESS_FINE_LOCATION)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     /**
      * Runs all grant commands via root. [runtimePermissions] is the SDK-dependent

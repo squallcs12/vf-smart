@@ -8,7 +8,9 @@ import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.Build
 import android.util.Log
+import com.daotranbang.vfsmart.autolink.AccessibilityDisclosure
 import com.daotranbang.vfsmart.autolink.AutoLinkService
+import com.daotranbang.vfsmart.autolink.RootPermissionGranter
 import com.daotranbang.vfsmart.data.ImouScanner
 import com.daotranbang.vfsmart.data.local.SecurePreferences
 import com.daotranbang.vfsmart.data.repository.VF3Repository
@@ -19,9 +21,11 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.HiltAndroidApp
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -42,6 +46,17 @@ class VF3Application : Application() {
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var cameraScanJob: Job? = null
     private var autoLinkStartJob: Job? = null
+
+    /**
+     * The one-shot root permission grant (runtime perms, notification listener,
+     * accessibility, screen-capture). Started at process creation so it runs before
+     * anything — including the power-on AutoLink start and MainActivity — depends on
+     * it. Resolves to `true` if root was available and the grants ran. Awaited by
+     * [scheduleAutoLinkStart] and by MainActivity so notification access is in place
+     * before the AutoLink flow begins, even on the very first run.
+     */
+    lateinit var permissionGrant: Deferred<Boolean>
+        private set
 
     // AutoLink monitoring should only run while the head unit has power (car on).
     // This receiver lives for the whole process, so it can start the service again
@@ -74,6 +89,10 @@ class VF3Application : Application() {
         autoLinkStartJob?.cancel()
         autoLinkStartJob = appScope.launch {
             delay(AUTOLINK_START_DELAY_MS)
+            // Don't start until the permission grant has settled — the AutoLink flow
+            // needs notification access + accessibility to work. Usually already done
+            // by the time the delay elapses; this only blocks if root is slow.
+            permissionGrant.await()
             Log.i(TAG, "AutoLink start delay elapsed — starting AutoLinkService")
             AutoLinkService.start(context)
         }
@@ -106,6 +125,26 @@ class VF3Application : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // Grant every permission via root as the very first thing the process does, so
+        // notification access (and the rest) is in place before any AutoLink start —
+        // including the power-on path, which can fire before MainActivity ever opens.
+        // On a non-rooted device this resolves to false and the in-app prompts take over.
+        //
+        // One-shot: the grants persist, so once root has succeeded on a prior start we
+        // skip the su session on every later launch. The flag only sticks on success,
+        // so a non-rooted device (or a transient root failure) keeps retrying each start.
+        permissionGrant = appScope.async {
+            if (rootGrantDone()) return@async true
+            val granted = RootPermissionGranter.grantAll(
+                this@VF3Application, RootPermissionGranter.requiredRuntimePermissions()
+            )
+            if (granted) {
+                AccessibilityDisclosure.setAccepted(this@VF3Application, true)
+                markRootGrantDone()
+            }
+            granted
+        }
+
         // Crashlytics auto-initializes via its ContentProvider; here we attach
         // diagnostics so reports tell us which of the two target devices crashed
         // (S20+ vs the armeabi-v7a head unit) and the ABI.
@@ -129,6 +168,14 @@ class VF3Application : Application() {
         }
     }
 
+    /** True once the root permission grant has succeeded on some earlier start. */
+    private fun rootGrantDone(): Boolean =
+        getSharedPreferences(PREFS_ROOT_GRANT, MODE_PRIVATE).getBoolean(KEY_ROOT_GRANTED, false)
+
+    private fun markRootGrantDone() =
+        getSharedPreferences(PREFS_ROOT_GRANT, MODE_PRIVATE)
+            .edit().putBoolean(KEY_ROOT_GRANTED, true).apply()
+
     private fun isOnPower(): Boolean {
         val plugged = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
             ?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) ?: -1
@@ -139,6 +186,9 @@ class VF3Application : Application() {
 
     companion object {
         private const val TAG = "VF3App"
+        // Persisted one-shot flag: root grant only needs to run until it succeeds once.
+        private const val PREFS_ROOT_GRANT = "root_grant"
+        private const val KEY_ROOT_GRANTED = "granted"
         // Wait for the car's systems (WiFi/AutoLink/head unit) to come up after power-on.
         private const val AUTOLINK_START_DELAY_MS = 30_000L
         // Scan once every 30 s for 5 minutes → 10 attempts.
