@@ -24,7 +24,6 @@ import com.daotranbang.vfsmart.ui.components.ControlButton
 import com.daotranbang.vfsmart.ui.components.HoldControlButton
 import com.daotranbang.vfsmart.ui.components.OutlinedControlButton
 import com.daotranbang.vfsmart.ui.components.ToggleControlButton
-import com.daotranbang.vfsmart.util.playLightReminder
 import com.daotranbang.vfsmart.viewmodel.CarStatusViewModel
 import com.daotranbang.vfsmart.viewmodel.ControlViewModel
 
@@ -119,10 +118,6 @@ fun HomeScreen(
                     IconButton(onClick = onNavigateToMirror) {
                         Icon(Icons.Default.Fullscreen,
                             contentDescription = stringResource(R.string.mirror_mode_cd))
-                    }
-                    IconButton(onClick = { playLightReminder(context) }) {
-                        Icon(Icons.Default.VolumeUp,
-                            contentDescription = stringResource(R.string.light_reminder_test_cd))
                     }
                     IconButton(onClick = onNavigateToDebug) {
                         Icon(Icons.Default.BugReport,

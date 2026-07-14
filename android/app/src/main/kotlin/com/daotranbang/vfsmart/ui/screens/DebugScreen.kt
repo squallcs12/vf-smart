@@ -9,11 +9,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.daotranbang.vfsmart.R
 import com.daotranbang.vfsmart.ui.components.ControlButton
+import com.daotranbang.vfsmart.util.playLightReminder
 import com.daotranbang.vfsmart.viewmodel.DebugViewModel
 
 @Composable
@@ -22,6 +24,7 @@ fun DebugScreen(
     modifier: Modifier = Modifier,
     debugViewModel: DebugViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     Scaffold(
         topBar = {
             @OptIn(ExperimentalMaterial3Api::class)
@@ -90,33 +93,22 @@ fun DebugScreen(
 
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         ControlButton(
-                            text = stringResource(R.string.debug_test_window),
-                            onClick = { debugViewModel.testWindowWarning() },
-                            icon = { Icon(Icons.Default.VolumeUp, contentDescription = null) }
-                        )
-                        Text(text = "Cửa sổ đang mở (x2)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        ControlButton(
-                            text = stringResource(R.string.debug_test_light),
-                            onClick = { debugViewModel.testLightReminder() },
-                            icon = { Icon(Icons.Default.VolumeUp, contentDescription = null) }
-                        )
-                        Text(text = "Bạn chưa bật đèn (x2)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        ControlButton(
                             text = stringResource(R.string.debug_test_close_windows),
                             onClick = { debugViewModel.testCloseWindows() },
                             icon = { Icon(Icons.Default.VolumeUp, contentDescription = null) }
                         )
                         Text(text = "Vui lòng đóng cửa sổ (x2)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        ControlButton(
+                            text = stringResource(R.string.debug_test_light_reminder),
+                            onClick = { playLightReminder(context) },
+                            icon = { Icon(Icons.Default.VolumeUp, contentDescription = null) }
+                        )
+                        Text(text = "Âm thanh nhắc bật đèn",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }

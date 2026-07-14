@@ -98,25 +98,18 @@ class VoiceWarningManager @Inject constructor(
     }
 
     /**
-     * Warn about open windows when car is locked
-     */
-    fun warnWindowsOpen() {
-        speak("Cửa sổ đang mở", repeatCount = 2)
-    }
-
-    /**
-     * Warn that headlights are not turned on (nighttime driving)
-     */
-    fun warnLightsOff() {
-        speak("Bạn chưa bật đèn", repeatCount = 2)
-    }
-
-    /**
      * Remind the driver to close the windows (e.g. when the Android Auto session ends).
      */
     fun warnCloseWindows() {
         speak("Vui lòng đóng cửa sổ", repeatCount = 2)
     }
+
+    /**
+     * No-op that exists to force creation of this singleton so its TTS engine starts
+     * initializing ahead of the first [speak] (called when an Android Auto session begins,
+     * so the "close windows" reminder is ready by the time the session ends).
+     */
+    fun prepare() { /* touching the singleton is enough — TTS inits in the constructor */ }
 
     /**
      * Stop any ongoing speech

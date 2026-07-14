@@ -133,9 +133,8 @@
     <string name="debug_mode_desc">Chỉ dùng để kiểm tra</string>
     <string name="debug_voice_warnings">Cảnh báo giọng nói</string>
     <string name="debug_voice_warnings_desc">Kiểm tra cảnh báo giọng nói tiếng Việt</string>
-    <string name="debug_test_window">Kiểm tra cảnh báo cửa sổ</string>
-    <string name="debug_test_light">Kiểm tra nhắc đèn</string>
     <string name="debug_test_close_windows">Kiểm tra nhắc đóng cửa sổ</string>
+    <string name="debug_test_light_reminder">Kiểm tra nhắc bật đèn</string>
     <string name="debug_info">Thông tin</string>
     <string name="debug_tts_engine">Động cơ TTS:</string>
     <string name="debug_tts_value">Tiếng Việt (vi-VN)</string>
@@ -170,7 +169,6 @@
     <string name="autolink_channel_name">Màn hình AutoLink</string>
     <string name="autolink_notif_text">Đang theo dõi AutoLink Pro</string>
     <string name="autolink_light_reminder">Trời đang tối, vui lòng bật đèn xe</string>
-    <string name="light_reminder_test_cd">Phát nhắc nhở đèn xe</string>
 
     <!-- CameraPreviewScreen -->
     <string name="camera_no_signal">KHÔNG CÓ TÍN HIỆU</string>

@@ -19,22 +19,6 @@ class DebugViewModel @Inject constructor(
     }
 
     /**
-     * Test the window warning voice
-     */
-    fun testWindowWarning() {
-        Log.d(TAG, "Testing window warning voice")
-        voiceWarningManager.warnWindowsOpen()
-    }
-
-    /**
-     * Test the light reminder voice
-     */
-    fun testLightReminder() {
-        Log.d(TAG, "Testing light reminder voice")
-        voiceWarningManager.warnLightsOff()
-    }
-
-    /**
      * Test the "close the windows" voice (played when the Android Auto session ends)
      */
     fun testCloseWindows() {

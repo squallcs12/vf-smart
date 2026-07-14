@@ -247,7 +247,9 @@ The light reminder beeps periodically when **all** of these hold:
 - Normal headlights are off
 - Light reminder is enabled (`light-reminder:on`)
 
-(The Android app mirrors this logic for its own voice warning; keep them aligned.)
+(This is the ESP32-side beep. The Android app no longer mirrors this logic — its
+former status-driven voice reminder was removed; the app now plays a GPS/clock-based
+"turn on your lights" reminder independently on the mirror screen.)
 
 ### Frunk safety / rate limiting
 

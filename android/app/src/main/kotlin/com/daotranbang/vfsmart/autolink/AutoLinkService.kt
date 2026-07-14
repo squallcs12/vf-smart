@@ -141,6 +141,7 @@ class AutoLinkService : Service() {
                 _sessionStartedAt.value = System.currentTimeMillis()  // trip timer counts from here
                 ScreenAwakeController.keepAwake()   // wake + unlock, hold screen on for the session
                 LightReminderSession.reset()        // allow one light reminder this session
+                voiceWarningManager.prepare()       // warm up TTS for the close-windows reminder
                 launchAutoLink()
             }
             else -> {
