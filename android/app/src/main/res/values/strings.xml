@@ -129,8 +129,6 @@
 
     <!-- DebugScreen -->
     <string name="debug_title">Menu Debug</string>
-    <string name="debug_mode_title">Chế độ Debug</string>
-    <string name="debug_mode_desc">Chỉ dùng để kiểm tra</string>
     <string name="debug_voice_warnings">Cảnh báo giọng nói</string>
     <string name="debug_voice_warnings_desc">Kiểm tra cảnh báo giọng nói tiếng Việt</string>
     <string name="debug_test_close_windows">Kiểm tra nhắc đóng cửa sổ</string>
